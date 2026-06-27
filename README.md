@@ -41,6 +41,11 @@ Each object in `items` supports these fields:
 | `images`       | `string[]`                  | Additional image gallery URLs            |
 | `temas`        | `{ title, desc, tone }[]`   | Topics / themes within the article       |
 
+## Preview
+
+![TimelineViewer screenshot 1](images/01.PNG)
+![TimelineViewer screenshot 2](images/02.PNG)
+
 ---
 
 *Vibecoded with [opencode](https://opencode.ai) and free AI models.*
