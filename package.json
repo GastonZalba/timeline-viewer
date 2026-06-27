@@ -1,0 +1,24 @@
+{
+  "name": "timeline-viewer",
+  "version": "1.0.0",
+  "description": "A frontend timeline card viewer for news articles with expandable details",
+  "type": "module",
+  "main": "src/TimelineViewer.js",
+  "module": "src/TimelineViewer.js",
+  "files": [
+    "src/"
+  ],
+  "scripts": {
+    "start": "node example/server.js",
+    "example": "node example/server.js"
+  },
+  "keywords": [
+    "timeline",
+    "cards",
+    "news",
+    "viewer",
+    "ui-component"
+  ],
+  "author": "Gastón Zalba",
+  "license": "MIT"
+}
