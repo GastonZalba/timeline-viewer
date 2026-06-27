@@ -1,14 +1,40 @@
 # TimelineViewer
 
-Interactive timeline component that displays news articles as an overlapping card stack with an expandable full timeline view.
+WORK IN PROGRESS. Interactive timeline component that displays news articles as an overlapping card stack with an expandable full timeline view.
 
-## Getting Started
+## Installation
 
 ```bash
-npm start
+npm install https://github.com/GastonZalba/timeline-viewer
 ```
 
-Opens `http://localhost:3010` — no build step required, just Node.js.
+## Usage
+
+```js
+import Timeline from 'timeline-viewer';
+
+new Timeline({
+  container: '#my-container',
+  items: [
+    {
+      id: 1,
+      title: 'Example article',
+      description: 'A short summary.',
+      date: '2026-06-27',
+      tone: 'positivo',
+      fuente: 'My Source',
+      image: 'https://picsum.photos/seed/example/600/400',
+      link: 'https://example.com',
+      protagonista: ['Someone'],
+      hasPdf: false,
+      images: [],
+      temas: []
+    }
+  ],
+  featuredCount: 6,
+  lastUpdated: '2026-06-27T12:00:00'
+});
+```
 
 ## Options
 
@@ -40,6 +66,14 @@ Each object in `items` supports these fields:
 | `hasPdf`       | `boolean`                   | PDF download available                   |
 | `images`       | `string[]`                  | Additional image gallery URLs            |
 | `temas`        | `{ title, desc, tone }[]`   | Topics / themes within the article       |
+
+## Development
+
+```bash
+npm start
+```
+
+Opens `http://localhost:3010` with a demo page — no build step required.
 
 ## Preview
 

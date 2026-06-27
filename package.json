@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/TimelineViewer.js",
   "module": "src/TimelineViewer.js",
+  "types": "src/TimelineViewer.d.ts",
   "files": [
     "src/"
   ],
