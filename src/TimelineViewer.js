@@ -63,23 +63,29 @@ export default class Timeline {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
+  _formatDateTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
   // ====== Render featured (overlapping) cards ======
   _renderFeatured(cards) {
     this.featuredContainer.innerHTML = '';
     cards.forEach((card, i) => {
       const el = document.createElement('div');
       el.className = 'featured-card';
-      const imgHtml = card.image
-        ? `<img class="card-image" src="${card.image}" alt="${card.title}" loading="lazy">`
+      const imgHtml = card.link_portada
+        ? `<img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy">`
         : '';
-      const protHtml = card.protagonista && card.protagonista.length
-        ? `<div class="card-protagonista"><span class="protagonista-label">Protagonistas:</span> ${card.protagonista.join(', ')}</div>`
-        : `<div class="card-protagonista"><span class="protagonista-label">Protagonistas:</span> -</div>`;
+      const protHtml = card.actores_principales && card.actores_principales.length
+        ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
+        : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
       el.innerHTML = `
         ${imgHtml}
         <div class="card-body">
-          <div class="card-date">${this._formatDate(card.date)}</div>
-          <div class="card-title">${card.title}</div>
+          <div class="card-date">${this._formatDate(card.fecha_publicacion)}</div>
+          <div class="card-title">${card.nombre_fuente}</div>
           ${protHtml}
         </div>
       `;
@@ -94,29 +100,29 @@ export default class Timeline {
       const el = document.createElement('div');
       el.className = 'timeline-item';
       el.style.transitionDelay = `${i * 0.08}s`;
-      const imgHtml = card.image
-        ? `<img class="card-image" src="${card.image}" alt="${card.title}" loading="lazy">`
+      const imgHtml = card.link_portada
+        ? `<img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy">`
         : '';
       const toneLabel = { positivo: 'Positivo', negativo: 'Negativo', neutro: 'Neutro' };
       const toneLabelTema = { positivo: 'Positivo', negativo: 'Negativo', neutro: 'Neutro' };
-      const protHtml = card.protagonista && card.protagonista.length
-        ? `<div class="card-protagonista"><span class="protagonista-label">Protagonistas:</span> ${card.protagonista.join(', ')}</div>`
-        : `<div class="card-protagonista"><span class="protagonista-label">Protagonistas:</span> -</div>`;
+      const protHtml = card.actores_principales && card.actores_principales.length
+        ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
+        : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
       const temasHtml = card.temas && card.temas.length
         ? `<div class="card-temas">${card.temas.map(t => `
-            <div class="tema-item tone-tema-${t.tone}">
+            <div class="tema-item tone-tema-${t.tono_social}">
               <div class="tema-header">
-                <span class="tema-title">${t.title}</span>
-                <span class="tema-tone">${toneLabelTema[t.tone]}</span>
+                <span class="tema-title">${t.titulo}</span>
+                <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
               </div>
-              <div class="tema-desc">${t.desc}</div>
+              <div class="tema-desc">${t.resumen}</div>
             </div>`).join('')}</div>`
         : '';
       const footerHtml = `<div class="card-footer">
         <div class="card-footer-sep"></div>
         <div class="card-footer-actions">
-          ${card.hasPdf ? '<button class="card-footer-btn" title="Descargar PDF"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> PDF</button>' : ''}
-          ${card.images && card.images.length ? '<button class="card-footer-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.images.length + '</span></button>' : ''}
+          ${card.hasCapture ? '<button class="card-footer-btn" title="Descargar Captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Captura</button>' : ''}
+          ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
           <button class="card-footer-btn card-open" title="Abrir enlace">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             Ir
@@ -125,37 +131,58 @@ export default class Timeline {
       </div>`;
       el.innerHTML = `
         <div class="timeline-date-col">
-          <div class="timeline-date">${this._formatDate(card.date)}</div>
+          <div class="timeline-date">${this._formatDate(card.fecha_publicacion)}</div>
           <div class="timeline-dot"></div>
           <div class="timeline-hline"></div>
         </div>
-        <div class="timeline-card${card.image ? '' : ' no-image'} tone-${card.tone}">
+        <div class="timeline-card${card.link_portada ? '' : ' no-image'} tone-${card.tono_social}">
           ${imgHtml}
           <div class="card-body">
-            <div class="card-title">${card.title}</div>
-            <div class="card-desc">${card.description}</div>
-            <div class="card-tone">${toneLabel[card.tone]}</div>
+            <div class="card-title">${card.nombre_fuente}</div>
+            <div class="card-desc">${card.resumen_ia}</div>
+            <div class="card-tone">${toneLabel[card.tono_social]}</div>
             ${temasHtml}
             <div class="card-hint"><span class="card-hint-arrow"></span></div>
             <button class="card-collapse" title="Colapsar"></button>
+            <button class="card-info-btn" title="Información">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            </button>
+            <div class="card-info-menu">
+              <div class="card-info-row">
+                <span class="card-info-label">ID</span>
+                <span class="card-info-value">${card.id}</span>
+              </div>
+              <div class="card-info-row">
+                <span class="card-info-label">Captura</span>
+                <span class="card-info-value">${this._formatDateTime(card.crawlDate)}</span>
+              </div>
+              <div class="card-info-row">
+                <span class="card-info-label">Tipo</span>
+                <span class="card-info-value">${card.tipo_medio}</span>
+              </div>
+            </div>
             ${protHtml}
-            <div class="card-fuente">${card.fuente}</div>
+            <div class="card-fuente">${card.fuente_institucional}</div>
             ${footerHtml}
           </div>
         </div>
       `;
       const cardEl = el.querySelector('.timeline-card');
       cardEl.addEventListener('click', (e) => {
-        if (e.target.closest('.card-open, .card-collapse')) return;
+        if (e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
         cardEl.classList.add('expanded');
       });
       cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
         e.stopPropagation();
         cardEl.classList.remove('expanded');
       });
+      cardEl.querySelector('.card-info-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        cardEl.querySelector('.card-info-menu').classList.toggle('open');
+      });
       cardEl.querySelector('.card-open').addEventListener('click', (e) => {
         e.stopPropagation();
-        if (card.link) window.open(card.link, '_blank', 'noopener');
+        if (card.link_web) window.open(card.link_web, '_blank', 'noopener');
       });
       this.timelineCards.appendChild(el);
     });
@@ -268,6 +295,12 @@ export default class Timeline {
     this.expandToggle.addEventListener('click', () => this._toggleExpand());
     this.fabCollapse.addEventListener('click', () => this._toggleExpand());
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.card-info-btn, .card-info-menu')) {
+        document.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
+      }
+    });
 
     window.addEventListener('scroll', () => {
       if (!this.isExpanded) return;

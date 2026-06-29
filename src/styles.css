@@ -468,6 +468,65 @@
   pointer-events: auto;
 }
 
+.card-info-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(0,0,0,0.3);
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.25s ease, background 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  pointer-events: none;
+  color: rgba(255,255,255,0.85);
+}
+.timeline-card.expanded .card-info-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.card-info-btn:hover {
+  background: rgba(0,0,0,0.6);
+}
+
+.card-info-menu {
+  display: none;
+  position: absolute;
+  top: 36px;
+  left: 8px;
+  background: #1e2a3a;
+  border: 1px solid var(--border-card);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 200px;
+  z-index: 20;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.card-info-menu.open {
+  display: block;
+}
+.card-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.card-info-label {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.card-info-value {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
 .timeline-card .card-protagonista {
   font-size: 0.8rem;
   color: var(--tone-neutral);

@@ -1,22 +1,23 @@
 export interface ItemTema {
-  title: string;
-  desc: string;
-  tone: 'positivo' | 'negativo' | 'neutro';
+  titulo: string;
+  resumen: string;
+  tono_social: 'positivo' | 'negativo' | 'neutro';
 }
 
 export interface TimelineItem {
   id: number | string;
-  title: string;
-  description: string;
-  date: string;
+  nombre_fuente: string;
+  resumen_ia: string;
+  fecha_publicacion: string;
   crawlDate: string;
-  tone: 'positivo' | 'negativo' | 'neutro';
-  fuente: string;
-  image: string | null;
-  link: string;
-  protagonista: string[];
-  hasPdf: boolean;
-  images: string[];
+  tono_social: 'positivo' | 'negativo' | 'neutro';
+  fuente_institucional: string;
+  tipo_medio: string;
+  link_portada: string | null;
+  link_web: string;
+  actores_principales: string[];
+  hasCapture: boolean;
+  imagenes: string[];
   temas: ItemTema[];
 }
 
