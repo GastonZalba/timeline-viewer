@@ -250,7 +250,7 @@
 
 .timeline-line {
   position: absolute;
-  left: 100px;
+  left: 110px;
   top: 0;
   bottom: 25px;
   width: 1px;
@@ -285,17 +285,20 @@
 }
 .timeline-item:has(.timeline-card.expanded) .timeline-dot {
   border: none;
-  width: 15px;
-  height: 15px;
-  right: -8px;
+  width: 13px;
+  height: 13px;
+  right: -7px;
 }
-
+.timeline-item:has(.timeline-card.expanded) .timeline-date {
+  font-size: 0.95rem;
+}
 .timeline-date-col {
-  width: 100px;
+  width: 110px;
   flex-shrink: 0;
   text-align: right;
   padding-right: 16px;
   position: relative;
+  text-transform: uppercase;
 }
 
 .timeline-dot {
@@ -311,7 +314,11 @@
   z-index: 2;
 }
 
+.timeline-item:has(.timeline-card.expanded) .timeline-hline {
+  display: block;
+}
 .timeline-hline {
+  display: none;
   position: absolute;
   right: -21px;
   top: 50%;
@@ -325,6 +332,7 @@
   font-size: 0.8rem;
   color: var(--accent);
   font-weight: 600;
+  line-height: 1;
 }
 
 .timeline-card {
@@ -710,6 +718,9 @@
     font-size: 0.7em;
     max-width: 80px;
   }
+  .timeline-item:has(.timeline-card.expanded) .timeline-date {
+    font-size: 0.8rem;
+  }
   .timeline-card.expanded .card-footer {
     width: 100%;
     overflow: auto;
@@ -730,10 +741,10 @@
     min-height: 30px;
   }
   .timeline-line {
-    left: 53px;
+    left: 63px;
   }
   .timeline-date-col {
-    width: 55px;
+    width: 65px;
     padding-right: 16px;
   }
   .timeline-dot {
