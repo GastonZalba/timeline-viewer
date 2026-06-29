@@ -153,12 +153,12 @@ export default class Timeline {
                 <span class="card-info-value">${card.id}</span>
               </div>
               <div class="card-info-row">
-                <span class="card-info-label">Captura</span>
-                <span class="card-info-value">${this._formatDateTime(card.crawlDate)}</span>
-              </div>
-              <div class="card-info-row">
                 <span class="card-info-label">Tipo</span>
                 <span class="card-info-value">${card.tipo_medio}</span>
+              </div>
+              <div class="card-info-row">
+                <span class="card-info-label">Captura</span>
+                <span class="card-info-value">${this._formatDateTime(card.crawlDate)}</span>
               </div>
             </div>
             ${protHtml}
