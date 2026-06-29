@@ -25,7 +25,7 @@ export default class Timeline {
         <div class="featured-row">
           <div class="noticias-top">
             <button class="expand-toggle" id="expand-toggle">
-              <span class="expand-text">Ver <span id="remaining-count">0</span> artículos</span>
+              <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">artículos relacionados</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
           </div>
@@ -164,10 +164,15 @@ export default class Timeline {
       const d = new Date(this.lastUpdated);
       const formatted = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
         ' a las ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-      const footer = document.createElement('div');
-      footer.className = 'timeline-footer';
-      footer.textContent = `Actualizado por última vez el ${formatted}.`;
-      this.timelineCards.appendChild(footer);
+      const el = document.createElement('div');
+      el.className = 'timeline-item timeline-footer-item';
+      el.innerHTML = `
+        <div class="timeline-date-col">
+          <div class="timeline-dot timeline-footer-dot"></div>
+        </div>
+        <div class="timeline-footer-text">Actualizado por última vez el ${formatted}.</div>
+      `;
+      this.timelineCards.appendChild(el);
     }
   }
 
@@ -245,7 +250,9 @@ export default class Timeline {
 
     const featured = this.allCards.slice(0, this.FEATURED_COUNT);
 
-    this.remainingCount.textContent = this.allCards.length;
+    const n = this.allCards.length;
+    this.remainingCount.textContent = n;
+    document.getElementById('remaining-text').textContent = n === 1 ? 'artículo relacionado' : 'artículos relacionados';
     this._renderFeatured(featured);
     this._renderTimeline(this.allCards);
 
