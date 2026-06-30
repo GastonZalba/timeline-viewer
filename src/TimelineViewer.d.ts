@@ -1,7 +1,7 @@
 export interface ItemTema {
   titulo: string;
   resumen: string;
-  tono_social: 'positivo' | 'negativo' | 'neutro';
+  tono_social: 'Positivo' | 'Negativo' | 'Neutro';
 }
 
 export interface TimelineItem {
@@ -9,8 +9,8 @@ export interface TimelineItem {
   nombre_fuente: string;
   resumen_ia: string;
   fecha_publicacion: string;
-  crawlDate: string;
-  tono_social: 'positivo' | 'negativo' | 'neutro';
+  fecha_scrapeo: string;
+  tono_social: 'Positivo' | 'Negativo' | 'Neutro';
   fuente_institucional: string;
   tipo_medio: string;
   link_portada: string | null;

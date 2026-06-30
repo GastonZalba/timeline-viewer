@@ -772,7 +772,11 @@
   max-width: 100px;
   margin-left: 6px;
 }
-
+.fab-icon-stack {
+  transform: rotate(90deg);
+  font-family: monospace;
+  font-size: 20px;
+}
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {
   .timeline-container {
@@ -784,7 +788,7 @@
   .fab-sticky-wrap {
     width: 45px;
   }
-  .fab-label {
+.fab-label {
     display: none;
   }
   .timeline-cards {

@@ -25,11 +25,11 @@ export default class Timeline {
         <div class="featured-row">
           <div class="noticias-top">
             <button class="expand-toggle" id="expand-toggle">
-              <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">artículos relacionados</span></span>
+              <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">publicaciones relacionadas</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
           </div>
-          <div class="featured-cards" id="featured-cards" title="Expandir artículos"></div>
+          <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
         </div>
         <div class="timeline-container" id="timeline-container">
           <div class="timeline-collapse-wrap">
@@ -37,9 +37,9 @@ export default class Timeline {
             <div class="timeline-content">
               <div class="timeline-cards" id="timeline-cards"></div>
               <div class="fab-sticky-wrap">
-                <button class="fab-collapse" id="fab-collapse" title="Ocultar timeline">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                  <span class="fab-label">Ocultar</span>
+                <button class="fab-collapse" id="fab-collapse" title="Colapsar timeline">
+                  <span class="fab-icon-stack">&gt;&lt;</span>
+                  <span class="fab-label">Colapsar</span>
                 </button>
               </div>
             </div>
@@ -108,14 +108,14 @@ export default class Timeline {
       const imgHtml = card.link_portada
         ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
         : '';
-      const toneLabel = { positivo: 'Positivo', negativo: 'Negativo', neutro: 'Neutro' };
-      const toneLabelTema = { positivo: 'Positivo', negativo: 'Negativo', neutro: 'Neutro' };
+      const toneLabel = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+      const toneLabelTema = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
       const protHtml = card.actores_principales && card.actores_principales.length
         ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
         : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
       const temasHtml = card.temas && card.temas.length
         ? `<div class="card-temas">${card.temas.map(t => `
-            <div class="tema-item tone-tema-${t.tono_social}">
+            <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
               <div class="tema-header">
                 <span class="tema-title">${t.titulo}</span>
                 <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
@@ -140,7 +140,7 @@ export default class Timeline {
           <div class="timeline-dot"></div>
           <div class="timeline-hline"></div>
         </div>
-        <div class="timeline-card${card.link_portada ? '' : ' no-image'} tone-${card.tono_social}">
+        <div class="timeline-card${card.link_portada ? '' : ' no-image'} tone-${card.tono_social.toLowerCase()}">
           ${imgHtml}
           <div class="card-body">
             <div class="card-title">${card.nombre_fuente}</div>
@@ -163,7 +163,7 @@ export default class Timeline {
               </div>
               <div class="card-info-row">
                 <span class="card-info-label">Captura</span>
-                <span class="card-info-value">${this._formatDateTime(card.crawlDate)}</span>
+                <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
               </div>
             </div>
             ${protHtml}
@@ -289,7 +289,7 @@ export default class Timeline {
 
     const n = this.allCards.length;
     this.remainingCount.textContent = n;
-    document.getElementById('remaining-text').textContent = n === 1 ? 'artículo relacionado' : 'artículos relacionados';
+    document.getElementById('remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
     this._renderTimeline(this.allCards);
 
