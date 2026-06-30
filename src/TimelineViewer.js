@@ -59,6 +59,7 @@ export default class Timeline {
 
   // ====== Helpers ======
   _formatDate(dateStr) {
+    if (!dateStr) return 'Sin fecha';
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   }
@@ -283,7 +284,11 @@ export default class Timeline {
   // ====== Init ======
   _init() {
     this._buildLayout();
-    this.allCards = this.items;
+    this.allCards = [...this.items].sort((a, b) => {
+      if (!a.fecha_publicacion) return 1;
+      if (!b.fecha_publicacion) return -1;
+      return new Date(b.fecha_publicacion) - new Date(a.fecha_publicacion);
+    });
 
     const featured = this.allCards.slice(0, this.FEATURED_COUNT);
 

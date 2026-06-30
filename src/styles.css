@@ -731,8 +731,8 @@
 }
 
 .fab-collapse {
-  height: 42px;
-  max-width: 42px;
+  height: 47px;
+  max-width: 52px;
   border: none;
   border-radius: 42px;
   background: rgba(59, 130, 246, 0.3);
@@ -776,6 +776,9 @@
   transform: rotate(90deg);
   font-family: monospace;
   font-size: 20px;
+  width: 24px;
+  height: 24px;
+  letter-spacing: 2px;
 }
 /* ===== RESPONSIVE ===== */
 @media (max-width: 768px) {

@@ -248,6 +248,28 @@ export default {
   },
   {
     id: 'FUE-00012',
+    nombre_fuente: 'Arquitectura de micro-frontends en produccion',
+    resumen_ia: 'Como implementar micro-frontends con Module Federation, con resultados mixtos en equipos distribuidos.',
+    link_portada: 'https://picsum.photos/seed/noticia13/600/400',
+    link_web: 'https://microfrontends.dev/case-study',
+    fecha_scrapeo: '2026-06-28T12:00:00',
+    tono_social: 'Neutro',
+    fuente_institucional: 'MicroFrontends.dev',
+    tipo_medio: 'Digital',
+    actores_principales: ['Module Federation Team', 'Sarah Connor'],
+    hasCapture: true,
+    imagenes: [
+      'https://picsum.photos/seed/noticia13a/600/400',
+      'https://picsum.photos/seed/noticia13b/600/400'
+    ],
+    temas: [
+      { titulo: 'Module Federation', resumen: 'Webpack 5 permite compartir modulos entre aplicaciones independientes', tono_social: 'Positivo' },
+      { titulo: 'Orquestacion', resumen: 'El shell principal maneja ruteo, autenticacion y estado global', tono_social: 'Neutro' },
+      { titulo: 'Despliegue', resumen: 'Cada micro-frontend se deploya independientemente sin afectar el resto', tono_social: 'Positivo' }
+    ]
+  },
+  {
+    id: 'FUE-00013',
     nombre_fuente: 'Accesibilidad web: un compromiso permanente',
     resumen_ia: 'Nuevas herramientas y estandares facilitan la creacion de experiencias inclusivas para todos los usuarios.',
     link_portada: 'https://picsum.photos/seed/noticia12/600/400',
@@ -272,5 +294,5 @@ export default {
       { titulo: 'Legislacion', resumen: 'Multas por incumplimiento de accesibilidad aumentan un 200%', tono_social: 'Negativo' },
       { titulo: 'Educacion', resumen: 'Crece la demanda de profesionales certificados en accesibilidad', tono_social: 'Neutro' }
     ]
-  }
+  } 
 ] };
