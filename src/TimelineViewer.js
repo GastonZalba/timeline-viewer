@@ -28,6 +28,18 @@ export default class Timeline {
               <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">publicaciones relacionadas</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
+            <div class="filter-wrap">
+              <button class="filter-toggle" id="filter-toggle" title="Filtrar por tono social">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+               <div class="filter-menu" id="filter-menu">
+                <div class="filter-header">Tono social</div>
+                <div class="filter-options" id="filter-options"></div>
+              </div>
+            </div>
+            <button class="sort-toggle" id="sort-toggle" title="Invertir orden">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 9 12 4 7 9"/><polyline points="17 15 12 20 7 15"/></svg>
+            </button>
           </div>
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
         </div>
@@ -37,14 +49,14 @@ export default class Timeline {
             <div class="timeline-content">
               <div class="timeline-cards" id="timeline-cards"></div>
               <div class="fab-sticky-wrap">
-                <button class="fab-collapse" id="fab-collapse" title="Colapsar timeline">
+                <button class="fab-collapse" id="fab-collapse" title="Colapsar publicaciones">
                   <span class="fab-icon-stack">&gt;&lt;</span>
                   <span class="fab-label">Colapsar</span>
                 </button>
               </div>
+              </div>
             </div>
           </div>
-        </div>
       </section>
     `;
     this.section = document.getElementById('noticias-section');
@@ -55,6 +67,11 @@ export default class Timeline {
     this.remainingCount = document.getElementById('remaining-count');
     this.expandIcon = document.getElementById('expand-icon');
     this.fabCollapse = document.getElementById('fab-collapse');
+    this.sortToggle = document.getElementById('sort-toggle');
+    this.sortAscending = false;
+    this.filterToggle = document.getElementById('filter-toggle');
+    this.filterMenu = document.getElementById('filter-menu');
+    this.filterOptions = document.getElementById('filter-options');
   }
 
   // ====== Helpers ======
@@ -281,22 +298,73 @@ export default class Timeline {
     }
   }
 
-  // ====== Init ======
-  _init() {
-    this._buildLayout();
-    this.allCards = [...this.items].sort((a, b) => {
-      if (!a.fecha_publicacion) return 1;
-      if (!b.fecha_publicacion) return -1;
-      return new Date(b.fecha_publicacion) - new Date(a.fecha_publicacion);
+  // ====== Toggle timeline sort order ======
+  _toggleSort() {
+    this.sortAscending = !this.sortAscending;
+    this.sortToggle.classList.toggle('asc', this.sortAscending);
+    this._applyFilters();
+  }
+
+  // ====== Build filter checkboxes from data ======
+  _buildFilterCheckboxes() {
+    const tones = [...new Set(this.items.map(c => c.tono_social))];
+    this.filterOptions.innerHTML = '';
+    this.filterCheckboxes = [];
+    tones.forEach(tone => {
+      const label = document.createElement('label');
+      label.className = 'filter-option';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = tone;
+      cb.checked = true;
+      const span = document.createElement('span');
+      span.textContent = tone;
+      label.appendChild(cb);
+      label.appendChild(span);
+      cb.addEventListener('change', () => this._applyFilters());
+      this.filterOptions.appendChild(label);
+      this.filterCheckboxes.push(cb);
     });
+  }
 
+  // ====== Filter by tone ======
+  _applyFilters() {
+    const active = new Set();
+    this.filterCheckboxes.forEach(cb => {
+      if (cb.checked) active.add(cb.value);
+    });
+    this.allCards = this._originalCards.filter(c => active.has(c.tono_social));
+    if (this.sortAscending) this.allCards.reverse();
+    this._renderAll();
+  }
+
+  // ====== Render featured + timeline ======
+  _renderAll() {
     const featured = this.allCards.slice(0, this.FEATURED_COUNT);
-
     const n = this.allCards.length;
     this.remainingCount.textContent = n;
     document.getElementById('remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
     this._renderTimeline(this.allCards);
+    requestAnimationFrame(() => {
+      this.featuredContainer.querySelectorAll('.featured-card').forEach(c => c.classList.add('visible'));
+    });
+    if (this.isExpanded) {
+      requestAnimationFrame(() => this._setupTimelineObserver());
+    }
+  }
+
+  // ====== Init ======
+  _init() {
+    this._buildLayout();
+    this._buildFilterCheckboxes();
+    this._originalCards = [...this.items].sort((a, b) => {
+      if (!a.fecha_publicacion) return 1;
+      if (!b.fecha_publicacion) return -1;
+      return new Date(b.fecha_publicacion) - new Date(a.fecha_publicacion);
+    });
+    this.allCards = [...this._originalCards];
+    this._renderAll();
 
     if (this.allCards.length <= 3) {
       this.fabCollapse.style.display = 'none';
@@ -310,10 +378,21 @@ export default class Timeline {
     this.expandToggle.addEventListener('click', () => this._toggleExpand());
     this.fabCollapse.addEventListener('click', () => this._toggleExpand());
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
+    this.sortToggle.addEventListener('click', () => this._toggleSort());
+    this.filterToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.filterMenu.classList.toggle('open');
+    });
+    this.filterCheckboxes.forEach(cb => {
+      cb.addEventListener('change', () => this._applyFilters());
+    });
 
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.card-info-btn, .card-info-menu')) {
         document.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
+      }
+      if (!e.target.closest('.filter-wrap')) {
+        this.filterMenu.classList.remove('open');
       }
     });
 
