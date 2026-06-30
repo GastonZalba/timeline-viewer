@@ -76,7 +76,7 @@ export default class Timeline {
       const el = document.createElement('div');
       el.className = 'featured-card';
       const imgHtml = card.link_portada
-        ? `<img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy">`
+        ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
         : '';
       const protHtml = card.actores_principales && card.actores_principales.length
         ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
@@ -89,6 +89,11 @@ export default class Timeline {
           ${protHtml}
         </div>
       `;
+      const featuredImg = el.querySelector('.card-image');
+      if (featuredImg) {
+        featuredImg.addEventListener('load', () => featuredImg.classList.add('loaded'));
+        if (featuredImg.complete) featuredImg.classList.add('loaded');
+      }
       this.featuredContainer.appendChild(el);
     });
   }
@@ -101,7 +106,7 @@ export default class Timeline {
       el.className = 'timeline-item';
       el.style.transitionDelay = `${i * 0.08}s`;
       const imgHtml = card.link_portada
-        ? `<img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy">`
+        ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
         : '';
       const toneLabel = { positivo: 'Positivo', negativo: 'Negativo', neutro: 'Neutro' };
       const toneLabelTema = { positivo: 'Positivo', negativo: 'Negativo', neutro: 'Neutro' };
@@ -167,6 +172,11 @@ export default class Timeline {
           </div>
         </div>
       `;
+      const timelineImg = el.querySelector('.card-image');
+      if (timelineImg) {
+        timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
+        if (timelineImg.complete) timelineImg.classList.add('loaded');
+      }
       const cardEl = el.querySelector('.timeline-card');
       cardEl.addEventListener('click', (e) => {
         if (e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
