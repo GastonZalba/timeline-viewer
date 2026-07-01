@@ -26,6 +26,7 @@ export interface TimelineOptions {
   items?: TimelineItem[];
   featuredCount?: number;
   lastUpdated?: string;
+  itemsPerPage?: number;
 }
 
 export default class Timeline {

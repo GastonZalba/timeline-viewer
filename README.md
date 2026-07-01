@@ -47,6 +47,7 @@ The `Timeline` constructor accepts a single config object:
 | `container`     | `string` (CSS selector/Element)| **required** | DOM element to mount into          |
 | `items`         | `Array`                        | `[]`       | Array of article card objects        |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
+| `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
 
 ### Item fields

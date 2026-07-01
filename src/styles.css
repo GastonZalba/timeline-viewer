@@ -42,7 +42,7 @@
   background: none;
   border: 1px solid var(--accent);
   color: var(--accent);
-  padding: 8px 18px 8px 12px;
+  padding: 8px 14px 8px 7px;
   border-radius: 42px;
   cursor: pointer;
   font-size: 0.7rem;
@@ -51,7 +51,7 @@
   transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
 }
 .expand-toggle:hover {
   background: var(--accent);
@@ -985,6 +985,39 @@
   .card-footer-btn {
     justify-content: center;
   }
+}
+
+/* ===== LOAD MORE BUTTON ===== */
+.timeline-load-more-item {
+  opacity: 1 !important;
+  transform: none !important;
+  margin-bottom: 0;
+}
+.timeline-load-more-dot {
+  display: none;
+}
+.timeline-load-more-wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  margin-left: 25px;
+  margin-bottom: 30px;
+}
+.timeline-load-more-btn {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 8px 18px;
+  border-radius: 42px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 100;
+  transition: all 0.3s ease;
+}
+.timeline-load-more-btn:hover {
+  background: var(--accent);
+  color: var(--text-on-primary);
 }
 
 /* ===== TIMELINE FOOTER ===== */

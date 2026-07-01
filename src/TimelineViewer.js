@@ -6,6 +6,8 @@ export default class Timeline {
     this.items = config.items || [];
     this.FEATURED_COUNT = config.featuredCount || 6;
     this.lastUpdated = config.lastUpdated || '';
+    this.itemsPerPage = config.itemsPerPage !== undefined ? config.itemsPerPage : 10;
+    this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
     this.featuredContainer = null;
@@ -116,103 +118,118 @@ export default class Timeline {
     });
   }
 
+  // ====== Create a single timeline item element ======
+  _createTimelineItem(card, index) {
+    const el = document.createElement('div');
+    el.className = 'timeline-item';
+    el.style.transitionDelay = `${index * 0.08}s`;
+    const imgHtml = card.link_portada
+      ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
+      : '';
+    const toneLabel = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+    const toneLabelTema = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+    const protHtml = card.actores_principales && card.actores_principales.length
+      ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
+      : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
+    const temasHtml = card.temas && card.temas.length
+      ? `<div class="card-temas">${card.temas.map(t => `
+          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
+            <div class="tema-header">
+              <span class="tema-title">${t.titulo}</span>
+              <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
+            </div>
+            <div class="tema-desc">${t.resumen}</div>
+          </div>`).join('')}</div>`
+      : '';
+    const footerHtml = `<div class="card-footer">
+      <div class="card-footer-sep"></div>
+      <div class="card-footer-actions">
+        ${card.hasCapture ? '<button class="card-footer-btn" title="Descargar Captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Captura</button>' : ''}
+        ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
+        <button class="card-footer-btn card-open" title="Abrir enlace">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Ir
+        </button>
+      </div>
+    </div>`;
+    el.innerHTML = `
+      <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
+        <div class="timeline-date">${this._formatDate(card.fecha_publicacion)}</div>
+        <div class="timeline-dot"></div>
+        <div class="timeline-hline"></div>
+      </div>
+      <div class="timeline-card${card.link_portada ? '' : ' no-image'} tone-${card.tono_social.toLowerCase()}">
+        ${imgHtml}
+        <div class="card-body">
+          <div class="card-title">${card.nombre_fuente}</div>
+          <div class="card-desc">${card.resumen_ia}</div>
+          <div class="card-tone">${toneLabel[card.tono_social]}</div>
+          ${temasHtml}
+          <div class="card-hint"><span class="card-hint-arrow"></span></div>
+          <button class="card-collapse" title="Colapsar"></button>
+          <button class="card-info-btn" title="Información">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          </button>
+          <div class="card-info-menu">
+            <div class="card-info-row">
+              <span class="card-info-label">ID</span>
+              <span class="card-info-value">${card.id}</span>
+            </div>
+            <div class="card-info-row">
+              <span class="card-info-label">Tipo</span>
+              <span class="card-info-value">${card.tipo_medio}</span>
+            </div>
+            <div class="card-info-row">
+              <span class="card-info-label">Captura</span>
+              <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
+            </div>
+          </div>
+          ${protHtml}
+          <div class="card-fuente">${card.fuente_institucional}</div>
+          ${footerHtml}
+        </div>
+      </div>
+    `;
+    const timelineImg = el.querySelector('.card-image');
+    if (timelineImg) {
+      timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
+      if (timelineImg.complete) timelineImg.classList.add('loaded');
+    }
+    const cardEl = el.querySelector('.timeline-card');
+    cardEl.addEventListener('click', (e) => {
+      if (e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
+      cardEl.classList.add('expanded');
+    });
+    cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
+      e.stopPropagation();
+      cardEl.classList.remove('expanded');
+    });
+    cardEl.querySelector('.card-info-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      cardEl.querySelector('.card-info-menu').classList.toggle('open');
+    });
+    cardEl.querySelector('.card-open').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (card.link_web) window.open(card.link_web, '_blank', 'noopener');
+    });
+    return el;
+  }
+
+  // ====== Insert element before timeline footer ======
+  _insertBeforeFooter(el) {
+    const footer = this.timelineCards.querySelector('.timeline-footer-item');
+    if (footer) {
+      this.timelineCards.insertBefore(el, footer);
+    } else {
+      this.timelineCards.appendChild(el);
+    }
+  }
+
   // ====== Render timeline cards ======
   _renderTimeline(cards) {
     this.timelineCards.innerHTML = '';
     cards.forEach((card, i) => {
-      const el = document.createElement('div');
-      el.className = 'timeline-item';
-      el.style.transitionDelay = `${i * 0.08}s`;
-      const imgHtml = card.link_portada
-        ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
-        : '';
-      const toneLabel = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
-      const toneLabelTema = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
-      const protHtml = card.actores_principales && card.actores_principales.length
-        ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
-        : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
-      const temasHtml = card.temas && card.temas.length
-        ? `<div class="card-temas">${card.temas.map(t => `
-            <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
-              <div class="tema-header">
-                <span class="tema-title">${t.titulo}</span>
-                <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
-              </div>
-              <div class="tema-desc">${t.resumen}</div>
-            </div>`).join('')}</div>`
-        : '';
-      const footerHtml = `<div class="card-footer">
-        <div class="card-footer-sep"></div>
-        <div class="card-footer-actions">
-          ${card.hasCapture ? '<button class="card-footer-btn" title="Descargar Captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Captura</button>' : ''}
-          ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
-          <button class="card-footer-btn card-open" title="Abrir enlace">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            Ir
-          </button>
-        </div>
-      </div>`;
-      el.innerHTML = `
-        <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
-          <div class="timeline-date">${this._formatDate(card.fecha_publicacion)}</div>
-          <div class="timeline-dot"></div>
-          <div class="timeline-hline"></div>
-        </div>
-        <div class="timeline-card${card.link_portada ? '' : ' no-image'} tone-${card.tono_social.toLowerCase()}">
-          ${imgHtml}
-          <div class="card-body">
-            <div class="card-title">${card.nombre_fuente}</div>
-            <div class="card-desc">${card.resumen_ia}</div>
-            <div class="card-tone">${toneLabel[card.tono_social]}</div>
-            ${temasHtml}
-            <div class="card-hint"><span class="card-hint-arrow"></span></div>
-            <button class="card-collapse" title="Colapsar"></button>
-            <button class="card-info-btn" title="Información">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            </button>
-            <div class="card-info-menu">
-              <div class="card-info-row">
-                <span class="card-info-label">ID</span>
-                <span class="card-info-value">${card.id}</span>
-              </div>
-              <div class="card-info-row">
-                <span class="card-info-label">Tipo</span>
-                <span class="card-info-value">${card.tipo_medio}</span>
-              </div>
-              <div class="card-info-row">
-                <span class="card-info-label">Captura</span>
-                <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
-              </div>
-            </div>
-            ${protHtml}
-            <div class="card-fuente">${card.fuente_institucional}</div>
-            ${footerHtml}
-          </div>
-        </div>
-      `;
-      const timelineImg = el.querySelector('.card-image');
-      if (timelineImg) {
-        timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
-        if (timelineImg.complete) timelineImg.classList.add('loaded');
-      }
-      const cardEl = el.querySelector('.timeline-card');
-      cardEl.addEventListener('click', (e) => {
-        if (e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
-        cardEl.classList.add('expanded');
-      });
-      cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
-        e.stopPropagation();
-        cardEl.classList.remove('expanded');
-      });
-      cardEl.querySelector('.card-info-btn').addEventListener('click', (e) => {
-        e.stopPropagation();
-        cardEl.querySelector('.card-info-menu').classList.toggle('open');
-      });
-      cardEl.querySelector('.card-open').addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (card.link_web) window.open(card.link_web, '_blank', 'noopener');
-      });
-      this.timelineCards.appendChild(el);
+      this.timelineCards.appendChild(this._createTimelineItem(card, i));
     });
 
     if (this.lastUpdated) {
@@ -354,6 +371,7 @@ export default class Timeline {
     });
     this.allCards = this._originalCards.filter(c => active.has(c.tono_social));
     if (this.sortAscending) this.allCards.reverse();
+    if (this.itemsPerPage > 0) this._displayedCount = this.itemsPerPage;
     this._renderAll();
   }
 
@@ -364,13 +382,55 @@ export default class Timeline {
     this.remainingCount.textContent = this._originalCards.length;
     this.container.querySelector('#remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
-    this._renderTimeline(this.allCards);
+    const displayCards = this.itemsPerPage > 0
+      ? this.allCards.slice(0, this._displayedCount)
+      : this.allCards;
+    this._renderTimeline(displayCards);
+    if (this.itemsPerPage > 0 && this._displayedCount < this.allCards.length) {
+      this._renderLoadMoreButton();
+    }
     requestAnimationFrame(() => {
       this.featuredContainer.querySelectorAll('.featured-card').forEach(c => c.classList.add('visible'));
     });
     if (this.isExpanded) {
       requestAnimationFrame(() => this._setupTimelineObserver());
     }
+  }
+
+  // ====== Render load more button ======
+  _renderLoadMoreButton() {
+    const el = document.createElement('div');
+    el.className = 'timeline-item timeline-load-more-item';
+    el.innerHTML = `
+      <div class="timeline-date-col">
+        <div class="timeline-dot timeline-load-more-dot"></div>
+      </div>
+      <div class="timeline-load-more-wrap">
+        <button class="timeline-load-more-btn">Cargar m&aacute;s</button>
+      </div>
+    `;
+    el.querySelector('.timeline-load-more-btn').addEventListener('click', () => {
+      const start = this._displayedCount;
+      const end = Math.min(start + this.itemsPerPage, this.allCards.length);
+      const more = this.allCards.slice(start, end);
+
+      el.remove();
+
+      more.forEach((card, i) => {
+        this._insertBeforeFooter(this._createTimelineItem(card, i));
+      });
+
+      this._displayedCount = end;
+
+      if (this._displayedCount < this.allCards.length) {
+        this._renderLoadMoreButton();
+      }
+
+      if (this.isExpanded) {
+        requestAnimationFrame(() => this._setupTimelineObserver());
+      }
+    });
+    this._insertBeforeFooter(el);
   }
 
   // ====== Init ======
@@ -383,6 +443,7 @@ export default class Timeline {
       return new Date(b.fecha_publicacion) - new Date(a.fecha_publicacion);
     });
     this.allCards = [...this._originalCards];
+    if (this.itemsPerPage > 0) this._displayedCount = this.itemsPerPage;
     this._renderAll();
 
     if (this.allCards.length <= 3) {
