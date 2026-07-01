@@ -17,22 +17,24 @@ new Timeline({
   container: '#my-container',
   items: [
     {
-      id: 1,
-      title: 'Example article',
-      description: 'A short summary.',
-      date: '2026-06-27',
-      tone: 'positivo',
-      fuente: 'My Source',
-      image: 'https://picsum.photos/seed/example/600/400',
-      link: 'https://example.com',
-      protagonista: ['Someone'],
-      hasPdf: false,
-      images: [],
+      id: 'FUE-00001',
+      nombre_fuente: 'Lanzamiento del nuevo framework de JavaScript',
+      resumen_ia: 'El nuevo framework promete revolucionar la forma en que construimos aplicaciones web.',
+      link_portada: 'https://picsum.photos/seed/noticia1/600/400',
+      link_web: 'https://dev.to/news/javascript-framework-2026',
+      fecha_publicacion: '2026-06-25',
+      fecha_scrapeo: '2026-06-25T14:30:00',
+      tono_social: 'Positivo',
+      fuente_institucional: 'Dev.to',
+      tipo_medio: 'Digital',
+      actores_principales: ['Ana García', 'Carlos Ruiz'],
+      hasCapture: true,
+      imagenes: [],
       temas: []
     }
   ],
   featuredCount: 6,
-  lastUpdated: '2026-06-27T12:00:00'
+  lastUpdated: '2026-06-25T14:30:00'
 });
 ```
 
@@ -51,21 +53,22 @@ The `Timeline` constructor accepts a single config object:
 
 Each object in `items` supports these fields:
 
-| Field          | Type                        | Description                              |
-|----------------|-----------------------------|------------------------------------------|
-| `id`           | `number` / `string`         | Unique identifier                        |
-| `title`        | `string`                    | Article headline                         |
-| `description`  | `string`                    | Short summary                            |
-| `date`         | `string` (YYYY-MM-DD)       | Publication date                         |
-| `crawlDate`    | `string` (ISO)              | When it was crawled                      |
-| `tone`         | `"positivo"` / `"negativo"` / `"neutro"` | Overall sentiment       |
-| `fuente`       | `string`                    | Source / publication name                |
-| `image`        | `string` (URL) / `null`     | Main card image                          |
-| `link`         | `string` (URL)              | External article link                    |
-| `protagonista` | `string[]`                  | Key people or entities                   |
-| `hasPdf`       | `boolean`                   | PDF download available                   |
-| `images`       | `string[]`                  | Additional image gallery URLs            |
-| `temas`        | `{ title, desc, tone }[]`   | Topics / themes within the article       |
+| Field                  | Type                        | Description                              |
+|------------------------|-----------------------------|------------------------------------------|
+| `id`                   | `string`                    | Unique identifier (e.g. `FUE-00001`)    |
+| `nombre_fuente`        | `string`                    | Article headline                         |
+| `resumen_ia`           | `string`                    | AI-generated short summary               |
+| `link_portada`         | `string` (URL) / `null`     | Main card image                          |
+| `link_web`             | `string` (URL)              | External article link                    |
+| `fecha_publicacion`    | `string` (YYYY-MM-DD)       | Publication date                         |
+| `fecha_scrapeo`        | `string` (ISO)              | When it was crawled                      |
+| `tono_social`          | `"Positivo"` / `"Negativo"` / `"Neutro"` | Overall sentiment       |
+| `fuente_institucional` | `string`                    | Source / publication name                |
+| `tipo_medio`           | `string`                    | Media type (e.g. `"Digital"`)            |
+| `actores_principales`  | `string[]`                  | Key people or entities                   |
+| `hasCapture`           | `boolean`                   | Screenshot capture available             |
+| `imagenes`             | `string[]`                  | Additional image gallery URLs            |
+| `temas`                | `{ titulo, resumen, tono_social }[]` | Topics / themes within the article |
 
 ## Development
 
