@@ -62,7 +62,10 @@ export default class Timeline {
               <div class="timeline-cards" id="timeline-cards"></div>
               <div class="fab-sticky-wrap">
                 <button class="fab-collapse" id="fab-collapse" title="Colapsar publicaciones">
-                  <span class="fab-icon-stack">&gt;&lt;</span>
+                  <span class="fab-icon-stack">
+                    <svg class="fab-chevron-right" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,4 17,12 9,20"/></svg>
+                    <svg class="fab-chevron-left" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,4 7,12 15,20"/></svg>
+                  </span>
                   <span class="fab-label">Colapsar</span>
                 </button>
               </div>
