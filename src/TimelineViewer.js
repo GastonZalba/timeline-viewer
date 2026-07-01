@@ -1,5 +1,6 @@
 import lightGallery from '../node_modules/lightgallery/lightgallery.es5.js';
 import lgThumbnail from '../node_modules/lightgallery/plugins/thumbnail/lg-thumbnail.es5.js';
+import lgZoom from '../node_modules/lightgallery/plugins/zoom/lg-zoom.es5.js';
 
 export default class Timeline {
   constructor(config) {
@@ -130,7 +131,7 @@ export default class Timeline {
         src: imgInfo.full,
         thumb: imgInfo.thumb,
       })),
-      plugins: [lgThumbnail],
+      plugins: [lgThumbnail, lgZoom],
     });
     this._lgContainer.addEventListener('lgAfterClose', () => {
       if (this._lgInstance) {

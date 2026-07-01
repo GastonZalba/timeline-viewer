@@ -13,7 +13,7 @@ export default {
     fuente_institucional: 'Dev.to',
     tipo_fuente: 'Sitio web o portal',
     actores_principales: ['Ana García', 'Carlos Ruiz'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia1a/300/200', full: 'https://picsum.photos/seed/noticia1a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia1b/300/200', full: 'https://picsum.photos/seed/noticia1b/600/400' }
@@ -36,7 +36,7 @@ export default {
     fuente_institucional: 'Mozilla Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     actores_principales: ['Mozilla', 'Google Chrome Team'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
       { titulo: 'Parche critico', resumen: 'Parchean vulnerabilidad CVE-2026-1234 que afectaba a todos los navegadores basados en Chromium', tono_social: 'Negativo' }
@@ -54,7 +54,7 @@ export default {
     fuente_institucional: 'OpenAI Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     actores_principales: ['OpenAI'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia3a/300/200', full: 'https://picsum.photos/seed/noticia3a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia3b/300/200', full: 'https://picsum.photos/seed/noticia3b/600/400' },
@@ -79,7 +79,7 @@ export default {
     fuente_institucional: 'W3C',
     tipo_fuente: 'Decreto o norma',
     actores_principales: ['W3C', 'Rachel Andrews', 'Jake Archibald'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
     ],
@@ -100,7 +100,7 @@ export default {
     fuente_institucional: 'Node.js Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     actores_principales: ['Node.js Foundation'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia5a/300/200', full: 'https://picsum.photos/seed/noticia5a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia5b/300/200', full: 'https://picsum.photos/seed/noticia5b/600/400' },
@@ -142,7 +142,7 @@ export default {
     fuente_institucional: 'TypeScript Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     actores_principales: ['Anders Hejlsberg', 'Microsoft'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia7a/300/200', full: 'https://picsum.photos/seed/noticia7a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia7b/300/200', full: 'https://picsum.photos/seed/noticia7b/600/400' },
@@ -168,7 +168,7 @@ export default {
     fuente_institucional: 'WebAssembly',
     tipo_fuente: 'Sitio web o portal',
     actores_principales: [],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia8a/300/200', full: 'https://picsum.photos/seed/noticia8a/600/400' }
     ],
@@ -189,7 +189,7 @@ export default {
     fuente_institucional: 'Nielsen Norman Group',
     tipo_fuente: 'Libro o publicación',
     actores_principales: ['María López', 'Google UX', 'Nielsen Norman Group'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia9a/300/200', full: 'https://picsum.photos/seed/noticia9a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia9b/300/200', full: 'https://picsum.photos/seed/noticia9b/600/400' },
@@ -213,7 +213,7 @@ export default {
     fuente_institucional: 'Vitest',
     tipo_fuente: 'Sitio web o portal',
     actores_principales: ['Vitest Team'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia10a/300/200', full: 'https://picsum.photos/seed/noticia10a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia10b/300/200', full: 'https://picsum.photos/seed/noticia10b/600/400' }
@@ -236,7 +236,7 @@ export default {
     fuente_institucional: 'Vercel',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     actores_principales: ['Vercel', 'Next.js Team', 'Juan Pérez'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia11a/300/200', full: 'https://picsum.photos/seed/noticia11a/600/400' }
     ],
@@ -257,7 +257,7 @@ export default {
     fuente_institucional: 'MicroFrontends.dev',
     tipo_fuente: 'Sitio web o portal',
     actores_principales: ['Module Federation Team', 'Sarah Connor'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia13a/300/200', full: 'https://picsum.photos/seed/noticia13a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia13b/300/200', full: 'https://picsum.photos/seed/noticia13b/600/400' }
@@ -280,7 +280,7 @@ export default {
     fuente_institucional: 'W3C WAI',
     tipo_fuente: 'Decreto o norma',
     actores_principales: ['WAI', 'Laura Jiménez', 'GovUK', 'Marta Ruiz', 'Carlos Mendoza', 'Sofía Torres', 'Diego Hernández', 'Valentina Paz', 'Javier Acosta', 'Lucía Campos'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia12a/300/200', full: 'https://picsum.photos/seed/noticia12a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia12b/300/200', full: 'https://picsum.photos/seed/noticia12b/600/400' },
@@ -307,7 +307,7 @@ export default {
     fuente_institucional: 'YouTube',
     tipo_fuente: 'Video',
     actores_principales: ['CSS Animations Channel'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
       { titulo: 'Animaciones', resumen: 'Keyframes, transitions y animaciones en cascada explicadas paso a paso', tono_social: 'Positivo' }
@@ -325,7 +325,7 @@ export default {
     fuente_institucional: 'Instagram',
     tipo_fuente: 'Red Social',
     actores_principales: ['dev_tips_css'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
       { titulo: 'CSS framework', resumen: 'Nueva herramienta open-source para maquetacion veloz', tono_social: 'Positivo' }
@@ -343,7 +343,7 @@ export default {
     fuente_institucional: 'Twitter',
     tipo_fuente: 'Red Social',
     actores_principales: ['react_dev_tips'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
       { titulo: 'Performance', resumen: 'Tips para optimizar renders con useMemo y useCallback', tono_social: 'Positivo' },
@@ -362,7 +362,7 @@ export default {
     fuente_institucional: 'Facebook',
     tipo_fuente: 'Red Social',
     actores_principales: ['Comunidad Web Dev'],
-    screenshot: 'https://picsum.photos/seed/captura/800/600',
+    screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
       { titulo: 'WCAG 3.0', resumen: 'Implementacion practica de los nuevos estandares de accesibilidad', tono_social: 'Positivo' }

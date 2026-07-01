@@ -1,6 +1,6 @@
 # TimelineViewer
 
-WORK IN PROGRESS. Interactive timeline component that displays news articles as an overlapping card stack with an expandable full timeline view.
+Interactive timeline component that displays news articles as an overlapping card stack with an expandable full timeline view.
 
 ## Installation
 
@@ -28,14 +28,18 @@ new Timeline({
       fuente_institucional: 'Dev.to',
       tipo_fuente: 'Digital',
       actores_principales: ['Ana García', 'Carlos Ruiz'],
-      screenshot: 'https://picsum.photos/seed/captura/800/600',
+      screenshot: 'https://picsum.photos/seed/captura/400/800',
       imagenes: [
-        { thumb: 'https://picsum.photos/seed/img1/300/200', full: 'https://picsum.photos/seed/img1/600/400' }
+        { 
+          thumb: 'https://picsum.photos/seed/img1/300/200', 
+          full: 'https://picsum.photos/seed/img1/600/400'
+        }
       ],
       temas: []
     }
   ],
   featuredCount: 6,
+  itemsPerPage: 10,
   lastUpdated: '2026-06-25T14:30:00'
 });
 ```
