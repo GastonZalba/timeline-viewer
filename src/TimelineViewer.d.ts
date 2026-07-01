@@ -12,12 +12,12 @@ export interface TimelineItem {
   fecha_scrapeo: string;
   tono_social: 'Positivo' | 'Negativo' | 'Neutro';
   fuente_institucional: string;
-  tipo_medio: string;
-  link_portada: string | null;
+  tipo_fuente: string;
+  thumbnail: string | null;
   link_web: string;
   actores_principales: string[];
-  hasCapture: boolean;
-  imagenes: string[];
+  screenshot: string | null;
+  imagenes: { thumb: string; full: string }[];
   temas: ItemTema[];
 }
 

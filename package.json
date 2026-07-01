@@ -21,5 +21,8 @@
     "ui-component"
   ],
   "author": "Gastón Zalba",
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "lightgallery": "^2.9.0"
+  }
 }

@@ -17,10 +17,13 @@ const MIME_TYPES = {
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
   '.webp': 'image/webp',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+  '.ttf': 'font/ttf',
 };
 
 const server = http.createServer((req, res) => {
-  const urlPath = req.url === '/' ? '/index.html' : req.url;
+  const urlPath = (req.url === '/' ? '/index.html' : req.url).split('?')[0];
   let filePath = path.join(__dirname, urlPath);
 
   if (!fs.existsSync(filePath)) {

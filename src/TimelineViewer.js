@@ -1,3 +1,6 @@
+import lightGallery from '../node_modules/lightgallery/lightgallery.es5.js';
+import lgThumbnail from '../node_modules/lightgallery/plugins/thumbnail/lg-thumbnail.es5.js';
+
 export default class Timeline {
   constructor(config) {
     this.container = typeof config.container === 'string'
@@ -31,12 +34,18 @@ export default class Timeline {
               <span class="expand-icon" id="expand-icon"></span>
             </button>
             <div class="filter-wrap">
-              <button class="filter-toggle" id="filter-toggle" title="Filtrar por tono social">
+              <button class="filter-toggle" id="filter-toggle" title="Filtrar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
-               <div class="filter-menu" id="filter-menu">
-                <div class="filter-header">Tono social</div>
-                <div class="filter-options" id="filter-options"></div>
+              <div class="filter-menu" id="filter-menu">
+                <div class="filter-section">
+                  <div class="filter-header">Tono social</div>
+                  <div class="filter-options" id="filter-options-tone"></div>
+                </div>
+                <div class="filter-section">
+                  <div class="filter-header">Tipo de fuente</div>
+                  <div class="filter-options" id="filter-options-source"></div>
+                </div>
               </div>
             </div>
             <button class="sort-toggle" id="sort-toggle" title="Invertir orden">
@@ -73,7 +82,10 @@ export default class Timeline {
     this.sortAscending = false;
     this.filterToggle = this.container.querySelector('#filter-toggle');
     this.filterMenu = this.container.querySelector('#filter-menu');
-    this.filterOptions = this.container.querySelector('#filter-options');
+    this.filters = [
+      { field: 'tono_social', label: 'Tono social', options: this.container.querySelector('#filter-options-tone'), checkboxes: [] },
+      { field: 'tipo_fuente', label: 'Tipo de fuente', options: this.container.querySelector('#filter-options-source'), checkboxes: [] },
+    ];
   }
 
   // ====== Helpers ======
@@ -89,14 +101,54 @@ export default class Timeline {
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
+  _parseLinkWeb(url) {
+    if (!url) return null;
+    let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
+    if (m) return { url: `https://www.youtube.com/embed/${m[1]}`, type: 'youtube' };
+    m = url.match(/(?:instagram\.com)\/(p|reel)\/([a-zA-Z0-9_-]+)/);
+    if (m) return { url: `https://www.instagram.com/${m[1]}/${m[2]}/embed/`, type: 'instagram' };
+    m = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
+    if (m) return { url: `https://platform.twitter.com/embed/Tweet.html?id=${m[1]}`, type: 'twitter' };
+    m = url.match(/(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+)/);
+    if (m) return { url: `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(`https://www.facebook.com/${m[1]}/posts/${m[2]}`)}&show_text=true&width=500`, type: 'facebook' };
+    m = url.match(/(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/);
+    if (m) return { url: `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=500`, type: 'facebook' };
+    return null;
+  }
+
+  _openLightGallery(images) {
+    if (this._lgInstance) {
+      this._lgInstance.destroy();
+      this._lgInstance = null;
+    }
+    if (!this._lgContainer) {
+      this._lgContainer = document.createElement('div');
+    }
+    this._lgInstance = lightGallery(this._lgContainer, {
+      dynamic: true,
+      dynamicEl: images.map(imgInfo => ({
+        src: imgInfo.full,
+        thumb: imgInfo.thumb,
+      })),
+      plugins: [lgThumbnail],
+    });
+    this._lgContainer.addEventListener('lgAfterClose', () => {
+      if (this._lgInstance) {
+        this._lgInstance.destroy();
+        this._lgInstance = null;
+      }
+    }, { once: true });
+    this._lgInstance.openGallery();
+  }
+
   // ====== Render featured (overlapping) cards ======
   _renderFeatured(cards) {
     this.featuredContainer.innerHTML = '';
     cards.forEach((card, i) => {
       const el = document.createElement('div');
       el.className = 'featured-card';
-      const imgHtml = card.link_portada
-        ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
+      const imgHtml = card.thumbnail
+        ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"></div>`
         : '';
       const protHtml = card.actores_principales && card.actores_principales.length
         ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
@@ -123,14 +175,24 @@ export default class Timeline {
     const el = document.createElement('div');
     el.className = 'timeline-item';
     el.style.transitionDelay = `${index * 0.08}s`;
-    const imgHtml = card.link_portada
-      ? `<div class="card-image-wrap"><img class="card-image" src="${card.link_portada}" alt="${card.nombre_fuente}" loading="lazy"></div>`
+    const imgHtml = card.thumbnail
+      ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"></div>`
       : '';
     const toneLabel = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
     const toneLabelTema = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
-    const protHtml = card.actores_principales && card.actores_principales.length
-      ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
+    const actors = card.actores_principales || [];
+    const MAX_ACTORS = 3;
+    const hasMore = actors.length > MAX_ACTORS;
+    const protHtml = actors.length
+      ? `<div class="card-protagonista${hasMore ? ' has-more' : ''}" data-full="${actors.join(', ')}">
+          <span class="protagonista-label">Actores principales:</span>
+          <span class="protagonista-list">${actors.slice(0, MAX_ACTORS).join(', ')}${hasMore ? '...' : ''}</span>
+         </div>`
       : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
+    const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
+    const iframeHtml = embedUrl
+      ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
+      : '';
     const temasHtml = card.temas && card.temas.length
       ? `<div class="card-temas">${card.temas.map(t => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
@@ -144,8 +206,8 @@ export default class Timeline {
     const footerHtml = `<div class="card-footer">
       <div class="card-footer-sep"></div>
       <div class="card-footer-actions">
-        ${card.hasCapture ? '<button class="card-footer-btn" title="Descargar Captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Captura</button>' : ''}
-        ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
+        ${card.screenshot ? '<button class="card-footer-btn card-screenshot-btn" title="Ver captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Ver captura</button>' : ''}
+        ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
         <button class="card-footer-btn card-open" title="Abrir enlace">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Ir
@@ -158,7 +220,7 @@ export default class Timeline {
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
-      <div class="timeline-card${card.link_portada ? '' : ' no-image'} tone-${card.tono_social.toLowerCase()}">
+      <div class="timeline-card${card.thumbnail ? '' : ' no-image'} tone-${card.tono_social.toLowerCase()}">
         ${imgHtml}
         <div class="card-body">
           <div class="card-title">${card.nombre_fuente}</div>
@@ -177,7 +239,7 @@ export default class Timeline {
             </div>
             <div class="card-info-row">
               <span class="card-info-label">Tipo</span>
-              <span class="card-info-value">${card.tipo_medio}</span>
+              <span class="card-info-value">${card.tipo_fuente}</span>
             </div>
             <div class="card-info-row">
               <span class="card-info-label">Captura</span>
@@ -186,6 +248,7 @@ export default class Timeline {
           </div>
           ${protHtml}
           <div class="card-fuente">${card.fuente_institucional}</div>
+          ${iframeHtml}
           ${footerHtml}
         </div>
       </div>
@@ -212,6 +275,33 @@ export default class Timeline {
       e.stopPropagation();
       if (card.link_web) window.open(card.link_web, '_blank', 'noopener');
     });
+    const screenshotBtn = el.querySelector('.card-screenshot-btn');
+    if (screenshotBtn) {
+      screenshotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._openLightGallery([{ thumb: card.screenshot, full: card.screenshot }]);
+      });
+    }
+    const imagesBtn = el.querySelector('.card-images-btn');
+    if (imagesBtn) {
+      imagesBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._openLightGallery(card.imagenes);
+      });
+    }
+    const prot = el.querySelector('.card-protagonista.has-more');
+    if (prot) {
+      prot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        prot.classList.toggle('expanded');
+        const list = prot.querySelector('.protagonista-list');
+        if (prot.classList.contains('expanded')) {
+          list.textContent = prot.dataset.full;
+        } else {
+          list.textContent = actors.slice(0, MAX_ACTORS).join(', ') + '...';
+        }
+      });
+    }
     return el;
   }
 
@@ -228,9 +318,19 @@ export default class Timeline {
   // ====== Render timeline cards ======
   _renderTimeline(cards) {
     this.timelineCards.innerHTML = '';
-    cards.forEach((card, i) => {
-      this.timelineCards.appendChild(this._createTimelineItem(card, i));
-    });
+    if (cards.length === 0) {
+      const el = document.createElement('div');
+      el.className = 'timeline-item timeline-empty-item';
+      el.innerHTML = `
+        <div class="timeline-date-col"></div>
+        <div class="timeline-empty-text">Sin publicaciones para mostrar</div>
+      `;
+      this.timelineCards.appendChild(el);
+    } else {
+      cards.forEach((card, i) => {
+        this.timelineCards.appendChild(this._createTimelineItem(card, i));
+      });
+    }
 
     if (this.lastUpdated) {
       const d = new Date(this.lastUpdated);
@@ -341,35 +441,38 @@ export default class Timeline {
 
   // ====== Build filter checkboxes from data ======
   _buildFilterCheckboxes() {
-    const tones = [...new Set(this.items.map(c => c.tono_social))];
-    this.filterOptions.innerHTML = '';
-    this.filterCheckboxes = [];
-    tones.forEach(tone => {
-      const label = document.createElement('label');
-      label.className = 'filter-option';
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.value = tone;
-      cb.checked = true;
-      const span = document.createElement('span');
-      span.textContent = tone;
-      label.appendChild(cb);
-      label.appendChild(span);
-      cb.addEventListener('change', () => this._applyFilters());
-      this.filterOptions.appendChild(label);
-      this.filterCheckboxes.push(cb);
+    this.filters.forEach(f => {
+      const values = [...new Set(this.items.map(c => c[f.field]))];
+      f.options.innerHTML = '';
+      f.checkboxes = [];
+      values.forEach(val => {
+        const label = document.createElement('label');
+        label.className = 'filter-option';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = val;
+        cb.checked = true;
+        const span = document.createElement('span');
+        span.textContent = val;
+        label.appendChild(cb);
+        label.appendChild(span);
+        cb.addEventListener('change', () => this._applyFilters());
+        f.options.appendChild(label);
+        f.checkboxes.push(cb);
+      });
     });
   }
 
-  // ====== Filter by tone ======
+  // ====== Filter by tone and source type ======
   _applyFilters() {
-    const allChecked = this.filterCheckboxes.every(cb => cb.checked);
-    this.filterToggle.classList.toggle('active', !allChecked);
-    const active = new Set();
-    this.filterCheckboxes.forEach(cb => {
-      if (cb.checked) active.add(cb.value);
-    });
-    this.allCards = this._originalCards.filter(c => active.has(c.tono_social));
+    const anyActive = this.filters.some(f => !f.checkboxes.every(cb => cb.checked));
+    this.filterToggle.classList.toggle('active', anyActive);
+    this.allCards = this._originalCards.filter(c =>
+      this.filters.every(f => {
+        const active = f.checkboxes.filter(cb => cb.checked).map(cb => cb.value);
+        return active.length === f.checkboxes.length || active.includes(c[f.field]);
+      })
+    );
     if (this.sortAscending) this.allCards.reverse();
     if (this.itemsPerPage > 0) this._displayedCount = this.itemsPerPage;
     this._renderAll();

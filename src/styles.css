@@ -171,10 +171,6 @@
   background: var(--accent);
   border: 1px solid #1e2a3a;
 }
-.filter-wrap {
-  position: relative;
-}
-
 .filter-menu {
   display: none;
   position: absolute;
@@ -183,39 +179,45 @@
   background: #1e2a3a;
   border: 1px solid var(--border-card);
   border-radius: 8px;
-  padding: 8px;
-  min-width: 140px;
+  padding: 6px;
+  min-width: 220px;
   z-index: 20;
   box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 .filter-menu.open {
   display: block;
 }
+.filter-section + .filter-section {
+  border-top: 1px solid var(--border-card);
+  margin-top: 4px;
+  padding-top: 4px;
+}
 .filter-header {
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 4px 8px 8px;
-  border-bottom: 1px solid var(--border-card);
-  margin-bottom: 4px;
+  padding: 2px 6px 4px;
 }
 .filter-option {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  font-size: 0.8rem;
+  gap: 6px;
+  padding: 3px 6px;
+  font-size: 0.7rem;
   color: var(--text-primary);
   cursor: pointer;
   border-radius: 4px;
   transition: background 0.2s;
+  white-space: nowrap;
 }
 .filter-option:hover {
   background: rgba(255,255,255,0.05);
 }
 .filter-option input[type="checkbox"] {
   accent-color: var(--accent);
+  width: 12px;
+  height: 12px;
 }
 
 /* ===== FEATURED CARDS (overlapping stack) ===== */
@@ -711,6 +713,12 @@
   opacity: 1;
   margin-top: 10px;
 }
+.timeline-card .card-protagonista.has-more {
+  cursor: pointer;
+}
+.timeline-card.expanded .card-protagonista.expanded {
+  max-height: none;
+}
 
 .card-tone {
   display: inline-block;
@@ -737,6 +745,52 @@
 
 .timeline-card.expanded .card-tone {
   display: none;
+}
+.card-iframe-wrap {
+  display: none;
+  margin: 16px 0;
+  border-radius: 8px;
+  position: relative;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent) transparent;
+}
+.card-iframe-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+.card-iframe-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+.card-iframe-wrap::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 3px;
+  min-height: 40px;
+}
+.card-iframe-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-light);
+}
+.card-iframe-wrap iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+.timeline-card.expanded .card-iframe-wrap {
+  display: block;
+}
+.card-iframe-youtube {
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+}
+.card-iframe-instagram {
+  min-height: 420px;
+}
+.card-iframe-twitter {
+  min-height: 350px;
+}
+.card-iframe-facebook {
+  min-height: 400px;
 }
 
 .card-temas {
@@ -1018,6 +1072,23 @@
 .timeline-load-more-btn:hover {
   background: var(--accent);
   color: var(--text-on-primary);
+}
+
+/* ===== TIMELINE EMPTY STATE ===== */
+.timeline-empty-item {
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: none;
+}
+.timeline-empty-text {
+  flex: 1;
+  max-width: 500px;
+  margin-left: 25px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 40px 0;
+  font-style: italic;
 }
 
 /* ===== TIMELINE FOOTER ===== */

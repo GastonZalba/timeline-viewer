@@ -6,11 +6,20 @@
   <title>Noticias</title>
   <link rel="stylesheet" href="base.css">
   <link rel="stylesheet" href="../src/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/css/lightgallery-bundle.min.css">
 </head>
 <body>
 
   <div id="noticias-container"></div>
 
+  <script type="importmap">
+  {
+    "imports": {
+      "../node_modules/lightgallery/lightgallery.es5.js": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/lightgallery.es5.js",
+      "../node_modules/lightgallery/plugins/thumbnail/lg-thumbnail.es5.js": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/thumbnail/lg-thumbnail.es5.js"
+    }
+  }
+  </script>
   <script type="module" src="script.js"></script>
 </body>
 </html>
