@@ -59,19 +59,19 @@ export default class Timeline {
           </div>
       </section>
     `;
-    this.section = document.getElementById('noticias-section');
-    this.featuredContainer = document.getElementById('featured-cards');
-    this.timelineContainer = document.getElementById('timeline-container');
-    this.timelineCards = document.getElementById('timeline-cards');
-    this.expandToggle = document.getElementById('expand-toggle');
-    this.remainingCount = document.getElementById('remaining-count');
-    this.expandIcon = document.getElementById('expand-icon');
-    this.fabCollapse = document.getElementById('fab-collapse');
-    this.sortToggle = document.getElementById('sort-toggle');
+    this.section = this.container.querySelector('#noticias-section');
+    this.featuredContainer = this.container.querySelector('#featured-cards');
+    this.timelineContainer = this.container.querySelector('#timeline-container');
+    this.timelineCards = this.container.querySelector('#timeline-cards');
+    this.expandToggle = this.container.querySelector('#expand-toggle');
+    this.remainingCount = this.container.querySelector('#remaining-count');
+    this.expandIcon = this.container.querySelector('#expand-icon');
+    this.fabCollapse = this.container.querySelector('#fab-collapse');
+    this.sortToggle = this.container.querySelector('#sort-toggle');
     this.sortAscending = false;
-    this.filterToggle = document.getElementById('filter-toggle');
-    this.filterMenu = document.getElementById('filter-menu');
-    this.filterOptions = document.getElementById('filter-options');
+    this.filterToggle = this.container.querySelector('#filter-toggle');
+    this.filterMenu = this.container.querySelector('#filter-menu');
+    this.filterOptions = this.container.querySelector('#filter-options');
   }
 
   // ====== Helpers ======
@@ -262,13 +262,13 @@ export default class Timeline {
       { threshold: 0.1, rootMargin: '0px 0px 100px 0px' }
     );
 
-    document.querySelectorAll('.timeline-item').forEach((item) => {
+    this.container.querySelectorAll('.timeline-item').forEach((item) => {
       observer.observe(item);
     });
   }
 
   // ====== Toggle expand / collapse ======
-  _toggleExpand() {
+  _toggleExpand(scrollTo = false) {
     this.isExpanded = !this.isExpanded;
 
     if (this.isExpanded) {
@@ -288,14 +288,31 @@ export default class Timeline {
       this.section.classList.remove('expanded', 'scrolled');
       this.timelineContainer.classList.remove('expanded');
       this.expandIcon.classList.remove('rotated');
-      document.querySelectorAll('.timeline-item').forEach((item) => {
+      this.container.querySelectorAll('.timeline-item').forEach((item) => {
         item.classList.remove('visible');
       });
+
+      if (scrollTo) this._scrollToSection();
 
       setTimeout(() => {
         cards.forEach((c) => c.classList.add('visible'));
       }, 100);
     }
+  }
+
+  _scrollToSection() {
+    const offset = 60;
+    const rect = this.section.getBoundingClientRect();
+    let el = this.section.parentElement;
+    while (el) {
+      const style = getComputedStyle(el);
+      if (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflow === 'auto' || style.overflow === 'scroll') {
+        el.scrollTo({ top: el.scrollTop + rect.top - offset, behavior: 'smooth' });
+        return;
+      }
+      el = el.parentElement;
+    }
+    window.scrollTo({ top: window.scrollY + rect.top - offset, behavior: 'smooth' });
   }
 
   // ====== Toggle timeline sort order ======
@@ -345,7 +362,7 @@ export default class Timeline {
     const featured = this.allCards.slice(0, this.FEATURED_COUNT);
     const n = this.allCards.length;
     this.remainingCount.textContent = this._originalCards.length;
-    document.getElementById('remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+    this.container.querySelector('#remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
     this._renderTimeline(this.allCards);
     requestAnimationFrame(() => {
@@ -378,20 +395,17 @@ export default class Timeline {
     });
 
     this.expandToggle.addEventListener('click', () => this._toggleExpand());
-    this.fabCollapse.addEventListener('click', () => this._toggleExpand());
+    this.fabCollapse.addEventListener('click', () => this._toggleExpand(true));
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
     this.sortToggle.addEventListener('click', () => this._toggleSort());
     this.filterToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       this.filterMenu.classList.toggle('open');
     });
-    this.filterCheckboxes.forEach(cb => {
-      cb.addEventListener('change', () => this._applyFilters());
-    });
 
     document.addEventListener('click', (e) => {
       if (!e.target.closest('.card-info-btn, .card-info-menu')) {
-        document.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
+        this.container.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
       }
       if (!e.target.closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');

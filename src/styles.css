@@ -102,33 +102,26 @@
 }
 
 .sort-toggle {
-  background: none;
-  border: 1px solid var(--border-card);
-  color: var(--text-secondary);
+  border: 1px solid var(--accent);
   padding: 8px;
   border-radius: 42px;
   height: 34px;
   width: 34px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
+  transition: none;
+  display: none;
   align-items: center;
   gap: 8px;
   margin-left: auto;
   margin-right: 137px;
-  opacity: 0;
-  pointer-events: none;
-  display: none;
-}
-.sort-toggle {
   pointer-events: auto;
   color: var(--text-on-primary);
   background: rgba(59, 130, 246, 0.25);
-  border-color: var(--accent);
 }
 .noticias-section.expanded .sort-toggle {
   display: block;
   opacity: 1;
+  transition: opacity 0.3s ease;
 }
 .sort-toggle:hover {
   background: var(--accent);
@@ -868,8 +861,8 @@
 }
 
 .fab-collapse {
-  height: 47px;
-  max-width: 52px;
+  height: 41px;
+  max-width: 41px;
   border: none;
   border-radius: 42px;
   background: rgba(59, 130, 246, 0.3);
@@ -878,7 +871,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 12px;
+  padding: 0 9px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   opacity: 0;
   pointer-events: none;
@@ -901,21 +894,21 @@
   overflow: hidden;
   margin-left: 0;
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 100;
   transition: max-width 0.2s ease, margin-left 0.2s ease;
 }
 .fab-collapse:hover .fab-label {
   max-width: 100px;
-  margin-left: 6px;
+  margin: 0 3px;
 }
 .fab-icon-stack {
   transform: rotate(90deg);
   font-family: monospace;
-  font-size: 20px;
-  width: 24px;
-  height: 24px;
-  letter-spacing: 3px;
-  transition: letter-spacing 0.3s;
+  font-size: 17px;
+  width: 23px;
+  height: 22px;
+  letter-spacing: 4px;
+  transition: letter-spacing 0.1s;
 }
 .fab-collapse:hover .fab-icon-stack {
   letter-spacing: -2px;
