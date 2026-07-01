@@ -42,7 +42,7 @@
   background: none;
   border: 1px solid var(--accent);
   color: var(--accent);
-  padding: 10px 18px 10px 12px;
+  padding: 8px 18px 8px 12px;
   border-radius: 42px;
   cursor: pointer;
   font-size: 0.7rem;
@@ -67,15 +67,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 19px;
-  height: 19px;
+  width: 24px;
+  height: 24px;
   padding: 0 4px;
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  border-radius: 10px;
+  border-radius: 20px;
   border: 1px solid var(--accent);
   color: var(--accent);
-  margin-right: 2px;
+  margin-right: 3px;
 }
 .noticias-section.expanded .expand-toggle {
   color: var(--text-on-primary);
@@ -137,7 +137,7 @@
   transition: transform 0.2s ease;
 }
 .sort-toggle.asc svg {
-  transform: rotate(180deg);
+  transform: scaleY(-100%);
 }
 
 .filter-wrap {
@@ -146,6 +146,7 @@
 }
 
 .filter-toggle {
+  position: relative;
   background: none;
   border: 1px solid var(--accent);
   color: var(--text-on-primary);
@@ -165,6 +166,20 @@
 }
 .filter-toggle:hover {
   background: var(--accent);
+}
+.filter-toggle.active::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid #1e2a3a;
+}
+.filter-wrap {
+  position: relative;
 }
 
 .filter-menu {
@@ -426,6 +441,15 @@
   z-index: 2;
 }
 
+.timeline-item .timeline-date-col.no-date .timeline-dot,
+.timeline-item .timeline-date-col.no-date .timeline-hline {
+  display: none !important;
+}
+.timeline-date-col.no-date .timeline-date {
+  text-transform: initial;
+  font-style: italic;
+  font-weight: 100;
+}
 .timeline-item:has(.timeline-card.expanded) .timeline-hline {
   display: block;
 }
@@ -435,7 +459,7 @@
   right: -21px;
   top: 50%;
   transform: translateY(-50%);
-  width: 14px;
+  width: 19px;
   height: 1px;
   background: var(--accent);
 }
@@ -732,7 +756,8 @@
   display: flex;
 }
 .tema-item {
-  background: rgba(255,255,255,0.04);
+  background: rgb(0 0 0 / 11%);
+  border: 1px dashed #000000;
   border-radius: 8px;
   padding: 8px 10px;
 }

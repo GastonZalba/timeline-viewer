@@ -38,7 +38,7 @@ export default class Timeline {
               </div>
             </div>
             <button class="sort-toggle" id="sort-toggle" title="Invertir orden">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 9 12 4 7 9"/><polyline points="17 15 12 20 7 15"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="17,9 12,4 7,9" fill="currentColor"/><polygon points="17,15 12,20 7,15" fill="none" stroke-width="1.5"/></svg>
             </button>
           </div>
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
@@ -153,7 +153,7 @@ export default class Timeline {
         </div>
       </div>`;
       el.innerHTML = `
-        <div class="timeline-date-col">
+        <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
           <div class="timeline-date">${this._formatDate(card.fecha_publicacion)}</div>
           <div class="timeline-dot"></div>
           <div class="timeline-hline"></div>
@@ -329,6 +329,8 @@ export default class Timeline {
 
   // ====== Filter by tone ======
   _applyFilters() {
+    const allChecked = this.filterCheckboxes.every(cb => cb.checked);
+    this.filterToggle.classList.toggle('active', !allChecked);
     const active = new Set();
     this.filterCheckboxes.forEach(cb => {
       if (cb.checked) active.add(cb.value);
@@ -342,7 +344,7 @@ export default class Timeline {
   _renderAll() {
     const featured = this.allCards.slice(0, this.FEATURED_COUNT);
     const n = this.allCards.length;
-    this.remainingCount.textContent = n;
+    this.remainingCount.textContent = this._originalCards.length;
     document.getElementById('remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
     this._renderTimeline(this.allCards);
