@@ -776,6 +776,22 @@
   height: 100%;
   border: none;
 }
+.card-iframe-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--bg-card) 0%, rgba(255,255,255,0.06) 50%, var(--bg-card) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.card-iframe-wrap.loaded .card-iframe-shimmer {
+  display: none;
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 .timeline-card.expanded .card-iframe-wrap {
   display: block;
 }
@@ -1080,6 +1096,9 @@
   margin-bottom: 30px;
 }
 .timeline-load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: none;
   border: 1px solid var(--accent);
   color: var(--accent);

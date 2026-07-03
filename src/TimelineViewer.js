@@ -195,7 +195,7 @@ export default class Timeline {
       : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
     const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
     const iframeHtml = embedUrl
-      ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
+      ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
       : '';
     const temasHtml = card.temas && card.temas.length
       ? `<div class="card-temas">${card.temas.map(t => `
@@ -261,6 +261,14 @@ export default class Timeline {
     if (timelineImg) {
       timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
       if (timelineImg.complete) timelineImg.classList.add('loaded');
+    }
+    const iframeWrap = el.querySelector('.card-iframe-wrap');
+    if (iframeWrap) {
+      const iframe = iframeWrap.querySelector('iframe');
+      if (iframe) {
+        iframe.addEventListener('load', () => iframeWrap.classList.add('loaded'));
+        if (iframe.contentDocument?.readyState === 'complete') iframeWrap.classList.add('loaded');
+      }
     }
     const cardEl = el.querySelector('.timeline-card');
     cardEl.addEventListener('click', (e) => {
@@ -513,7 +521,7 @@ export default class Timeline {
         <div class="timeline-dot timeline-load-more-dot"></div>
       </div>
       <div class="timeline-load-more-wrap">
-        <button class="timeline-load-more-btn">Cargar m&aacute;s</button>
+        <button class="timeline-load-more-btn">Cargar m&aacute;s <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg></button>
       </div>
     `;
     el.querySelector('.timeline-load-more-btn').addEventListener('click', () => {
