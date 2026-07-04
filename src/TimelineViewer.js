@@ -110,13 +110,13 @@ export default class Timeline {
     let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
     if (m) return { url: `https://www.youtube.com/embed/${m[1]}`, type: 'youtube' };
     m = url.match(/(?:instagram\.com)\/(p|reel)\/([a-zA-Z0-9_-]+)/);
-    if (m) return { url: `https://www.instagram.com/${m[1]}/${m[2]}/embed/`, type: 'instagram' };
-    m = url.match(/(?:twitter\.com|x\.com)\/\w+\/status\/(\d+)/);
-    if (m) return { url: `https://platform.twitter.com/embed/Tweet.html?id=${m[1]}`, type: 'twitter' };
+    if (m) return { url: `https://www.instagram.com/${m[1]}/${m[2]}/`, type: 'instagram' };
+    m = url.match(/(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/);
+    if (m) return { url: `https://twitter.com/${m[1]}/status/${m[2]}`, type: 'twitter' };
     m = url.match(/(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+)/);
-    if (m) return { url: `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(`https://www.facebook.com/${m[1]}/posts/${m[2]}`)}&show_text=true&width=500`, type: 'facebook' };
+    if (m) return { url: `https://www.facebook.com/${m[1]}/posts/${m[2]}`, type: 'facebook' };
     m = url.match(/(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/);
-    if (m) return { url: `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=500`, type: 'facebook' };
+    if (m) return { url: url, type: 'facebook' };
     return null;
   }
 
@@ -195,7 +195,13 @@ export default class Timeline {
       : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
     const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
     const iframeHtml = embedUrl
-      ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
+      ? embedUrl.type === 'instagram'
+        ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="instagram-media" data-instgrm-permalink="${embedUrl.url}" data-instgrm-version="14" style="background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)"></blockquote></div>`
+        : embedUrl.type === 'facebook'
+          ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><div class="fb-post" data-href="${embedUrl.url}" data-show-text="true" data-width="auto"></div></div>`
+          : embedUrl.type === 'twitter'
+            ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="twitter-tweet" data-dnt="true"><a href="${embedUrl.url}"></a></blockquote></div>`
+            : `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
       : '';
     const temasHtml = card.temas && card.temas.length
       ? `<div class="card-temas">${card.temas.map(t => `
@@ -274,6 +280,106 @@ export default class Timeline {
     cardEl.addEventListener('click', (e) => {
       if (e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
       cardEl.classList.add('expanded');
+      const igWrap = cardEl.querySelector('.card-iframe-instagram');
+      if (igWrap) {
+        const loadEmbed = () => {
+          setTimeout(() => {
+            if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
+              instgrm.Embeds.process();
+            }
+            const check = setInterval(() => {
+              const iframe = igWrap.querySelector('iframe');
+              if (!iframe) return;
+              clearInterval(check);
+              if (iframe.contentDocument?.readyState === 'complete') {
+                igWrap.classList.add('loaded');
+              } else {
+                iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
+                setTimeout(() => igWrap.classList.add('loaded'), 3000);
+              }
+            }, 100);
+            setTimeout(() => igWrap.classList.add('loaded'), 10000);
+          }, 150);
+        };
+        if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
+          loadEmbed();
+        } else if (!document.querySelector('script[src*="instagram.com/embed.js"]')) {
+          const s = document.createElement('script');
+          s.src = 'https://www.instagram.com/embed.js';
+          s.async = true;
+          s.onload = loadEmbed;
+          document.head.appendChild(s);
+        }
+      }
+      const twWrap = cardEl.querySelector('.card-iframe-twitter');
+      if (twWrap) {
+        const loadEmbed = () => {
+          setTimeout(() => {
+            if (typeof twttr !== 'undefined' && twttr.widgets) {
+              twttr.widgets.load(twWrap);
+            }
+            const check = setInterval(() => {
+              const iframe = twWrap.querySelector('iframe');
+              if (!iframe) return;
+              clearInterval(check);
+              if (iframe.contentDocument?.readyState === 'complete') {
+                twWrap.classList.add('loaded');
+              } else {
+                iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
+                setTimeout(() => twWrap.classList.add('loaded'), 3000);
+              }
+            }, 100);
+            setTimeout(() => twWrap.classList.add('loaded'), 10000);
+          }, 150);
+        };
+        if (typeof twttr !== 'undefined' && twttr.widgets) {
+          loadEmbed();
+        } else if (!document.querySelector('script[src*="platform.twitter.com/widgets.js"]')) {
+          const s = document.createElement('script');
+          s.src = 'https://platform.twitter.com/widgets.js';
+          s.async = true;
+          s.onload = loadEmbed;
+          document.head.appendChild(s);
+        }
+      }
+      const fbWrap = cardEl.querySelector('.card-iframe-facebook');
+      if (fbWrap) {
+        const loadEmbed = () => {
+          setTimeout(() => {
+            if (typeof FB !== 'undefined' && FB.XFBML) {
+              FB.XFBML.parse(fbWrap);
+            }
+            const check = setInterval(() => {
+              const iframe = fbWrap.querySelector('iframe');
+              if (!iframe) return;
+              clearInterval(check);
+              if (iframe.contentDocument?.readyState === 'complete') {
+                fbWrap.classList.add('loaded');
+              } else {
+                iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
+                setTimeout(() => fbWrap.classList.add('loaded'), 3000);
+              }
+            }, 100);
+            setTimeout(() => fbWrap.classList.add('loaded'), 10000);
+          }, 150);
+        };
+        if (typeof FB !== 'undefined' && FB.XFBML) {
+          loadEmbed();
+        } else if (!document.querySelector('script[src*="connect.facebook.net"]')) {
+          if (!document.getElementById('fb-root')) {
+            const fbRoot = document.createElement('div');
+            fbRoot.id = 'fb-root';
+            document.body.prepend(fbRoot);
+          }
+          const s = document.createElement('script');
+          s.src = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
+          s.async = true;
+          s.defer = true;
+          s.crossOrigin = 'anonymous';
+          s.onload = loadEmbed;
+          document.head.appendChild(s);
+        }
+      }
     });
     cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
       e.stopPropagation();

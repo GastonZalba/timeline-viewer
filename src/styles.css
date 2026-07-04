@@ -769,7 +769,7 @@
 .card-iframe-wrap::-webkit-scrollbar-thumb:hover {
   background: var(--accent-light);
 }
-.card-iframe-wrap iframe {
+.card-iframe-youtube iframe {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -800,13 +800,26 @@
   overflow: hidden;
 }
 .card-iframe-instagram {
-  min-height: 420px;
+  min-height: 350px;
+  overflow: hidden;
+}
+.card-iframe-instagram iframe.instagram-media {
+  display: block;
+  width: 100% !important;
+  border: none !important;
 }
 .card-iframe-twitter {
   min-height: 350px;
+  overflow: hidden;
+}
+.card-iframe-twitter iframe {
+  display: block;
+  width: 100% !important;
+  border: none !important;
 }
 .card-iframe-facebook {
-  min-height: 400px;
+  min-height: 350px;
+  overflow: hidden;
 }
 
 .card-temas {

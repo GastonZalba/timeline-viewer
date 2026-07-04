@@ -79,14 +79,16 @@ Each object in `items` supports these fields:
 
 ### Embedded content
 
-When the card is expanded, `link_web` is automatically parsed for supported platforms and rendered as an embedded iframe just above the card footer:
+When the card is expanded, `link_web` is automatically parsed for supported platforms and embedded just above the card footer:
 
-| Platform  | URL pattern                    | Example embed                                          |
-|-----------|--------------------------------|--------------------------------------------------------|
-| YouTube   | `/watch?v=`, `youtu.be/`, `/shorts/` | `youtube.com/embed/VIDEO_ID` (16:9)          |
-| Instagram | `/p/`, `/reel/`                | `instagram.com/p/CODE/embed/` (min-height 420px)       |
-| Twitter/X | `/username/status/ID`          | `platform.twitter.com/embed/Tweet.html?id=ID` (min-height 350px) |
-| Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `fb.watch` | `facebook.com/plugins/post.php?href=URL` (min-height 400px) |
+| Platform  | URL pattern                    | Method                                                  |
+|-----------|--------------------------------|---------------------------------------------------------|
+| YouTube   | `/watch?v=`, `youtu.be/`, `/shorts/` | Direct `<iframe>` with 16:9 aspect ratio          |
+| Instagram | `/p/`, `/reel/`                | Official [embed.js](https://www.instagram.com/embed.js) via `<blockquote class="instagram-media">` |
+| Twitter/X | `/username/status/ID`          | Official [Twitter Widgets](https://platform.twitter.com/widgets.js) via `<blockquote class="twitter-tweet">` |
+| Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` |
+
+Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of raw iframes. The scripts are loaded **lazily** — they are only fetched when a card with a matching link is expanded for the first time. The SDKs handle responsive sizing automatically, eliminating fixed heights and scrollbars.
 
 Profile pages, channels, playlists and other non-content URLs are ignored.
 
