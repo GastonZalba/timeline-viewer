@@ -561,6 +561,8 @@ export default class Timeline {
   _buildFilterCheckboxes() {
     this.filters.forEach(f => {
       const values = [...new Set(this.items.map(c => c[f.field]))];
+      const counts = {};
+      values.forEach(val => { counts[val] = this.items.filter(c => c[f.field] === val).length; });
       f.options.innerHTML = '';
       f.checkboxes = [];
       values.forEach(val => {
@@ -571,7 +573,7 @@ export default class Timeline {
         cb.value = val;
         cb.checked = true;
         const span = document.createElement('span');
-        span.textContent = val;
+        span.textContent = `${val} (${counts[val]})`;
         label.appendChild(cb);
         label.appendChild(span);
         cb.addEventListener('change', () => this._applyFilters());
