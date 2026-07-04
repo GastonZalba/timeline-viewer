@@ -701,6 +701,7 @@ export default class Timeline {
     this.filterToggle.addEventListener('click', (e) => {
       e.stopPropagation();
       this.filterMenu.classList.toggle('open');
+      this.filterToggle.classList.toggle('open');
     });
 
     document.addEventListener('click', (e) => {
@@ -709,6 +710,7 @@ export default class Timeline {
       }
       if (!e.target.closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
+        this.filterToggle.classList.remove('open');
       }
     });
 

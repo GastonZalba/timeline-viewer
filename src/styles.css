@@ -157,7 +157,8 @@
 .noticias-section.expanded .filter-toggle {
   display: inline-flex;
 }
-.filter-toggle:hover {
+.filter-toggle:hover,
+.filter-toggle.open {
   background: var(--accent);
 }
 .filter-toggle.active::after {
