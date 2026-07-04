@@ -1,6 +1,22 @@
-import lightGallery from '../node_modules/lightgallery/lightgallery.es5.js';
-import lgThumbnail from '../node_modules/lightgallery/plugins/thumbnail/lg-thumbnail.es5.js';
-import lgZoom from '../node_modules/lightgallery/plugins/zoom/lg-zoom.es5.js';
+import lightGallery from 'lightgallery/lightgallery.es5.js';
+import lgThumbnail from 'lightgallery/plugins/thumbnail/lg-thumbnail.es5.js';
+import lgZoom from 'lightgallery/plugins/zoom/lg-zoom.es5.js';
+
+const YOUTUBE_REGEX = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
+
+const INSTAGRAM_REGEX = /(?:instagram\.com)\/(p|reel)\/([a-zA-Z0-9_-]+)/;
+const INSTAGRAM_EMBED_BASE = 'https://www.instagram.com/';
+const INSTAGRAM_EMBED_SCRIPT = 'https://www.instagram.com/embed.js';
+
+const TWITTER_REGEX = /(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/;
+const TWITTER_EMBED_BASE = 'https://twitter.com/';
+const TWITTER_WIDGETS_SCRIPT = 'https://platform.twitter.com/widgets.js';
+
+const FACEBOOK_POST_REGEX = /(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+)/;
+const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
+const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
+const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
 export default class Timeline {
   constructor(config) {
@@ -8,9 +24,9 @@ export default class Timeline {
       ? document.querySelector(config.container)
       : config.container;
     this.items = config.items || [];
-    this.FEATURED_COUNT = config.featuredCount || 6;
+    this.featured_count = config.featuredCount || 6;
     this.lastUpdated = config.lastUpdated || '';
-    this.itemsPerPage = config.itemsPerPage !== undefined ? config.itemsPerPage : 10;
+    this.itemsPerPage = config.itemsPerPage || 10;
     this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
@@ -107,15 +123,15 @@ export default class Timeline {
 
   _parseLinkWeb(url) {
     if (!url) return null;
-    let m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/);
-    if (m) return { url: `https://www.youtube.com/embed/${m[1]}`, type: 'youtube' };
-    m = url.match(/(?:instagram\.com)\/(p|reel)\/([a-zA-Z0-9_-]+)/);
-    if (m) return { url: `https://www.instagram.com/${m[1]}/${m[2]}/`, type: 'instagram' };
-    m = url.match(/(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/);
-    if (m) return { url: `https://twitter.com/${m[1]}/status/${m[2]}`, type: 'twitter' };
-    m = url.match(/(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+)/);
-    if (m) return { url: `https://www.facebook.com/${m[1]}/posts/${m[2]}`, type: 'facebook' };
-    m = url.match(/(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/);
+    let m = url.match(YOUTUBE_REGEX);
+    if (m) return { url: `${YOUTUBE_EMBED_URL}${m[1]}`, type: 'youtube' };
+    m = url.match(INSTAGRAM_REGEX);
+    if (m) return { url: `${INSTAGRAM_EMBED_BASE}${m[1]}/${m[2]}/`, type: 'instagram' };
+    m = url.match(TWITTER_REGEX);
+    if (m) return { url: `${TWITTER_EMBED_BASE}${m[1]}/status/${m[2]}`, type: 'twitter' };
+    m = url.match(FACEBOOK_POST_REGEX);
+    if (m) return { url: `${FACEBOOK_EMBED_BASE}${m[1]}/posts/${m[2]}`, type: 'facebook' };
+    m = url.match(FACEBOOK_OTHER_REGEX);
     if (m) return { url: url, type: 'facebook' };
     return null;
   }
@@ -305,7 +321,7 @@ export default class Timeline {
           loadEmbed();
         } else if (!document.querySelector('script[src*="instagram.com/embed.js"]')) {
           const s = document.createElement('script');
-          s.src = 'https://www.instagram.com/embed.js';
+          s.src = INSTAGRAM_EMBED_SCRIPT;
           s.async = true;
           s.onload = loadEmbed;
           document.head.appendChild(s);
@@ -336,7 +352,7 @@ export default class Timeline {
           loadEmbed();
         } else if (!document.querySelector('script[src*="platform.twitter.com/widgets.js"]')) {
           const s = document.createElement('script');
-          s.src = 'https://platform.twitter.com/widgets.js';
+          s.src = TWITTER_WIDGETS_SCRIPT;
           s.async = true;
           s.onload = loadEmbed;
           document.head.appendChild(s);
@@ -372,7 +388,7 @@ export default class Timeline {
             document.body.prepend(fbRoot);
           }
           const s = document.createElement('script');
-          s.src = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
+          s.src = FACEBOOK_SDK_URL;
           s.async = true;
           s.defer = true;
           s.crossOrigin = 'anonymous';
@@ -600,7 +616,7 @@ export default class Timeline {
 
   // ====== Render featured + timeline ======
   _renderAll() {
-    const featured = this.allCards.slice(0, this.FEATURED_COUNT);
+    const featured = this.allCards.slice(0, this.featured_count);
     const n = this.allCards.length;
     this.remainingCount.textContent = this._originalCards.length;
     this.container.querySelector('#remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
