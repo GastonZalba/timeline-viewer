@@ -929,6 +929,8 @@
   font-weight: 700;
   text-transform: uppercase;
   margin-left: auto;
+  width: 120px;
+  justify-content: center;
 }
 .card-open:hover {
   background: var(--accent);
