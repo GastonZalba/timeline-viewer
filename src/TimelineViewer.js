@@ -145,6 +145,7 @@ export default class Timeline {
       this._lgContainer = document.createElement('div');
     }
     this._lgInstance = lightGallery(this._lgContainer, {
+      addClass: 'timeline-gallery',
       dynamic: true,
       dynamicEl: images.map(imgInfo => ({
         src: imgInfo.full,
@@ -601,7 +602,7 @@ export default class Timeline {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = val;
-        cb.checked = true;
+        cb.checked = false;
         const span = document.createElement('span');
         span.textContent = `${val} (${counts[val]})`;
         label.appendChild(cb);
@@ -615,12 +616,12 @@ export default class Timeline {
 
   // ====== Filter by tone and source type ======
   _applyFilters() {
-    const anyActive = this.filters.some(f => !f.checkboxes.every(cb => cb.checked));
+    const anyActive = this.filters.some(f => f.checkboxes.some(cb => cb.checked));
     this.filterToggle.classList.toggle('active', anyActive);
     this.allCards = this._originalCards.filter(c =>
       this.filters.every(f => {
         const active = f.checkboxes.filter(cb => cb.checked).map(cb => cb.value);
-        return active.length === f.checkboxes.length || active.includes(c[f.field]);
+        return active.length === 0 || active.includes(c[f.field]);
       })
     );
     if (this.sortAscending) this.allCards.reverse();
