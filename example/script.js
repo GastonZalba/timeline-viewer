@@ -5,6 +5,6 @@ new Timeline({
   container: '#noticias-container',
   items: mockData.items,
   lastUpdated: mockData.lastUpdated,
-  featuredCount: 12,
+  featuredCount: 10,
   itemsPerPage: 10
 });
