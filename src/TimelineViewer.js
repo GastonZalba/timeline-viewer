@@ -298,103 +298,51 @@ export default class Timeline {
       cardEl.classList.add('expanded');
       const igWrap = cardEl.querySelector('.card-iframe-instagram');
       if (igWrap) {
-        const loadEmbed = () => {
-          setTimeout(() => {
-            if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
-              instgrm.Embeds.process();
-            }
+        setTimeout(() => {
+          if (!igWrap.querySelector('iframe') && typeof instgrm !== 'undefined' && instgrm.Embeds) instgrm.Embeds.process();
+          if (!igWrap.classList.contains('loaded')) {
             const check = setInterval(() => {
               const iframe = igWrap.querySelector('iframe');
               if (!iframe) return;
               clearInterval(check);
-              if (iframe.contentDocument?.readyState === 'complete') {
-                igWrap.classList.add('loaded');
-              } else {
-                iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
-                setTimeout(() => igWrap.classList.add('loaded'), 3000);
-              }
+              iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
+              setTimeout(() => igWrap.classList.add('loaded'), 3000);
             }, 100);
             setTimeout(() => igWrap.classList.add('loaded'), 10000);
-          }, 150);
-        };
-        if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
-          loadEmbed();
-        } else if (!document.querySelector('script[src*="instagram.com/embed.js"]')) {
-          const s = document.createElement('script');
-          s.src = INSTAGRAM_EMBED_SCRIPT;
-          s.async = true;
-          s.onload = loadEmbed;
-          document.head.appendChild(s);
-        }
+          }
+        }, 150);
       }
       const twWrap = cardEl.querySelector('.card-iframe-twitter');
       if (twWrap) {
-        const loadEmbed = () => {
-          setTimeout(() => {
-            if (typeof twttr !== 'undefined' && twttr.widgets) {
-              twttr.widgets.load(twWrap);
-            }
+        setTimeout(() => {
+          if (!twWrap.querySelector('iframe') && typeof twttr !== 'undefined' && twttr.widgets) twttr.widgets.load(twWrap);
+          if (!twWrap.classList.contains('loaded')) {
             const check = setInterval(() => {
               const iframe = twWrap.querySelector('iframe');
               if (!iframe) return;
               clearInterval(check);
-              if (iframe.contentDocument?.readyState === 'complete') {
-                twWrap.classList.add('loaded');
-              } else {
-                iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
-                setTimeout(() => twWrap.classList.add('loaded'), 3000);
-              }
+              iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
+              setTimeout(() => twWrap.classList.add('loaded'), 3000);
             }, 100);
             setTimeout(() => twWrap.classList.add('loaded'), 10000);
-          }, 150);
-        };
-        if (typeof twttr !== 'undefined' && twttr.widgets) {
-          loadEmbed();
-        } else if (!document.querySelector('script[src*="platform.twitter.com/widgets.js"]')) {
-          const s = document.createElement('script');
-          s.src = TWITTER_WIDGETS_SCRIPT;
-          s.async = true;
-          s.onload = loadEmbed;
-          document.head.appendChild(s);
-        }
+          }
+        }, 150);
       }
       const fbWrap = cardEl.querySelector('.card-iframe-facebook');
       if (fbWrap) {
-        const loadEmbed = () => {
-          setTimeout(() => {
-            if (typeof FB !== 'undefined' && FB.XFBML) {
-              FB.XFBML.parse(fbWrap);
-            }
+        setTimeout(() => {
+          if (!fbWrap.querySelector('iframe') && typeof FB !== 'undefined' && FB.XFBML) FB.XFBML.parse(fbWrap);
+          if (!fbWrap.classList.contains('loaded')) {
             const check = setInterval(() => {
               const iframe = fbWrap.querySelector('iframe');
               if (!iframe) return;
               clearInterval(check);
-              if (iframe.contentDocument?.readyState === 'complete') {
-                fbWrap.classList.add('loaded');
-              } else {
-                iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
-                setTimeout(() => fbWrap.classList.add('loaded'), 3000);
-              }
+              iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
+              setTimeout(() => fbWrap.classList.add('loaded'), 3000);
             }, 100);
             setTimeout(() => fbWrap.classList.add('loaded'), 10000);
-          }, 150);
-        };
-        if (typeof FB !== 'undefined' && FB.XFBML) {
-          loadEmbed();
-        } else if (!document.querySelector('script[src*="connect.facebook.net"]')) {
-          if (!document.getElementById('fb-root')) {
-            const fbRoot = document.createElement('div');
-            fbRoot.id = 'fb-root';
-            document.body.prepend(fbRoot);
           }
-          const s = document.createElement('script');
-          s.src = FACEBOOK_SDK_URL;
-          s.async = true;
-          s.defer = true;
-          s.crossOrigin = 'anonymous';
-          s.onload = loadEmbed;
-          document.head.appendChild(s);
-        }
+        }, 150);
       }
     });
     cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
@@ -519,6 +467,71 @@ export default class Timeline {
   }
 
   // ====== Toggle expand / collapse ======
+  _preloadEmbedLibraries() {
+    const types = new Set();
+    this.allCards.forEach(card => {
+      if (!card.link_web) return;
+      const parsed = this._parseLinkWeb(card.link_web);
+      if (parsed) types.add(parsed.type);
+    });
+
+    const _watchEmbeds = (selector) => {
+      const scan = setInterval(() => {
+        const wraps = document.querySelectorAll(selector);
+        let pending = 0;
+        wraps.forEach(wrap => {
+          if (wrap.classList.contains('loaded')) return;
+          const iframe = wrap.querySelector('iframe');
+          if (!iframe) { pending++; return; }
+          iframe.addEventListener('load', () => wrap.classList.add('loaded'), { once: true });
+          pending++;
+        });
+        if (pending === 0) clearInterval(scan);
+      }, 200);
+      setTimeout(() => clearInterval(scan), 15000);
+    };
+
+    if (types.has('instagram') && !document.querySelector('script[src*="instagram.com/embed.js"]')) {
+      const s = document.createElement('script');
+      s.src = INSTAGRAM_EMBED_SCRIPT;
+      s.async = true;
+      s.onload = () => {
+        if (typeof instgrm !== 'undefined' && instgrm.Embeds) instgrm.Embeds.process();
+        _watchEmbeds('.card-iframe-instagram');
+      };
+      document.head.appendChild(s);
+    }
+
+    if (types.has('twitter') && !document.querySelector('script[src*="platform.twitter.com/widgets.js"]')) {
+      const s = document.createElement('script');
+      s.src = TWITTER_WIDGETS_SCRIPT;
+      s.async = true;
+      s.onload = () => {
+        if (typeof twttr !== 'undefined' && twttr.widgets) twttr.widgets.load();
+        _watchEmbeds('.card-iframe-twitter');
+      };
+      document.head.appendChild(s);
+    }
+
+    if (types.has('facebook') && !document.querySelector('script[src*="connect.facebook.net"]')) {
+      if (!document.getElementById('fb-root')) {
+        const fbRoot = document.createElement('div');
+        fbRoot.id = 'fb-root';
+        document.body.prepend(fbRoot);
+      }
+      const s = document.createElement('script');
+      s.src = FACEBOOK_SDK_URL;
+      s.async = true;
+      s.defer = true;
+      s.crossOrigin = 'anonymous';
+      s.onload = () => {
+        if (typeof FB !== 'undefined' && FB.XFBML) FB.XFBML.parse();
+        _watchEmbeds('.card-iframe-facebook');
+      };
+      document.head.appendChild(s);
+    }
+  }
+
   _toggleExpand(scrollTo = false) {
     this.isExpanded = !this.isExpanded;
 
@@ -529,6 +542,7 @@ export default class Timeline {
       requestAnimationFrame(() => {
         this._setupTimelineObserver();
       });
+      this._preloadEmbedLibraries();
     } else {
       const cards = this.featuredContainer.querySelectorAll('.featured-card');
       cards.forEach((c) => c.style.transition = 'none');

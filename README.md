@@ -88,7 +88,7 @@ When the card is expanded, `link_web` is automatically parsed for supported plat
 | Twitter/X | `/username/status/ID`          | Official [Twitter Widgets](https://platform.twitter.com/widgets.js) via `<blockquote class="twitter-tweet">` |
 | Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` |
 
-Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of raw iframes. The scripts are loaded **lazily** — they are only fetched when a card with a matching link is expanded for the first time. The SDKs handle responsive sizing automatically, eliminating fixed heights and scrollbars.
+Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of raw iframes. The scripts are loaded **lazily**.
 
 Profile pages, channels, playlists and other non-content URLs are ignored.
 
