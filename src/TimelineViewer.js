@@ -136,7 +136,7 @@ export default class Timeline {
     return null;
   }
 
-  _openLightGallery(images) {
+  _openLightGallery(images, title, showFileName) {
     if (this._lgInstance) {
       this._lgInstance.destroy();
       this._lgInstance = null;
@@ -150,6 +150,7 @@ export default class Timeline {
       dynamicEl: images.map(imgInfo => ({
         src: imgInfo.full,
         thumb: imgInfo.thumb,
+        subHtml: title ? `<div class="lg-caption"><h4>${title}</h4>${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}</div>` : '',
       })),
       plugins: [lgThumbnail, lgZoom],
     });
@@ -362,14 +363,14 @@ export default class Timeline {
     if (screenshotBtn) {
       screenshotBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this._openLightGallery([{ thumb: card.screenshot, full: card.screenshot }]);
+        this._openLightGallery([{ thumb: card.screenshot, full: card.screenshot }], card.nombre_fuente, false);
       });
     }
     const imagesBtn = el.querySelector('.card-images-btn');
     if (imagesBtn) {
       imagesBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        this._openLightGallery(card.imagenes);
+        this._openLightGallery(card.imagenes, card.nombre_fuente, true);
       });
     }
     const prot = el.querySelector('.card-protagonista.has-more');

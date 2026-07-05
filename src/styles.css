@@ -1203,3 +1203,15 @@
 .timeline-gallery .lg-next:before {
   color: #c5c5c5;
 }
+.timeline-gallery .lg-caption {
+  text-align: center;
+  color: #fff;
+  font-size: 0.85rem;
+}
+.timeline-gallery .lg-caption h4 {
+  font-weight: 700;
+}
+.timeline-gallery img.lg-object {
+  box-shadow: 0 4px 10px black;
+  border-radius: 5px;
+}
