@@ -150,7 +150,7 @@ export default class Timeline {
       dynamicEl: images.map(imgInfo => ({
         src: imgInfo.full,
         thumb: imgInfo.thumb,
-        subHtml: title ? `<div class="lg-caption"><h4>${title}</h4>${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}</div>` : '',
+        subHtml: title ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>` : '',
       })),
       plugins: [lgThumbnail, lgZoom],
     });

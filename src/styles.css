@@ -1175,8 +1175,10 @@
 }
 
 /* Light Gallery */
-.timeline-gallery  .lg-backdrop.in {
+.timeline-gallery .lg-backdrop.in {
   opacity: 0.9;
+}
+.timeline-gallery .lg-backdrop {
   background-color: #1a2025;
 }
 .timeline-gallery .lg-content button.lg-icon {
