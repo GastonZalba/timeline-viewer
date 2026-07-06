@@ -92,15 +92,28 @@ Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of 
 
 Profile pages, channels, playlists and other non-content URLs are ignored.
 
+## Build
+
+```bash
+npm run build
+```
+
+Compiles TypeScript (`src/TimelineViewer.ts`) and SCSS (`src/styles.scss`) into `dist/`. The resulting JS, type declarations, and CSS are ready for distribution.
+
+Run only the TypeScript compilation:
+```bash
+npm run build:ts
+```
+
 ## Development
 
 ```bash
 npm start
 ```
 
-Opens `http://localhost:3010` with a demo page — no build step required.
+Opens `http://localhost:3010` with a demo page — the example imports the built output from `dist/`. Run `npm run build` before starting if you make changes.
 
-The demo page loads lightgallery JS and CSS from CDN via importmap. The source itself (`src/TimelineViewer.js`) imports from `node_modules/` — consumers are responsible for providing lightgallery as a peer dependency.
+The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency.
 
 ## Preview
 

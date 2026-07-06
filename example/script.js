@@ -1,4 +1,4 @@
-import Timeline from '../src/TimelineViewer.js';
+import Timeline from '../dist/TimelineViewer.js';
 import mockData from './mock-data.js';
 
 new Timeline({

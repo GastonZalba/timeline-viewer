@@ -1,17 +1,21 @@
 {
   "name": "timeline-viewer",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "A frontend timeline card viewer for news articles with expandable details",
   "type": "module",
-  "main": "src/TimelineViewer.js",
-  "module": "src/TimelineViewer.js",
-  "types": "src/TimelineViewer.d.ts",
+  "main": "dist/TimelineViewer.js",
+  "module": "dist/TimelineViewer.js",
+  "types": "dist/TimelineViewer.d.ts",
   "files": [
-    "src/"
+    "src/",
+    "dist/"
   ],
   "scripts": {
     "start": "node example/server.js",
-    "example": "node example/server.js"
+    "example": "node example/server.js",
+    "build:css": "sass src/styles.scss dist/styles.css",
+    "build:ts": "tsc",
+    "build": "npm run build:ts && npm run build:css"
   },
   "keywords": [
     "timeline",
@@ -24,5 +28,9 @@
   "license": "MIT",
   "peerDependencies": {
     "lightgallery": "^2.9.0"
+  },
+  "devDependencies": {
+    "sass": "^1.80.0",
+    "typescript": "^6.0.3"
   }
 }

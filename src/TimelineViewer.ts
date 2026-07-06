@@ -1,6 +1,12 @@
-import lightGallery from 'lightgallery/lightgallery.es5.js';
-import lgThumbnail from 'lightgallery/plugins/thumbnail/lg-thumbnail.es5.js';
-import lgZoom from 'lightgallery/plugins/zoom/lg-zoom.es5.js';
+import lightGallery from 'lightgallery';
+import lgThumbnail from 'lightgallery/plugins/thumbnail';
+import lgZoom from 'lightgallery/plugins/zoom';
+import type { LightGallery } from 'lightgallery/lightgallery';
+import type { GalleryItem } from 'lightgallery/lg-utils';
+
+declare const instgrm: { Embeds: { process: () => void } } | undefined;
+declare const twttr: { widgets: { load: (el?: HTMLElement) => void } } | undefined;
+declare const FB: { XFBML: { parse: (el?: HTMLElement) => void } } | undefined;
 
 const YOUTUBE_REGEX = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
 const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
@@ -18,10 +24,83 @@ const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.ph
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
+export interface ItemTema {
+  titulo: string;
+  resumen: string;
+  tono_social: 'Positivo' | 'Negativo' | 'Neutro';
+}
+
+export interface TimelineItem {
+  id: number | string;
+  nombre_fuente: string;
+  resumen_ia: string;
+  fecha_publicacion: string;
+  fecha_scrapeo: string;
+  tono_social: 'Positivo' | 'Negativo' | 'Neutro';
+  fuente_institucional: string;
+  tipo_fuente: string;
+  thumbnail: string | null;
+  link_web: string;
+  actores_principales: string[];
+  screenshot: string | null;
+  imagenes: { thumb: string; full: string }[];
+  temas: ItemTema[];
+}
+
+export interface TimelineOptions {
+  container: string | HTMLElement;
+  items?: TimelineItem[];
+  featuredCount?: number;
+  lastUpdated?: string;
+  itemsPerPage?: number;
+}
+
+interface ImageInfo {
+  thumb: string;
+  full: string;
+}
+
+interface LinkInfo {
+  url: string;
+  type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
+}
+
+interface FilterDef {
+  field: 'tono_social' | 'tipo_fuente';
+  label: string;
+  options: HTMLElement;
+  checkboxes: HTMLInputElement[];
+}
+
 export default class Timeline {
-  constructor(config) {
+  container: HTMLElement;
+  items: TimelineItem[];
+  featured_count: number;
+  lastUpdated: string;
+  itemsPerPage: number;
+  _displayedCount: number;
+  allCards: TimelineItem[];
+  isExpanded: boolean;
+  featuredContainer: HTMLElement;
+  timelineContainer: HTMLElement;
+  timelineCards: HTMLElement;
+  expandToggle: HTMLElement;
+  remainingCount: HTMLElement;
+  expandIcon: HTMLElement;
+  section: HTMLElement;
+  fabCollapse: HTMLElement;
+  sortToggle: HTMLElement;
+  sortAscending: boolean = false;
+  filterToggle: HTMLElement;
+  filterMenu: HTMLElement;
+  filters: FilterDef[];
+  _lgInstance: LightGallery | null;
+  _lgContainer: HTMLElement | null;
+  _originalCards: TimelineItem[];
+
+  constructor(config: TimelineOptions) {
     this.container = typeof config.container === 'string'
-      ? document.querySelector(config.container)
+      ? document.querySelector(config.container) as HTMLElement
       : config.container;
     this.items = config.items || [];
     this.featured_count = config.featuredCount || 6;
@@ -30,18 +109,26 @@ export default class Timeline {
     this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
-    this.featuredContainer = null;
-    this.timelineContainer = null;
-    this.timelineCards = null;
-    this.expandToggle = null;
-    this.remainingCount = null;
-    this.expandIcon = null;
-    this.section = null;
+    this.featuredContainer = null as unknown as HTMLElement;
+    this.timelineContainer = null as unknown as HTMLElement;
+    this.timelineCards = null as unknown as HTMLElement;
+    this.expandToggle = null as unknown as HTMLElement;
+    this.remainingCount = null as unknown as HTMLElement;
+    this.expandIcon = null as unknown as HTMLElement;
+    this.fabCollapse = null as unknown as HTMLElement;
+    this.sortToggle = null as unknown as HTMLElement;
+    this.filterToggle = null as unknown as HTMLElement;
+    this.filterMenu = null as unknown as HTMLElement;
+    this.section = null as unknown as HTMLElement;
+    this.filters = [];
+    this._lgInstance = null;
+    this._lgContainer = null;
+    this._originalCards = [];
     this._init();
   }
 
-  // ====== Build layout ======
-  _buildLayout() {
+  /** Build the main DOM layout and cache element references */
+  protected _buildLayout() {
     this.container.innerHTML = `
       <section class="noticias-section" id="noticias-section">
         <div class="featured-row">
@@ -85,43 +172,44 @@ export default class Timeline {
                   <span class="fab-label">Colapsar</span>
                 </button>
               </div>
-              </div>
             </div>
           </div>
+        </div>
       </section>
     `;
-    this.section = this.container.querySelector('#noticias-section');
-    this.featuredContainer = this.container.querySelector('#featured-cards');
-    this.timelineContainer = this.container.querySelector('#timeline-container');
-    this.timelineCards = this.container.querySelector('#timeline-cards');
-    this.expandToggle = this.container.querySelector('#expand-toggle');
-    this.remainingCount = this.container.querySelector('#remaining-count');
-    this.expandIcon = this.container.querySelector('#expand-icon');
-    this.fabCollapse = this.container.querySelector('#fab-collapse');
-    this.sortToggle = this.container.querySelector('#sort-toggle');
-    this.sortAscending = false;
-    this.filterToggle = this.container.querySelector('#filter-toggle');
-    this.filterMenu = this.container.querySelector('#filter-menu');
+    this.section = this.container.querySelector('#noticias-section') as HTMLElement;
+    this.featuredContainer = this.container.querySelector('#featured-cards') as HTMLElement;
+    this.timelineContainer = this.container.querySelector('#timeline-container') as HTMLElement;
+    this.timelineCards = this.container.querySelector('#timeline-cards') as HTMLElement;
+    this.expandToggle = this.container.querySelector('#expand-toggle') as HTMLElement;
+    this.remainingCount = this.container.querySelector('#remaining-count') as HTMLElement;
+    this.expandIcon = this.container.querySelector('#expand-icon') as HTMLElement;
+    this.fabCollapse = this.container.querySelector('#fab-collapse') as HTMLElement;
+    this.sortToggle = this.container.querySelector('#sort-toggle') as HTMLElement;
+    this.filterToggle = this.container.querySelector('#filter-toggle') as HTMLElement;
+    this.filterMenu = this.container.querySelector('#filter-menu') as HTMLElement;
     this.filters = [
-      { field: 'tono_social', label: 'Tono social', options: this.container.querySelector('#filter-options-tone'), checkboxes: [] },
-      { field: 'tipo_fuente', label: 'Tipo de fuente', options: this.container.querySelector('#filter-options-source'), checkboxes: [] },
+      { field: 'tono_social', label: 'Tono social', options: this.container.querySelector('#filter-options-tone') as HTMLElement, checkboxes: [] },
+      { field: 'tipo_fuente', label: 'Tipo de fuente', options: this.container.querySelector('#filter-options-source') as HTMLElement, checkboxes: [] },
     ];
   }
 
-  // ====== Helpers ======
-  _formatDate(dateStr) {
+  /** Format a date string (YYYY-MM-DD) to a locale display string */
+  protected _formatDate(dateStr: string): string {
     if (!dateStr) return 'Sin fecha';
     const d = new Date(dateStr + 'T00:00:00');
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
   }
 
-  _formatDateTime(dateStr) {
+  /** Format a full datetime string to a locale display string */
+  protected _formatDateTime(dateStr: string): string {
     if (!dateStr) return '';
     const d = new Date(dateStr);
     return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
-  _parseLinkWeb(url) {
+  /** Parse a URL and return embed info based on the supported social platforms */
+  protected _parseLinkWeb(url: string): LinkInfo | null {
     if (!url) return null;
     let m = url.match(YOUTUBE_REGEX);
     if (m) return { url: `${YOUTUBE_EMBED_URL}${m[1]}`, type: 'youtube' };
@@ -136,7 +224,8 @@ export default class Timeline {
     return null;
   }
 
-  _openLightGallery(images, title, showFileName) {
+  /** Open a lightGallery modal with the provided images */
+  protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean): void {
     if (this._lgInstance) {
       this._lgInstance.destroy();
       this._lgInstance = null;
@@ -151,7 +240,7 @@ export default class Timeline {
         src: imgInfo.full,
         thumb: imgInfo.thumb,
         subHtml: title ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>` : '',
-      })),
+      })) as GalleryItem[],
       plugins: [lgThumbnail, lgZoom],
     });
     this._lgContainer.addEventListener('lgAfterClose', () => {
@@ -163,8 +252,8 @@ export default class Timeline {
     this._lgInstance.openGallery();
   }
 
-  // ====== Render featured (overlapping) cards ======
-  _renderFeatured(cards) {
+  /** Render the featured (overlapping) cards row */
+  protected _renderFeatured(cards: TimelineItem[]): void {
     this.featuredContainer.innerHTML = '';
     cards.forEach((card, i) => {
       const el = document.createElement('div');
@@ -183,7 +272,7 @@ export default class Timeline {
           ${protHtml}
         </div>
       `;
-      const featuredImg = el.querySelector('.card-image');
+      const featuredImg = el.querySelector('.card-image') as HTMLImageElement | null;
       if (featuredImg) {
         featuredImg.addEventListener('load', () => featuredImg.classList.add('loaded'));
         if (featuredImg.complete) featuredImg.classList.add('loaded');
@@ -192,16 +281,16 @@ export default class Timeline {
     });
   }
 
-  // ====== Create a single timeline item element ======
-  _createTimelineItem(card, index) {
+  /** Create a single timeline card element with all its event listeners */
+  protected _createTimelineItem(card: TimelineItem, index: number): HTMLElement {
     const el = document.createElement('div');
     el.className = 'timeline-item';
     el.style.transitionDelay = `${index * 0.08}s`;
     const imgHtml = card.thumbnail
       ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"></div>`
       : '';
-    const toneLabel = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
-    const toneLabelTema = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+    const toneLabel: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+    const toneLabelTema: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
     const actors = card.actores_principales || [];
     const MAX_ACTORS = 3;
     const hasMore = actors.length > MAX_ACTORS;
@@ -281,24 +370,24 @@ export default class Timeline {
         </div>
       </div>
     `;
-    const timelineImg = el.querySelector('.card-image');
+    const timelineImg = el.querySelector('.card-image') as HTMLImageElement | null;
     if (timelineImg) {
       timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
       if (timelineImg.complete) timelineImg.classList.add('loaded');
     }
-    const iframeWrap = el.querySelector('.card-iframe-wrap');
+    const iframeWrap = el.querySelector('.card-iframe-wrap') as HTMLElement | null;
     if (iframeWrap) {
-      const iframe = iframeWrap.querySelector('iframe');
+      const iframe = iframeWrap.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
         iframe.addEventListener('load', () => iframeWrap.classList.add('loaded'));
         if (iframe.contentDocument?.readyState === 'complete') iframeWrap.classList.add('loaded');
       }
     }
-    const cardEl = el.querySelector('.timeline-card');
-    cardEl.addEventListener('click', (e) => {
-      if (e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
+    const cardEl = el.querySelector('.timeline-card') as HTMLElement;
+    cardEl.addEventListener('click', (e: Event) => {
+      if (e.target && (e.target as HTMLElement).closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
       cardEl.classList.add('expanded');
-      const igWrap = cardEl.querySelector('.card-iframe-instagram');
+      const igWrap = cardEl.querySelector('.card-iframe-instagram') as HTMLElement | null;
       if (igWrap) {
         setTimeout(() => {
           if (!igWrap.querySelector('iframe') && typeof instgrm !== 'undefined' && instgrm.Embeds) instgrm.Embeds.process();
@@ -314,7 +403,7 @@ export default class Timeline {
           }
         }, 150);
       }
-      const twWrap = cardEl.querySelector('.card-iframe-twitter');
+      const twWrap = cardEl.querySelector('.card-iframe-twitter') as HTMLElement | null;
       if (twWrap) {
         setTimeout(() => {
           if (!twWrap.querySelector('iframe') && typeof twttr !== 'undefined' && twttr.widgets) twttr.widgets.load(twWrap);
@@ -330,7 +419,7 @@ export default class Timeline {
           }
         }, 150);
       }
-      const fbWrap = cardEl.querySelector('.card-iframe-facebook');
+      const fbWrap = cardEl.querySelector('.card-iframe-facebook') as HTMLElement | null;
       if (fbWrap) {
         setTimeout(() => {
           if (!fbWrap.querySelector('iframe') && typeof FB !== 'undefined' && FB.XFBML) FB.XFBML.parse(fbWrap);
@@ -347,40 +436,40 @@ export default class Timeline {
         }, 150);
       }
     });
-    cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
+    (cardEl.querySelector('.card-collapse') as HTMLElement).addEventListener('click', (e: Event) => {
       e.stopPropagation();
       cardEl.classList.remove('expanded');
     });
-    cardEl.querySelector('.card-info-btn').addEventListener('click', (e) => {
+    (cardEl.querySelector('.card-info-btn') as HTMLElement).addEventListener('click', (e: Event) => {
       e.stopPropagation();
-      cardEl.querySelector('.card-info-menu').classList.toggle('open');
+      (cardEl.querySelector('.card-info-menu') as HTMLElement).classList.toggle('open');
     });
-    cardEl.querySelector('.card-open').addEventListener('click', (e) => {
+    (cardEl.querySelector('.card-open') as HTMLElement).addEventListener('click', (e: Event) => {
       e.stopPropagation();
       if (card.link_web) window.open(card.link_web, '_blank', 'noopener');
     });
-    const screenshotBtn = el.querySelector('.card-screenshot-btn');
+    const screenshotBtn = el.querySelector('.card-screenshot-btn') as HTMLElement | null;
     if (screenshotBtn) {
-      screenshotBtn.addEventListener('click', (e) => {
+      screenshotBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
-        this._openLightGallery([{ thumb: card.screenshot, full: card.screenshot }], card.nombre_fuente, false);
+        this._openLightGallery([{ thumb: card.screenshot!, full: card.screenshot! }], card.nombre_fuente, false);
       });
     }
-    const imagesBtn = el.querySelector('.card-images-btn');
+    const imagesBtn = el.querySelector('.card-images-btn') as HTMLElement | null;
     if (imagesBtn) {
-      imagesBtn.addEventListener('click', (e) => {
+      imagesBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
         this._openLightGallery(card.imagenes, card.nombre_fuente, true);
       });
     }
-    const prot = el.querySelector('.card-protagonista.has-more');
+    const prot = el.querySelector('.card-protagonista.has-more') as HTMLElement | null;
     if (prot) {
-      prot.addEventListener('click', (e) => {
+      prot.addEventListener('click', (e: Event) => {
         e.stopPropagation();
         prot.classList.toggle('expanded');
-        const list = prot.querySelector('.protagonista-list');
+        const list = prot.querySelector('.protagonista-list') as HTMLElement;
         if (prot.classList.contains('expanded')) {
-          list.textContent = prot.dataset.full;
+          list.textContent = prot.dataset.full || '';
         } else {
           list.textContent = actors.slice(0, MAX_ACTORS).join(', ') + '...';
         }
@@ -389,8 +478,8 @@ export default class Timeline {
     return el;
   }
 
-  // ====== Insert element before timeline footer ======
-  _insertBeforeFooter(el) {
+  /** Insert an element before the timeline footer, or append if no footer */
+  protected _insertBeforeFooter(el: HTMLElement): void {
     const footer = this.timelineCards.querySelector('.timeline-footer-item');
     if (footer) {
       this.timelineCards.insertBefore(el, footer);
@@ -399,8 +488,8 @@ export default class Timeline {
     }
   }
 
-  // ====== Render timeline cards ======
-  _renderTimeline(cards) {
+  /** Render the timeline cards list, including the last-updated footer */
+  protected _renderTimeline(cards: TimelineItem[]): void {
     this.timelineCards.innerHTML = '';
     if (cards.length === 0) {
       const el = document.createElement('div');
@@ -432,8 +521,8 @@ export default class Timeline {
     }
   }
 
-  // ====== Intersection Observer for featured cards ======
-  _setupObserver() {
+  /** Set up IntersectionObserver for the featured cards entrance animation */
+  protected _setupObserver(): void {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -449,8 +538,8 @@ export default class Timeline {
     observer.observe(this.section);
   }
 
-  // ====== Intersection Observer for timeline items ======
-  _setupTimelineObserver() {
+  /** Set up IntersectionObserver for the timeline items entrance animation */
+  protected _setupTimelineObserver(): void {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -468,16 +557,16 @@ export default class Timeline {
     });
   }
 
-  // ====== Toggle expand / collapse ======
-  _preloadEmbedLibraries() {
-    const types = new Set();
+  /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
+  protected _preloadEmbedLibraries(): void {
+    const types = new Set<string>();
     this.allCards.forEach(card => {
       if (!card.link_web) return;
       const parsed = this._parseLinkWeb(card.link_web);
       if (parsed) types.add(parsed.type);
     });
 
-    const _watchEmbeds = (selector) => {
+    const _watchEmbeds = (selector: string) => {
       const scan = setInterval(() => {
         const wraps = document.querySelectorAll(selector);
         let pending = 0;
@@ -534,7 +623,8 @@ export default class Timeline {
     }
   }
 
-  _toggleExpand(scrollTo = false) {
+  /** Toggle between expanded (timeline visible) and collapsed state */
+  protected _toggleExpand(scrollTo = false): void {
     this.isExpanded = !this.isExpanded;
 
     if (this.isExpanded) {
@@ -547,10 +637,10 @@ export default class Timeline {
       this._preloadEmbedLibraries();
     } else {
       const cards = this.featuredContainer.querySelectorAll('.featured-card');
-      cards.forEach((c) => c.style.transition = 'none');
+      cards.forEach((c) => (c as HTMLElement).style.transition = 'none');
       cards.forEach((c) => c.classList.remove('visible'));
       void this.featuredContainer.offsetHeight;
-      cards.forEach((c) => c.style.transition = '');
+      cards.forEach((c) => (c as HTMLElement).style.transition = '');
 
       this.section.classList.remove('expanded', 'scrolled');
       this.timelineContainer.classList.remove('expanded');
@@ -567,7 +657,8 @@ export default class Timeline {
     }
   }
 
-  _scrollToSection() {
+  /** Scroll the page/section to make the timeline container visible */
+  protected _scrollToSection(): void {
     const offset = 60;
     const rect = this.section.getBoundingClientRect();
     let el = this.section.parentElement;
@@ -582,18 +673,18 @@ export default class Timeline {
     window.scrollTo({ top: window.scrollY + rect.top - offset, behavior: 'smooth' });
   }
 
-  // ====== Toggle timeline sort order ======
-  _toggleSort() {
+  /** Toggle timeline sort order between ascending and descending */
+  protected _toggleSort(): void {
     this.sortAscending = !this.sortAscending;
     this.sortToggle.classList.toggle('asc', this.sortAscending);
     this._applyFilters();
   }
 
-  // ====== Build filter checkboxes from data ======
-  _buildFilterCheckboxes() {
+  /** Build filter checkboxes from the available tone and source type values */
+  protected _buildFilterCheckboxes(): void {
     this.filters.forEach(f => {
       const values = [...new Set(this.items.map(c => c[f.field]))];
-      const counts = {};
+      const counts: Record<string, number> = {};
       values.forEach(val => { counts[val] = this.items.filter(c => c[f.field] === val).length; });
       f.options.innerHTML = '';
       f.checkboxes = [];
@@ -615,14 +706,14 @@ export default class Timeline {
     });
   }
 
-  // ====== Filter by tone and source type ======
-  _applyFilters() {
+  /** Apply active filters and re-render the full view */
+  protected _applyFilters(): void {
     const anyActive = this.filters.some(f => f.checkboxes.some(cb => cb.checked));
     this.filterToggle.classList.toggle('active', anyActive);
     this.allCards = this._originalCards.filter(c =>
       this.filters.every(f => {
         const active = f.checkboxes.filter(cb => cb.checked).map(cb => cb.value);
-        return active.length === 0 || active.includes(c[f.field]);
+        return active.length === 0 || active.includes(c[f.field] as string);
       })
     );
     if (this.sortAscending) this.allCards.reverse();
@@ -630,12 +721,12 @@ export default class Timeline {
     this._renderAll();
   }
 
-  // ====== Render featured + timeline ======
-  _renderAll() {
+  /** Render featured cards, timeline, and load-more button if needed */
+  protected _renderAll(): void {
     const featured = this.allCards.slice(0, this.featured_count);
     const n = this.allCards.length;
-    this.remainingCount.textContent = this._originalCards.length;
-    this.container.querySelector('#remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+    this.remainingCount.textContent = String(this._originalCards.length);
+    this.container.querySelector('#remaining-text')!.textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
     const displayCards = this.itemsPerPage > 0
       ? this.allCards.slice(0, this._displayedCount)
@@ -652,8 +743,8 @@ export default class Timeline {
     }
   }
 
-  // ====== Render load more button ======
-  _renderLoadMoreButton() {
+  /** Render the "load more" button and wire its click handler */
+  protected _renderLoadMoreButton(): void {
     const el = document.createElement('div');
     el.className = 'timeline-item timeline-load-more-item';
     el.innerHTML = `
@@ -664,7 +755,7 @@ export default class Timeline {
         <button class="timeline-load-more-btn">Cargar m&aacute;s <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,9 12,15 18,9"/></svg></button>
       </div>
     `;
-    el.querySelector('.timeline-load-more-btn').addEventListener('click', () => {
+    (el.querySelector('.timeline-load-more-btn') as HTMLElement).addEventListener('click', () => {
       const start = this._displayedCount;
       const end = Math.min(start + this.itemsPerPage, this.allCards.length);
       const more = this.allCards.slice(start, end);
@@ -688,14 +779,14 @@ export default class Timeline {
     this._insertBeforeFooter(el);
   }
 
-  // ====== Init ======
-  _init() {
+  /** Initialize the component: build layout, sort data, render, bind events */
+  protected _init(): void {
     this._buildLayout();
     this._buildFilterCheckboxes();
     this._originalCards = [...this.items].sort((a, b) => {
       if (!a.fecha_publicacion) return 1;
       if (!b.fecha_publicacion) return -1;
-      return new Date(b.fecha_publicacion) - new Date(a.fecha_publicacion);
+      return new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
     });
     this.allCards = [...this._originalCards];
     if (this.itemsPerPage > 0) this._displayedCount = this.itemsPerPage;
@@ -714,17 +805,17 @@ export default class Timeline {
     this.fabCollapse.addEventListener('click', () => this._toggleExpand(true));
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
     this.sortToggle.addEventListener('click', () => this._toggleSort());
-    this.filterToggle.addEventListener('click', (e) => {
+    this.filterToggle.addEventListener('click', (e: Event) => {
       e.stopPropagation();
       this.filterMenu.classList.toggle('open');
       this.filterToggle.classList.toggle('open');
     });
 
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('.card-info-btn, .card-info-menu')) {
+    document.addEventListener('click', (e: Event) => {
+      if (!(e.target as HTMLElement).closest('.card-info-btn, .card-info-menu')) {
         this.container.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
       }
-      if (!e.target.closest('.filter-wrap')) {
+      if (!(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
         this.filterToggle.classList.remove('open');
       }
