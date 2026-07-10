@@ -108,10 +108,16 @@ npm run build:ts
 ## Development
 
 ```bash
-npm start
+npm run dev
 ```
 
-Opens `http://localhost:3010` with a demo page — the example imports the built output from `dist/`. Run `npm run build` before starting if you make changes.
+Starts the dev server at `http://localhost:3010` with a demo page, and automatically recompiles TypeScript and SCSS on every change. No need to manually build.
+
+To run the server without the file watchers:
+
+```bash
+npm start
+```
 
 The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency.
 

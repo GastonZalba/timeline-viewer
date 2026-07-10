@@ -222,7 +222,7 @@ export default class Timeline {
         const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
         const iframeHtml = embedUrl
             ? embedUrl.type === 'instagram'
-                ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="instagram-media" data-instgrm-permalink="${embedUrl.url}" data-instgrm-version="14" style="background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)"></blockquote></div>`
+                ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}" data-embed-url="${embedUrl.url}"><div class="card-iframe-shimmer"></div></div>`
                 : embedUrl.type === 'facebook'
                     ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><div class="fb-post" data-href="${embedUrl.url}" data-show-text="true" data-width="auto"></div></div>`
                     : embedUrl.type === 'twitter'
@@ -312,8 +312,29 @@ export default class Timeline {
             const igWrap = cardEl.querySelector('.card-iframe-instagram');
             if (igWrap) {
                 setTimeout(() => {
-                    if (!igWrap.querySelector('iframe') && typeof instgrm !== 'undefined' && instgrm.Embeds)
+                    if (!igWrap.querySelector('.instagram-media')) {
+                        const embedUrl = igWrap.getAttribute('data-embed-url');
+                        if (embedUrl) {
+                            const blockquote = document.createElement('blockquote');
+                            blockquote.className = 'instagram-media';
+                            blockquote.setAttribute('data-instgrm-permalink', embedUrl);
+                            blockquote.setAttribute('data-instgrm-version', '14');
+                            blockquote.style.cssText = 'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
+                            igWrap.insertAdjacentElement('afterbegin', blockquote);
+                        }
+                    }
+                    if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
                         instgrm.Embeds.process();
+                    }
+                    else if (!igWrap.querySelector('iframe')) {
+                        const waitForInstgrm = setInterval(() => {
+                            if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
+                                instgrm.Embeds.process();
+                                clearInterval(waitForInstgrm);
+                            }
+                        }, 200);
+                        setTimeout(() => clearInterval(waitForInstgrm), 15000);
+                    }
                     if (!igWrap.classList.contains('loaded')) {
                         const check = setInterval(() => {
                             const iframe = igWrap.querySelector('iframe');
@@ -330,8 +351,20 @@ export default class Timeline {
             const twWrap = cardEl.querySelector('.card-iframe-twitter');
             if (twWrap) {
                 setTimeout(() => {
-                    if (!twWrap.querySelector('iframe') && typeof twttr !== 'undefined' && twttr.widgets)
-                        twttr.widgets.load(twWrap);
+                    if (!twWrap.querySelector('iframe')) {
+                        if (typeof twttr !== 'undefined' && twttr.widgets) {
+                            twttr.widgets.load(twWrap);
+                        }
+                        else {
+                            const waitForTwttr = setInterval(() => {
+                                if (typeof twttr !== 'undefined' && twttr.widgets) {
+                                    twttr.widgets.load(twWrap);
+                                    clearInterval(waitForTwttr);
+                                }
+                            }, 200);
+                            setTimeout(() => clearInterval(waitForTwttr), 15000);
+                        }
+                    }
                     if (!twWrap.classList.contains('loaded')) {
                         const check = setInterval(() => {
                             const iframe = twWrap.querySelector('iframe');
@@ -348,8 +381,20 @@ export default class Timeline {
             const fbWrap = cardEl.querySelector('.card-iframe-facebook');
             if (fbWrap) {
                 setTimeout(() => {
-                    if (!fbWrap.querySelector('iframe') && typeof FB !== 'undefined' && FB.XFBML)
-                        FB.XFBML.parse(fbWrap);
+                    if (!fbWrap.querySelector('iframe')) {
+                        if (typeof FB !== 'undefined' && FB.XFBML) {
+                            FB.XFBML.parse(fbWrap);
+                        }
+                        else {
+                            const waitForFB = setInterval(() => {
+                                if (typeof FB !== 'undefined' && FB.XFBML) {
+                                    FB.XFBML.parse(fbWrap);
+                                    clearInterval(waitForFB);
+                                }
+                            }, 200);
+                            setTimeout(() => clearInterval(waitForFB), 15000);
+                        }
+                    }
                     if (!fbWrap.classList.contains('loaded')) {
                         const check = setInterval(() => {
                             const iframe = fbWrap.querySelector('iframe');
@@ -506,46 +551,48 @@ export default class Timeline {
             }, 200);
             setTimeout(() => clearInterval(scan), 15000);
         };
-        if (types.has('instagram') && !document.querySelector('script[src*="instagram.com/embed.js"]')) {
-            const s = document.createElement('script');
-            s.src = INSTAGRAM_EMBED_SCRIPT;
-            s.async = true;
-            s.onload = () => {
-                if (typeof instgrm !== 'undefined' && instgrm.Embeds)
-                    instgrm.Embeds.process();
-                _watchEmbeds('.card-iframe-instagram');
-            };
-            document.head.appendChild(s);
-        }
+        const loadScript = (src) => {
+            return new Promise(resolve => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.async = true;
+                s.onload = () => resolve();
+                s.onerror = () => resolve();
+                document.head.appendChild(s);
+            });
+        };
+        // Twitter can load in parallel (no conflict with other SDKs)
         if (types.has('twitter') && !document.querySelector('script[src*="platform.twitter.com/widgets.js"]')) {
-            const s = document.createElement('script');
-            s.src = TWITTER_WIDGETS_SCRIPT;
-            s.async = true;
-            s.onload = () => {
-                if (typeof twttr !== 'undefined' && twttr.widgets)
-                    twttr.widgets.load();
+            loadScript(TWITTER_WIDGETS_SCRIPT).then(() => {
                 _watchEmbeds('.card-iframe-twitter');
-            };
-            document.head.appendChild(s);
+            });
         }
-        if (types.has('facebook') && !document.querySelector('script[src*="connect.facebook.net"]')) {
-            if (!document.getElementById('fb-root')) {
-                const fbRoot = document.createElement('div');
-                fbRoot.id = 'fb-root';
-                document.body.prepend(fbRoot);
+        // Instagram must finish before Facebook, because Facebook's SDK
+        // sets window.FB which causes Instagram's embed.js to skip its
+        // initialization (embed.js checks: (window.FB && !window.FB.__buffer))
+        const loadInstagram = types.has('instagram') && !document.querySelector('script[src*="instagram.com/embed.js"]')
+            ? loadScript(INSTAGRAM_EMBED_SCRIPT).then(() => {
+                _watchEmbeds('.card-iframe-instagram');
+            })
+            : Promise.resolve();
+        loadInstagram.then(() => {
+            if (types.has('facebook') && !document.querySelector('script[src*="connect.facebook.net"]')) {
+                if (!document.getElementById('fb-root')) {
+                    const fbRoot = document.createElement('div');
+                    fbRoot.id = 'fb-root';
+                    document.body.prepend(fbRoot);
+                }
+                const s = document.createElement('script');
+                s.src = FACEBOOK_SDK_URL;
+                s.async = true;
+                s.defer = true;
+                s.crossOrigin = 'anonymous';
+                s.onload = () => {
+                    _watchEmbeds('.card-iframe-facebook');
+                };
+                document.head.appendChild(s);
             }
-            const s = document.createElement('script');
-            s.src = FACEBOOK_SDK_URL;
-            s.async = true;
-            s.defer = true;
-            s.crossOrigin = 'anonymous';
-            s.onload = () => {
-                if (typeof FB !== 'undefined' && FB.XFBML)
-                    FB.XFBML.parse();
-                _watchEmbeds('.card-iframe-facebook');
-            };
-            document.head.appendChild(s);
-        }
+        });
     }
     /** Toggle between expanded (timeline visible) and collapsed state */
     _toggleExpand(scrollTo = false) {
