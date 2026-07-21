@@ -12,9 +12,11 @@
   ],
   "scripts": {
     "start": "node example/server.js",
+    "format": "prettier --write \"src/**/*.{ts,scss}\" \"example/**/*.{js,html,css}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,scss}\" \"example/**/*.{js,html,css}\"",
     "build:css": "sass src/styles.scss dist/styles.css",
     "build:ts": "tsc",
-    "build": "npm run build:ts && npm run build:css",
+    "build": "npm run format && npm run build:ts && npm run build:css",
     "dev": "concurrently --kill-others \"npm run build:ts -- --watch\" \"npm run build:css -- --watch\" \"nodemon example/server.js\""
   },
   "keywords": [
@@ -32,6 +34,7 @@
   "devDependencies": {
     "concurrently": "^9.2.3",
     "nodemon": "^3.1.14",
+    "prettier": "^3.9.6",
     "sass": "^1.80.0",
     "typescript": "^6.0.3"
   }

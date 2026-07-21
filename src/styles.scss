@@ -1,4 +1,4 @@
-@use "sass:list";
+@use 'sass:list';
 
 .noticias-section {
   --tv-bg-primary: #1a2025;
@@ -204,7 +204,7 @@
     }
 
     &.active::after {
-      content: "";
+      content: '';
       position: absolute;
       top: -2px;
       right: 0;
@@ -263,7 +263,7 @@
         background: rgba(255, 255, 255, 0.05);
       }
 
-      input[type="checkbox"] {
+      input[type='checkbox'] {
         accent-color: var(--tv-accent);
         width: 12px;
         height: 12px;
@@ -303,7 +303,7 @@
     border: 1px solid var(--tv-border-card);
 
     &::after {
-      content: "";
+      content: '';
       position: absolute;
       inset: 0;
       background: #161c21;
@@ -763,7 +763,7 @@
     pointer-events: none;
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       width: 12px;
       height: 2px;
@@ -857,7 +857,7 @@
     border-radius: 14px 14px 0 0;
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       inset: 0;
       background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
@@ -1151,7 +1151,7 @@
       height: 16px;
       transition: transform 0.2s;
     }
-  } 
+  }
 
   .timeline-load-more-item {
     opacity: 1 !important;

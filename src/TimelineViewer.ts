@@ -8,7 +8,8 @@ declare const instgrm: { Embeds: { process: () => void } } | undefined;
 declare const twttr: { widgets: { load: (el?: HTMLElement) => void } } | undefined;
 declare const FB: { XFBML: { parse: (el?: HTMLElement) => void } } | undefined;
 
-const YOUTUBE_REGEX = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+const YOUTUBE_REGEX =
+  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
 const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
 
 const INSTAGRAM_REGEX = /(?:instagram\.com)\/(p|reel)\/([a-zA-Z0-9_-]+)/;
@@ -20,7 +21,8 @@ const TWITTER_EMBED_BASE = 'https://twitter.com/';
 const TWITTER_WIDGETS_SCRIPT = 'https://platform.twitter.com/widgets.js';
 
 const FACEBOOK_POST_REGEX = /(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+)/;
-const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
+const FACEBOOK_OTHER_REGEX =
+  /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
@@ -99,9 +101,10 @@ export default class Timeline {
   _originalCards: TimelineItem[];
 
   constructor(config: TimelineOptions) {
-    this.container = typeof config.container === 'string'
-      ? document.querySelector(config.container) as HTMLElement
-      : config.container;
+    this.container =
+      typeof config.container === 'string'
+        ? (document.querySelector(config.container) as HTMLElement)
+        : config.container;
     this.items = config.items || [];
     this.featured_count = config.featuredCount || 6;
     this.lastUpdated = config.lastUpdated || '';
@@ -189,8 +192,18 @@ export default class Timeline {
     this.filterToggle = this.container.querySelector('#filter-toggle') as HTMLElement;
     this.filterMenu = this.container.querySelector('#filter-menu') as HTMLElement;
     this.filters = [
-      { field: 'tono_social', label: 'Tono social', options: this.container.querySelector('#filter-options-tone') as HTMLElement, checkboxes: [] },
-      { field: 'tipo_fuente', label: 'Tipo de fuente', options: this.container.querySelector('#filter-options-source') as HTMLElement, checkboxes: [] },
+      {
+        field: 'tono_social',
+        label: 'Tono social',
+        options: this.container.querySelector('#filter-options-tone') as HTMLElement,
+        checkboxes: []
+      },
+      {
+        field: 'tipo_fuente',
+        label: 'Tipo de fuente',
+        options: this.container.querySelector('#filter-options-source') as HTMLElement,
+        checkboxes: []
+      }
     ];
   }
 
@@ -205,7 +218,13 @@ export default class Timeline {
   protected _formatDateTime(dateStr: string): string {
     if (!dateStr) return '';
     const d = new Date(dateStr);
-    return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
   /** Parse a URL and return embed info based on the supported social platforms */
@@ -236,19 +255,25 @@ export default class Timeline {
     this._lgInstance = lightGallery(this._lgContainer, {
       addClass: 'timeline-gallery',
       dynamic: true,
-      dynamicEl: images.map(imgInfo => ({
+      dynamicEl: images.map((imgInfo) => ({
         src: imgInfo.full,
         thumb: imgInfo.thumb,
-        subHtml: title ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>` : '',
+        subHtml: title
+          ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>`
+          : ''
       })) as GalleryItem[],
-      plugins: [lgThumbnail, lgZoom],
+      plugins: [lgThumbnail, lgZoom]
     });
-    this._lgContainer.addEventListener('lgAfterClose', () => {
-      if (this._lgInstance) {
-        this._lgInstance.destroy();
-        this._lgInstance = null;
-      }
-    }, { once: true });
+    this._lgContainer.addEventListener(
+      'lgAfterClose',
+      () => {
+        if (this._lgInstance) {
+          this._lgInstance.destroy();
+          this._lgInstance = null;
+        }
+      },
+      { once: true }
+    );
     this._lgInstance.openGallery();
   }
 
@@ -261,9 +286,10 @@ export default class Timeline {
       const imgHtml = card.thumbnail
         ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"></div>`
         : '';
-      const protHtml = card.actores_principales && card.actores_principales.length
-        ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
-        : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
+      const protHtml =
+        card.actores_principales && card.actores_principales.length
+          ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
+          : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
       el.innerHTML = `
         ${imgHtml}
         <div class="card-body">
@@ -310,16 +336,21 @@ export default class Timeline {
             ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="twitter-tweet" data-dnt="true"><a href="${embedUrl.url}"></a></blockquote></div>`
             : `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
       : '';
-    const temasHtml = card.temas && card.temas.length
-      ? `<div class="card-temas">${card.temas.map(t => `
+    const temasHtml =
+      card.temas && card.temas.length
+        ? `<div class="card-temas">${card.temas
+            .map(
+              (t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
             <div class="tema-header">
               <span class="tema-title">${t.titulo}</span>
               <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
             </div>
             <div class="tema-desc">${t.resumen}</div>
-          </div>`).join('')}</div>`
-      : '';
+          </div>`
+            )
+            .join('')}</div>`
+        : '';
     const footerHtml = `<div class="card-footer">
       <div class="card-footer-sep"></div>
       <div class="card-footer-actions">
@@ -385,7 +416,8 @@ export default class Timeline {
     }
     const cardEl = el.querySelector('.timeline-card') as HTMLElement;
     cardEl.addEventListener('click', (e: Event) => {
-      if (e.target && (e.target as HTMLElement).closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu')) return;
+      if (e.target && (e.target as HTMLElement).closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu'))
+        return;
       cardEl.classList.add('expanded');
       const igWrap = cardEl.querySelector('.card-iframe-instagram') as HTMLElement | null;
       if (igWrap) {
@@ -397,7 +429,8 @@ export default class Timeline {
               blockquote.className = 'instagram-media';
               blockquote.setAttribute('data-instgrm-permalink', embedUrl);
               blockquote.setAttribute('data-instgrm-version', '14');
-              blockquote.style.cssText = 'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
+              blockquote.style.cssText =
+                'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
               igWrap.insertAdjacentElement('afterbegin', blockquote);
             }
           }
@@ -552,8 +585,10 @@ export default class Timeline {
 
     if (this.lastUpdated) {
       const d = new Date(this.lastUpdated);
-      const formatted = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
-        ' a las ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      const formatted =
+        d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
+        ' a las ' +
+        d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
       const el = document.createElement('div');
       el.className = 'timeline-item timeline-footer-item';
       el.innerHTML = `
@@ -605,7 +640,7 @@ export default class Timeline {
   /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
   protected _preloadEmbedLibraries(): void {
     const types = new Set<string>();
-    this.allCards.forEach(card => {
+    this.allCards.forEach((card) => {
       if (!card.link_web) return;
       const parsed = this._parseLinkWeb(card.link_web);
       if (parsed) types.add(parsed.type);
@@ -615,10 +650,13 @@ export default class Timeline {
       const scan = setInterval(() => {
         const wraps = document.querySelectorAll(selector);
         let pending = 0;
-        wraps.forEach(wrap => {
+        wraps.forEach((wrap) => {
           if (wrap.classList.contains('loaded')) return;
           const iframe = wrap.querySelector('iframe');
-          if (!iframe) { pending++; return; }
+          if (!iframe) {
+            pending++;
+            return;
+          }
           iframe.addEventListener('load', () => wrap.classList.add('loaded'), { once: true });
           pending++;
         });
@@ -628,7 +666,7 @@ export default class Timeline {
     };
 
     const loadScript = (src: string): Promise<void> => {
-      return new Promise(resolve => {
+      return new Promise((resolve) => {
         const s = document.createElement('script');
         s.src = src;
         s.async = true;
@@ -648,11 +686,12 @@ export default class Timeline {
     // Instagram must finish before Facebook, because Facebook's SDK
     // sets window.FB which causes Instagram's embed.js to skip its
     // initialization (embed.js checks: (window.FB && !window.FB.__buffer))
-    const loadInstagram = types.has('instagram') && !document.querySelector('script[src*="instagram.com/embed.js"]')
-      ? loadScript(INSTAGRAM_EMBED_SCRIPT).then(() => {
-          _watchEmbeds('.card-iframe-instagram');
-        })
-      : Promise.resolve();
+    const loadInstagram =
+      types.has('instagram') && !document.querySelector('script[src*="instagram.com/embed.js"]')
+        ? loadScript(INSTAGRAM_EMBED_SCRIPT).then(() => {
+            _watchEmbeds('.card-iframe-instagram');
+          })
+        : Promise.resolve();
 
     loadInstagram.then(() => {
       if (types.has('facebook') && !document.querySelector('script[src*="connect.facebook.net"]')) {
@@ -688,10 +727,10 @@ export default class Timeline {
       this._preloadEmbedLibraries();
     } else {
       const cards = this.featuredContainer.querySelectorAll('.featured-card');
-      cards.forEach((c) => (c as HTMLElement).style.transition = 'none');
+      cards.forEach((c) => ((c as HTMLElement).style.transition = 'none'));
       cards.forEach((c) => c.classList.remove('visible'));
       void this.featuredContainer.offsetHeight;
-      cards.forEach((c) => (c as HTMLElement).style.transition = '');
+      cards.forEach((c) => ((c as HTMLElement).style.transition = ''));
 
       this.section.classList.remove('expanded', 'scrolled');
       this.timelineContainer.classList.remove('expanded');
@@ -715,7 +754,12 @@ export default class Timeline {
     let el = this.section.parentElement;
     while (el) {
       const style = getComputedStyle(el);
-      if (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflow === 'auto' || style.overflow === 'scroll') {
+      if (
+        style.overflowY === 'auto' ||
+        style.overflowY === 'scroll' ||
+        style.overflow === 'auto' ||
+        style.overflow === 'scroll'
+      ) {
         el.scrollTo({ top: el.scrollTop + rect.top - offset, behavior: 'smooth' });
         return;
       }
@@ -733,13 +777,15 @@ export default class Timeline {
 
   /** Build filter checkboxes from the available tone and source type values */
   protected _buildFilterCheckboxes(): void {
-    this.filters.forEach(f => {
-      const values = [...new Set(this.items.map(c => c[f.field]))];
+    this.filters.forEach((f) => {
+      const values = [...new Set(this.items.map((c) => c[f.field]))];
       const counts: Record<string, number> = {};
-      values.forEach(val => { counts[val] = this.items.filter(c => c[f.field] === val).length; });
+      values.forEach((val) => {
+        counts[val] = this.items.filter((c) => c[f.field] === val).length;
+      });
       f.options.innerHTML = '';
       f.checkboxes = [];
-      values.forEach(val => {
+      values.forEach((val) => {
         const label = document.createElement('label');
         label.className = 'filter-option';
         const cb = document.createElement('input');
@@ -759,11 +805,11 @@ export default class Timeline {
 
   /** Apply active filters and re-render the full view */
   protected _applyFilters(): void {
-    const anyActive = this.filters.some(f => f.checkboxes.some(cb => cb.checked));
+    const anyActive = this.filters.some((f) => f.checkboxes.some((cb) => cb.checked));
     this.filterToggle.classList.toggle('active', anyActive);
-    this.allCards = this._originalCards.filter(c =>
-      this.filters.every(f => {
-        const active = f.checkboxes.filter(cb => cb.checked).map(cb => cb.value);
+    this.allCards = this._originalCards.filter((c) =>
+      this.filters.every((f) => {
+        const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
         return active.length === 0 || active.includes(c[f.field] as string);
       })
     );
@@ -777,17 +823,16 @@ export default class Timeline {
     const featured = this.allCards.slice(0, this.featured_count);
     const n = this.allCards.length;
     this.remainingCount.textContent = String(this._originalCards.length);
-    this.container.querySelector('#remaining-text')!.textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+    this.container.querySelector('#remaining-text')!.textContent =
+      n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     this._renderFeatured(featured);
-    const displayCards = this.itemsPerPage > 0
-      ? this.allCards.slice(0, this._displayedCount)
-      : this.allCards;
+    const displayCards = this.itemsPerPage > 0 ? this.allCards.slice(0, this._displayedCount) : this.allCards;
     this._renderTimeline(displayCards);
     if (this.itemsPerPage > 0 && this._displayedCount < this.allCards.length) {
       this._renderLoadMoreButton();
     }
     requestAnimationFrame(() => {
-      this.featuredContainer.querySelectorAll('.featured-card').forEach(c => c.classList.add('visible'));
+      this.featuredContainer.querySelectorAll('.featured-card').forEach((c) => c.classList.add('visible'));
     });
     if (this.isExpanded) {
       requestAnimationFrame(() => this._setupTimelineObserver());
@@ -864,7 +909,7 @@ export default class Timeline {
 
     document.addEventListener('click', (e: Event) => {
       if (!(e.target as HTMLElement).closest('.card-info-btn, .card-info-menu')) {
-        this.container.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
+        this.container.querySelectorAll('.card-info-menu.open').forEach((m) => m.classList.remove('open'));
       }
       if (!(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
@@ -872,10 +917,14 @@ export default class Timeline {
       }
     });
 
-    window.addEventListener('scroll', () => {
-      if (!this.isExpanded) return;
-      const rect = this.timelineContainer.getBoundingClientRect();
-      this.section.classList.toggle('scrolled', rect.top < 0);
-    }, { passive: true });
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (!this.isExpanded) return;
+        const rect = this.timelineContainer.getBoundingClientRect();
+        this.section.classList.toggle('scrolled', rect.top < 0);
+      },
+      { passive: true }
+    );
   }
 }

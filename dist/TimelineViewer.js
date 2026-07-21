@@ -16,9 +16,10 @@ const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&vers
 export default class Timeline {
     constructor(config) {
         this.sortAscending = false;
-        this.container = typeof config.container === 'string'
-            ? document.querySelector(config.container)
-            : config.container;
+        this.container =
+            typeof config.container === 'string'
+                ? document.querySelector(config.container)
+                : config.container;
         this.items = config.items || [];
         this.featured_count = config.featuredCount || 6;
         this.lastUpdated = config.lastUpdated || '';
@@ -105,8 +106,18 @@ export default class Timeline {
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
         this.filters = [
-            { field: 'tono_social', label: 'Tono social', options: this.container.querySelector('#filter-options-tone'), checkboxes: [] },
-            { field: 'tipo_fuente', label: 'Tipo de fuente', options: this.container.querySelector('#filter-options-source'), checkboxes: [] },
+            {
+                field: 'tono_social',
+                label: 'Tono social',
+                options: this.container.querySelector('#filter-options-tone'),
+                checkboxes: []
+            },
+            {
+                field: 'tipo_fuente',
+                label: 'Tipo de fuente',
+                options: this.container.querySelector('#filter-options-source'),
+                checkboxes: []
+            }
         ];
     }
     /** Format a date string (YYYY-MM-DD) to a locale display string */
@@ -121,7 +132,13 @@ export default class Timeline {
         if (!dateStr)
             return '';
         const d = new Date(dateStr);
-        return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString('es-ES', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
     }
     /** Parse a URL and return embed info based on the supported social platforms */
     _parseLinkWeb(url) {
@@ -156,12 +173,14 @@ export default class Timeline {
         this._lgInstance = lightGallery(this._lgContainer, {
             addClass: 'timeline-gallery',
             dynamic: true,
-            dynamicEl: images.map(imgInfo => ({
+            dynamicEl: images.map((imgInfo) => ({
                 src: imgInfo.full,
                 thumb: imgInfo.thumb,
-                subHtml: title ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>` : '',
+                subHtml: title
+                    ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>`
+                    : ''
             })),
-            plugins: [lgThumbnail, lgZoom],
+            plugins: [lgThumbnail, lgZoom]
         });
         this._lgContainer.addEventListener('lgAfterClose', () => {
             if (this._lgInstance) {
@@ -230,14 +249,16 @@ export default class Timeline {
                         : `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
             : '';
         const temasHtml = card.temas && card.temas.length
-            ? `<div class="card-temas">${card.temas.map(t => `
+            ? `<div class="card-temas">${card.temas
+                .map((t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
             <div class="tema-header">
               <span class="tema-title">${t.titulo}</span>
               <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
             </div>
             <div class="tema-desc">${t.resumen}</div>
-          </div>`).join('')}</div>`
+          </div>`)
+                .join('')}</div>`
             : '';
         const footerHtml = `<div class="card-footer">
       <div class="card-footer-sep"></div>
@@ -319,7 +340,8 @@ export default class Timeline {
                             blockquote.className = 'instagram-media';
                             blockquote.setAttribute('data-instgrm-permalink', embedUrl);
                             blockquote.setAttribute('data-instgrm-version', '14');
-                            blockquote.style.cssText = 'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
+                            blockquote.style.cssText =
+                                'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
                             igWrap.insertAdjacentElement('afterbegin', blockquote);
                         }
                     }
@@ -482,7 +504,8 @@ export default class Timeline {
         if (this.lastUpdated) {
             const d = new Date(this.lastUpdated);
             const formatted = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
-                ' a las ' + d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                ' a las ' +
+                d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
             const el = document.createElement('div');
             el.className = 'timeline-item timeline-footer-item';
             el.innerHTML = `
@@ -524,7 +547,7 @@ export default class Timeline {
     /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
     _preloadEmbedLibraries() {
         const types = new Set();
-        this.allCards.forEach(card => {
+        this.allCards.forEach((card) => {
             if (!card.link_web)
                 return;
             const parsed = this._parseLinkWeb(card.link_web);
@@ -535,7 +558,7 @@ export default class Timeline {
             const scan = setInterval(() => {
                 const wraps = document.querySelectorAll(selector);
                 let pending = 0;
-                wraps.forEach(wrap => {
+                wraps.forEach((wrap) => {
                     if (wrap.classList.contains('loaded'))
                         return;
                     const iframe = wrap.querySelector('iframe');
@@ -552,7 +575,7 @@ export default class Timeline {
             setTimeout(() => clearInterval(scan), 15000);
         };
         const loadScript = (src) => {
-            return new Promise(resolve => {
+            return new Promise((resolve) => {
                 const s = document.createElement('script');
                 s.src = src;
                 s.async = true;
@@ -608,10 +631,10 @@ export default class Timeline {
         }
         else {
             const cards = this.featuredContainer.querySelectorAll('.featured-card');
-            cards.forEach((c) => c.style.transition = 'none');
+            cards.forEach((c) => (c.style.transition = 'none'));
             cards.forEach((c) => c.classList.remove('visible'));
             void this.featuredContainer.offsetHeight;
-            cards.forEach((c) => c.style.transition = '');
+            cards.forEach((c) => (c.style.transition = ''));
             this.section.classList.remove('expanded', 'scrolled');
             this.timelineContainer.classList.remove('expanded');
             this.expandIcon.classList.remove('rotated');
@@ -632,7 +655,10 @@ export default class Timeline {
         let el = this.section.parentElement;
         while (el) {
             const style = getComputedStyle(el);
-            if (style.overflowY === 'auto' || style.overflowY === 'scroll' || style.overflow === 'auto' || style.overflow === 'scroll') {
+            if (style.overflowY === 'auto' ||
+                style.overflowY === 'scroll' ||
+                style.overflow === 'auto' ||
+                style.overflow === 'scroll') {
                 el.scrollTo({ top: el.scrollTop + rect.top - offset, behavior: 'smooth' });
                 return;
             }
@@ -648,13 +674,15 @@ export default class Timeline {
     }
     /** Build filter checkboxes from the available tone and source type values */
     _buildFilterCheckboxes() {
-        this.filters.forEach(f => {
-            const values = [...new Set(this.items.map(c => c[f.field]))];
+        this.filters.forEach((f) => {
+            const values = [...new Set(this.items.map((c) => c[f.field]))];
             const counts = {};
-            values.forEach(val => { counts[val] = this.items.filter(c => c[f.field] === val).length; });
+            values.forEach((val) => {
+                counts[val] = this.items.filter((c) => c[f.field] === val).length;
+            });
             f.options.innerHTML = '';
             f.checkboxes = [];
-            values.forEach(val => {
+            values.forEach((val) => {
                 const label = document.createElement('label');
                 label.className = 'filter-option';
                 const cb = document.createElement('input');
@@ -673,10 +701,10 @@ export default class Timeline {
     }
     /** Apply active filters and re-render the full view */
     _applyFilters() {
-        const anyActive = this.filters.some(f => f.checkboxes.some(cb => cb.checked));
+        const anyActive = this.filters.some((f) => f.checkboxes.some((cb) => cb.checked));
         this.filterToggle.classList.toggle('active', anyActive);
-        this.allCards = this._originalCards.filter(c => this.filters.every(f => {
-            const active = f.checkboxes.filter(cb => cb.checked).map(cb => cb.value);
+        this.allCards = this._originalCards.filter((c) => this.filters.every((f) => {
+            const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
             return active.length === 0 || active.includes(c[f.field]);
         }));
         if (this.sortAscending)
@@ -690,17 +718,16 @@ export default class Timeline {
         const featured = this.allCards.slice(0, this.featured_count);
         const n = this.allCards.length;
         this.remainingCount.textContent = String(this._originalCards.length);
-        this.container.querySelector('#remaining-text').textContent = n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+        this.container.querySelector('#remaining-text').textContent =
+            n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
         this._renderFeatured(featured);
-        const displayCards = this.itemsPerPage > 0
-            ? this.allCards.slice(0, this._displayedCount)
-            : this.allCards;
+        const displayCards = this.itemsPerPage > 0 ? this.allCards.slice(0, this._displayedCount) : this.allCards;
         this._renderTimeline(displayCards);
         if (this.itemsPerPage > 0 && this._displayedCount < this.allCards.length) {
             this._renderLoadMoreButton();
         }
         requestAnimationFrame(() => {
-            this.featuredContainer.querySelectorAll('.featured-card').forEach(c => c.classList.add('visible'));
+            this.featuredContainer.querySelectorAll('.featured-card').forEach((c) => c.classList.add('visible'));
         });
         if (this.isExpanded) {
             requestAnimationFrame(() => this._setupTimelineObserver());
@@ -769,7 +796,7 @@ export default class Timeline {
         });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.card-info-btn, .card-info-menu')) {
-                this.container.querySelectorAll('.card-info-menu.open').forEach(m => m.classList.remove('open'));
+                this.container.querySelectorAll('.card-info-menu.open').forEach((m) => m.classList.remove('open'));
             }
             if (!e.target.closest('.filter-wrap')) {
                 this.filterMenu.classList.remove('open');

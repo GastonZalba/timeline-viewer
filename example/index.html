@@ -1,26 +1,25 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Noticias</title>
-  <link rel="stylesheet" href="base.css">
-  <link rel="stylesheet" href="../dist/styles.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/css/lightgallery-bundle.min.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Noticias</title>
+    <link rel="stylesheet" href="base.css" />
+    <link rel="stylesheet" href="../dist/styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/css/lightgallery-bundle.min.css" />
+  </head>
+  <body>
+    <div id="noticias-container"></div>
 
-  <div id="noticias-container"></div>
-
-  <script type="importmap">
-  {
-    "imports": {
-      "lightgallery": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/lightgallery.es5.js",
-      "lightgallery/plugins/thumbnail": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/thumbnail/lg-thumbnail.es5.js",
-      "lightgallery/plugins/zoom": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/zoom/lg-zoom.es5.js"
-    }
-  }
-  </script>
-  <script type="module" src="script.js"></script>
-</body>
+    <script type="importmap">
+      {
+        "imports": {
+          "lightgallery": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/lightgallery.es5.js",
+          "lightgallery/plugins/thumbnail": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/thumbnail/lg-thumbnail.es5.js",
+          "lightgallery/plugins/zoom": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/zoom/lg-zoom.es5.js"
+        }
+      }
+    </script>
+    <script type="module" src="script.js"></script>
+  </body>
 </html>
