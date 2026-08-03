@@ -980,6 +980,13 @@
       color: var(--tv-text-primary);
     }
 
+    .tema-fecha {
+      font-size: 0.65rem;
+      font-weight: 400;
+      color: var(--tv-text-secondary);
+      white-space: nowrap;
+    }
+
     .tema-tone {
       font-size: 0.65rem;
       font-weight: 600;

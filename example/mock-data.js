@@ -19,9 +19,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia1b/300/200', full: 'https://picsum.photos/seed/noticia1b/600/400' }
     ],
     temas: [
-      { titulo: 'Rendimiento', resumen: 'Benchmarks muestran 40% mejora en tiempo de carga inicial', tono_social: 'Positivo' },
-      { titulo: 'DX', resumen: 'Hot module replacement nativo y errores en tiempo real', tono_social: 'Positivo' },
-      { titulo: 'Ecosistema', resumen: 'Ya cuenta con mas de 200 plugins comunitarios', tono_social: 'Neutro' }
+      { titulo: 'Rendimiento', resumen: 'Benchmarks muestran 40% mejora en tiempo de carga inicial', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' },
+      { titulo: 'DX', resumen: 'Hot module replacement nativo y errores en tiempo real', tono_social: 'Positivo', fecha_narrativa: '2026-06-25' },
+      { titulo: 'Ecosistema', resumen: 'Ya cuenta con mas de 200 plugins comunitarios', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -39,7 +39,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'Parche critico', resumen: 'Parchean vulnerabilidad CVE-2026-1234 que afectaba a todos los navegadores basados en Chromium', tono_social: 'Negativo' }
+      { titulo: 'Parche critico', resumen: 'Parchean vulnerabilidad CVE-2026-1234 que afectaba a todos los navegadores basados en Chromium', tono_social: 'Negativo', fecha_narrativa: '2026-06-22' }
     ]
   },
   {
@@ -61,10 +61,10 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia3c/300/200', full: 'https://picsum.photos/seed/noticia3c/600/400' }
     ],
     temas: [
-      { titulo: 'Generacion de codigo', resumen: 'Modelo especializado genera JSX, CSS y logica de estado', tono_social: 'Positivo' },
-      { titulo: 'Editor inteligente', resumen: 'Plugin para VS Code con sugerencias contextuales', tono_social: 'Positivo' },
-      { titulo: 'Productividad', resumen: 'Equipos reportan 3x mas rapidez en prototipado', tono_social: 'Positivo' },
-      { titulo: 'Limites', resumen: 'Problemas con logica compleja y edge cases poco documentados', tono_social: 'Negativo' }
+      { titulo: 'Generacion de codigo', resumen: 'Modelo especializado genera JSX, CSS y logica de estado', tono_social: 'Positivo', fecha_narrativa: '2026-06-19' },
+      { titulo: 'Editor inteligente', resumen: 'Plugin para VS Code con sugerencias contextuales', tono_social: 'Positivo', fecha_narrativa: '2026-06-20' },
+      { titulo: 'Productividad', resumen: 'Equipos reportan 3x mas rapidez en prototipado', tono_social: 'Positivo', fecha_narrativa: '2026-06-18' },
+      { titulo: 'Limites', resumen: 'Problemas con logica compleja y edge cases poco documentados', tono_social: 'Negativo', fecha_narrativa: null }
     ]
   },
   {
@@ -84,8 +84,8 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
     ],
     temas: [
-      { titulo: 'Anchor positioning', resumen: 'Nueva spec para posicionar elementos relativos a otros sin JS', tono_social: 'Positivo' },
-      { titulo: 'Scroll-driven animations', resumen: 'Animaciones nativas vinculadas al desplazamiento del usuario', tono_social: 'Positivo' }
+      { titulo: 'Anchor positioning', resumen: 'Nueva spec para posicionar elementos relativos a otros sin JS', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
+      { titulo: 'Scroll-driven animations', resumen: 'Animaciones nativas vinculadas al desplazamiento del usuario', tono_social: 'Positivo', fecha_narrativa: '2026-06-15' }
     ]
   },
   {
@@ -109,9 +109,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia5e/300/200', full: 'https://picsum.photos/seed/noticia5e/600/400' }
     ],
     temas: [
-      { titulo: 'Nuevas APIs', resumen: 'API nativa de testing y watch mode integrado', tono_social: 'Positivo' },
-      { titulo: 'Rendimiento', resumen: '40% menos uso de memoria en aplicaciones Express', tono_social: 'Positivo' },
-      { titulo: 'Migracion', resumen: 'Guia oficial para migrar desde Node 20 y 22', tono_social: 'Neutro' }
+      { titulo: 'Nuevas APIs', resumen: 'API nativa de testing y watch mode integrado', tono_social: 'Positivo', fecha_narrativa: '2026-06-10' },
+      { titulo: 'Rendimiento', resumen: '40% menos uso de memoria en aplicaciones Express', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Migracion', resumen: 'Guia oficial para migrar desde Node 20 y 22', tono_social: 'Neutro', fecha_narrativa: '2026-06-09' }
     ]
   },
   {
@@ -150,10 +150,10 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia7d/300/200', full: 'https://picsum.photos/seed/noticia7d/600/400' }
     ],
     temas: [
-      { titulo: 'Patron matching', resumen: 'Nueva sintaxis match/case con exhaustiveness checking', tono_social: 'Positivo' },
-      { titulo: 'Decorators nativos', resumen: 'Soporte oficial sin necesidad de compiladores adicionales', tono_social: 'Positivo' },
-      { titulo: 'Inferencia mejorada', resumen: 'Tipos condicionales mas precisos en funciones genericas', tono_social: 'Positivo' },
-      { titulo: 'Breaking changes', resumen: 'Algunas sintaxis obsoletas seran eliminadas en TS 7', tono_social: 'Negativo' }
+      { titulo: 'Patron matching', resumen: 'Nueva sintaxis match/case con exhaustiveness checking', tono_social: 'Positivo', fecha_narrativa: '2026-05-28' },
+      { titulo: 'Decorators nativos', resumen: 'Soporte oficial sin necesidad de compiladores adicionales', tono_social: 'Positivo', fecha_narrativa: '2026-05-27' },
+      { titulo: 'Inferencia mejorada', resumen: 'Tipos condicionales mas precisos en funciones genericas', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Breaking changes', resumen: 'Algunas sintaxis obsoletas seran eliminadas en TS 7', tono_social: 'Negativo', fecha_narrativa: '2026-05-26' }
     ]
   },
   {
@@ -173,8 +173,8 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia8a/300/200', full: 'https://picsum.photos/seed/noticia8a/600/400' }
     ],
     temas: [
-      { titulo: 'WASM runtime', resumen: 'Nuevos runtimes optimizados para entornos serverless', tono_social: 'Positivo' },
-      { titulo: 'Casos de uso', resumen: 'Procesamiento de imagenes, parseo y computacion cientifica', tono_social: 'Neutro' }
+      { titulo: 'WASM runtime', resumen: 'Nuevos runtimes optimizados para entornos serverless', tono_social: 'Positivo', fecha_narrativa: '2026-05-15' },
+      { titulo: 'Casos de uso', resumen: 'Procesamiento de imagenes, parseo y computacion cientifica', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -196,9 +196,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia9c/300/200', full: 'https://picsum.photos/seed/noticia9c/600/400' }
     ],
     temas: [
-      { titulo: 'Micro-interacciones', resumen: 'Animaciones sutiles que mejoran la percepcion de respuesta', tono_social: 'Positivo' },
-      { titulo: 'Modo oscuro', resumen: 'Adaptacion automatica segun hora del dia y preferencias del SO', tono_social: 'Neutro' },
-      { titulo: 'Navegacion gestual', resumen: 'Swipes y gestos nativos para apps web progresivas', tono_social: 'Positivo' }
+      { titulo: 'Micro-interacciones', resumen: 'Animaciones sutiles que mejoran la percepcion de respuesta', tono_social: 'Positivo', fecha_narrativa: '2026-04-30' },
+      { titulo: 'Modo oscuro', resumen: 'Adaptacion automatica segun hora del dia y preferencias del SO', tono_social: 'Neutro', fecha_narrativa: null },
+      { titulo: 'Navegacion gestual', resumen: 'Swipes y gestos nativos para apps web progresivas', tono_social: 'Positivo', fecha_narrativa: '2026-04-29' }
     ]
   },
   {
@@ -219,9 +219,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia10b/300/200', full: 'https://picsum.photos/seed/noticia10b/600/400' }
     ],
     temas: [
-      { titulo: 'Unit testing', resumen: 'Configuracion optima de Vitest con cobertura por componente', tono_social: 'Positivo' },
-      { titulo: 'Integration tests', resumen: 'Testing Library para pruebas centradas en el usuario', tono_social: 'Neutro' },
-      { titulo: 'E2E', resumen: 'Playwright con paralelizacion y captura de video', tono_social: 'Positivo' }
+      { titulo: 'Unit testing', resumen: 'Configuracion optima de Vitest con cobertura por componente', tono_social: 'Positivo', fecha_narrativa: '2026-04-10' },
+      { titulo: 'Integration tests', resumen: 'Testing Library para pruebas centradas en el usuario', tono_social: 'Neutro', fecha_narrativa: '2026-04-09' },
+      { titulo: 'E2E', resumen: 'Playwright con paralelizacion y captura de video', tono_social: 'Positivo', fecha_narrativa: null }
     ]
   },
   {
@@ -241,9 +241,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia11a/300/200', full: 'https://picsum.photos/seed/noticia11a/600/400' }
     ],
     temas: [
-      { titulo: 'Server components', resumen: 'Componentes que se ejecutan exclusivamente en el servidor', tono_social: 'Positivo' },
-      { titulo: 'Streaming SSR', resumen: 'Renderizado progresivo que mejora la percepcion de carga', tono_social: 'Positivo' },
-      { titulo: 'Costo', resumen: 'Mayor consumo de recursos en el servidor comparado con SPA tradicional', tono_social: 'Negativo' }
+      { titulo: 'Server components', resumen: 'Componentes que se ejecutan exclusivamente en el servidor', tono_social: 'Positivo', fecha_narrativa: '2026-03-20' },
+      { titulo: 'Streaming SSR', resumen: 'Renderizado progresivo que mejora la percepcion de carga', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Costo', resumen: 'Mayor consumo de recursos en el servidor comparado con SPA tradicional', tono_social: 'Negativo', fecha_narrativa: '2026-03-19' }
     ]
   },
   {
@@ -263,9 +263,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia13b/300/200', full: 'https://picsum.photos/seed/noticia13b/600/400' }
     ],
     temas: [
-      { titulo: 'Module Federation', resumen: 'Webpack 5 permite compartir modulos entre aplicaciones independientes', tono_social: 'Positivo' },
-      { titulo: 'Orquestacion', resumen: 'El shell principal maneja ruteo, autenticacion y estado global', tono_social: 'Neutro' },
-      { titulo: 'Despliegue', resumen: 'Cada micro-frontend se deploya independientemente sin afectar el resto', tono_social: 'Positivo' }
+      { titulo: 'Module Federation', resumen: 'Webpack 5 permite compartir modulos entre aplicaciones independientes', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Orquestacion', resumen: 'El shell principal maneja ruteo, autenticacion y estado global', tono_social: 'Neutro', fecha_narrativa: null },
+      { titulo: 'Despliegue', resumen: 'Cada micro-frontend se deploya independientemente sin afectar el resto', tono_social: 'Positivo', fecha_narrativa: null }
     ]
   },
   {
@@ -289,10 +289,10 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia12e/300/200', full: 'https://picsum.photos/seed/noticia12e/600/400' }
     ],
     temas: [
-      { titulo: 'WCAG 3.0', resumen: 'Nuevo estandar con criterios de conformidad mas claros', tono_social: 'Positivo' },
-      { titulo: 'Herramientas', resumen: 'Linters y auditores automaticos integrados en CI/CD', tono_social: 'Positivo' },
-      { titulo: 'Legislacion', resumen: 'Multas por incumplimiento de accesibilidad aumentan un 200%', tono_social: 'Negativo' },
-      { titulo: 'Educacion', resumen: 'Crece la demanda de profesionales certificados en accesibilidad', tono_social: 'Neutro' }
+      { titulo: 'WCAG 3.0', resumen: 'Nuevo estandar con criterios de conformidad mas claros', tono_social: 'Positivo', fecha_narrativa: '2026-02-05' },
+      { titulo: 'Herramientas', resumen: 'Linters y auditores automaticos integrados en CI/CD', tono_social: 'Positivo', fecha_narrativa: '2026-02-04' },
+      { titulo: 'Legislacion', resumen: 'Multas por incumplimiento de accesibilidad aumentan un 200%', tono_social: 'Negativo', fecha_narrativa: '2026-02-03' },
+      { titulo: 'Educacion', resumen: 'Crece la demanda de profesionales certificados en accesibilidad', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -310,7 +310,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'Animaciones', resumen: 'Keyframes, transitions y animaciones en cascada explicadas paso a paso', tono_social: 'Positivo' }
+      { titulo: 'Animaciones', resumen: 'Keyframes, transitions y animaciones en cascada explicadas paso a paso', tono_social: 'Positivo', fecha_narrativa: '2026-06-28' }
     ]
   },
   {
@@ -328,7 +328,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'CSS framework', resumen: 'Nueva herramienta open-source para maquetacion veloz', tono_social: 'Positivo' }
+      { titulo: 'CSS framework', resumen: 'Nueva herramienta open-source para maquetacion veloz', tono_social: 'Positivo', fecha_narrativa: null }
     ]
   },
   {
@@ -346,8 +346,8 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'Performance', resumen: 'Tips para optimizar renders con useMemo y useCallback', tono_social: 'Positivo' },
-      { titulo: 'React', resumen: 'Hilo con 20 consejos para escribir components mas eficientes', tono_social: 'Neutro' }
+      { titulo: 'Performance', resumen: 'Tips para optimizar renders con useMemo y useCallback', tono_social: 'Positivo', fecha_narrativa: '2026-06-26' },
+      { titulo: 'React', resumen: 'Hilo con 20 consejos para escribir components mas eficientes', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -365,7 +365,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'WCAG 3.0', resumen: 'Implementacion practica de los nuevos estandares de accesibilidad', tono_social: 'Positivo' }
+      { titulo: 'WCAG 3.0', resumen: 'Implementacion practica de los nuevos estandares de accesibilidad', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' }
     ]
   }
 ] };
