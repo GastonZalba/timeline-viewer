@@ -3,6 +3,7 @@ export interface ItemTema {
     titulo: string;
     resumen: string;
     tono_social: 'Positivo' | 'Negativo' | 'Neutro';
+    fecha_narrativa?: string | null;
 }
 export interface TimelineItem {
     id: number | string;

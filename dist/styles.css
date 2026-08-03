@@ -895,6 +895,12 @@
   font-weight: 600;
   color: var(--tv-text-primary);
 }
+.noticias-section .tema-item .tema-fecha {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--tv-text-secondary);
+  white-space: nowrap;
+}
 .noticias-section .tema-item .tema-tone {
   font-size: 0.65rem;
   font-weight: 600;
