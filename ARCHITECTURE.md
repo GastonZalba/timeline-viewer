@@ -292,3 +292,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `.active` | `.filter-toggle` | Filtros activos (al menos uno seleccionado) |
 | `.asc` | `.sort-toggle` | Orden ascendente activo |
 | `.rotated` | `.expand-icon` | Icono de expand rotado 180° |
+
+## Artefactos de build (`dist/`)
+
+`dist/` contiene solo salida compilada (JS, `.d.ts`, CSS). No se edita a mano: cualquier cambio se hace en `src/` y se regenera con `npm run build`.

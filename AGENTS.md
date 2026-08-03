@@ -55,6 +55,7 @@ Estas son restricciones críticas. Violarlas rompe la filosofía del módulo:
 8. **NO renombrar la clase exportada** `Timeline` ni cambiar el default export.
 9. **NO modificar la estructura de datos** `TimelineItem` sin considerar que viene de un pipeline de scraping externo.
 10. **NO agregar CSS que dependa de clases fuera de `.noticias-section`**. Todo el estilo está scoped.
+11. **NO modificar manualmente los archivos de `dist/`**. Son artefactos generados por el build (`npm run build`). Cualquier cambio se hace en `src/` y se regenera.
 
 ## Convenciones de código
 

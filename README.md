@@ -75,7 +75,7 @@ Each object in `items` supports these fields:
 | `actores_principales`  | `string[]`                  | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
 | `imagenes`             | `{ thumb: string; full: string }[]` | Image gallery with low-res `thumb` and full-res `full` URLs |
-| `temas`                | `{ titulo, resumen, tono_social }[]` | Topics / themes within the article |
+| `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null` |
 
 ### Embedded content
 
@@ -99,6 +99,8 @@ npm run build
 ```
 
 Compiles TypeScript (`src/TimelineViewer.ts`) and SCSS (`src/styles.scss`) into `dist/`. The resulting JS, type declarations, and CSS are ready for distribution.
+
+> **Nota:** Los archivos de `dist/` se generan automáticamente con el build. No los edites a mano — haz los cambios en `src/` y ejecuta `npm run build`.
 
 Run only the TypeScript compilation:
 ```bash
