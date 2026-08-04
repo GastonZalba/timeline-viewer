@@ -27,6 +27,7 @@ new Timeline({
       tonos_sociales: ['Positivo'],
       fuente_institucional: 'Dev.to',
       tipo_fuente: 'Digital',
+      es_oficial: true,
       actores_principales: ['Ana García', 'Carlos Ruiz'],
       screenshot: 'https://picsum.photos/seed/captura/400/800',
       imagenes: [
@@ -72,6 +73,7 @@ Each object in `items` supports these fields:
 | `tonos_sociales`      | `string[]`                  | Overall sentiment(s) — unique tones present in the article's `temas` |
 | `fuente_institucional` | `string`                    | Source / publication name                |
 | `tipo_fuente`           | `string`                    | Source type. One of: `Diario o nota periodística`, `Decreto o norma`, `Boletín oficial`, `Expediente`, `Libro o publicación`, `Sitio web o portal`, `Red social`, `Gacetilla o comunicado de prensa` |
+| `es_oficial`            | `boolean`                   | Whether the source is official (`true`) or not (`false`) |
 | `actores_principales`  | `string[]`                  | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
 | `imagenes`             | `{ thumb: string; full: string }[]` | Image gallery with low-res `thumb` and full-res `full` URLs |

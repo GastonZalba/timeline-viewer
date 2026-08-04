@@ -44,6 +44,7 @@ export interface TimelineItem {
   tonos_sociales: TonoSocial[];
   fuente_institucional: string;
   tipo_fuente: string;
+  es_oficial: boolean;
   thumbnail: string | null;
   link_web: string;
   actores_principales: string[];
@@ -393,12 +394,16 @@ export default class Timeline {
               <span class="card-info-value">${card.tipo_fuente}</span>
             </div>
             <div class="card-info-row">
+              <span class="card-info-label">Oficial</span>
+              <span class="card-info-value">${card.es_oficial ? 'Sí' : 'No'}</span>
+            </div>
+            <div class="card-info-row">
               <span class="card-info-label">Captura</span>
               <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente">${card.fuente_institucional}</div>
+          <div class="card-fuente">${card.fuente_institucional}${card.es_oficial ? '<svg class="card-oficial" title="Es oficial" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>
           ${iframeHtml}
           ${footerHtml}
         </div>

@@ -12,6 +12,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'Dev.to',
     tipo_fuente: 'Sitio web o portal',
+    es_oficial: true,
     actores_principales: ['Ana García', 'Carlos Ruiz'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -35,6 +36,7 @@ export default {
     tonos_sociales: ['Negativo'],
     fuente_institucional: 'Mozilla Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
+    es_oficial: false,
     actores_principales: ['Mozilla', 'Google Chrome Team'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
@@ -53,6 +55,7 @@ export default {
     tonos_sociales: ['Positivo', 'Negativo'],
     fuente_institucional: 'OpenAI Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
+    es_oficial: true,
     actores_principales: ['OpenAI'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -78,6 +81,7 @@ export default {
     tonos_sociales: ['Positivo'],
     fuente_institucional: 'W3C',
     tipo_fuente: 'Decreto o norma',
+    es_oficial: true,
     actores_principales: ['W3C', 'Rachel Andrews', 'Jake Archibald'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -99,6 +103,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'Node.js Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
+    es_oficial: true,
     actores_principales: ['Node.js Foundation'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -125,6 +130,7 @@ export default {
     tonos_sociales: [],
     fuente_institucional: 'npm Blog',
     tipo_fuente: 'Sitio web o portal',
+    es_oficial: false,
     actores_principales: [],
     screenshot: null,
     imagenes: [],
@@ -141,6 +147,7 @@ export default {
     tonos_sociales: ['Positivo', 'Negativo'],
     fuente_institucional: 'TypeScript Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
+    es_oficial: false,
     actores_principales: ['Anders Hejlsberg', 'Microsoft'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -167,6 +174,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'WebAssembly',
     tipo_fuente: 'Sitio web o portal',
+    es_oficial: true,
     actores_principales: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -188,6 +196,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'Nielsen Norman Group',
     tipo_fuente: 'Libro o publicación',
+    es_oficial: false,
     actores_principales: ['María López', 'Google UX', 'Nielsen Norman Group'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -212,6 +221,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'Vitest',
     tipo_fuente: 'Sitio web o portal',
+    es_oficial: false,
     actores_principales: ['Vitest Team'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -235,6 +245,7 @@ export default {
     tonos_sociales: ['Positivo', 'Negativo'],
     fuente_institucional: 'Vercel',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
+    es_oficial: true,
     actores_principales: ['Vercel', 'Next.js Team', 'Juan Pérez'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -256,6 +267,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'MicroFrontends.dev',
     tipo_fuente: 'Sitio web o portal',
+    es_oficial: false,
     actores_principales: ['Module Federation Team', 'Sarah Connor'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -279,6 +291,7 @@ export default {
     tonos_sociales: ['Positivo', 'Negativo', 'Neutro'],
     fuente_institucional: 'W3C WAI',
     tipo_fuente: 'Decreto o norma',
+    es_oficial: true,
     actores_principales: ['WAI', 'Laura Jiménez', 'GovUK', 'Marta Ruiz', 'Carlos Mendoza', 'Sofía Torres', 'Diego Hernández', 'Valentina Paz', 'Javier Acosta', 'Lucía Campos'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -306,6 +319,7 @@ export default {
     tonos_sociales: ['Positivo'],
     fuente_institucional: 'YouTube',
     tipo_fuente: 'Video',
+    es_oficial: false,
     actores_principales: ['CSS Animations Channel'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
@@ -324,6 +338,7 @@ export default {
     tonos_sociales: ['Positivo'],
     fuente_institucional: 'Instagram',
     tipo_fuente: 'Red Social',
+    es_oficial: false,
     actores_principales: ['dev_tips_css'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
@@ -342,6 +357,7 @@ export default {
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'Twitter',
     tipo_fuente: 'Red Social',
+    es_oficial: true,
     actores_principales: ['react_dev_tips'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
@@ -361,6 +377,7 @@ export default {
     tonos_sociales: ['Positivo'],
     fuente_institucional: 'Facebook',
     tipo_fuente: 'Red Social',
+    es_oficial: false,
     actores_principales: ['Comunidad Web Dev'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],

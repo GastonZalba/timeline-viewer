@@ -105,6 +105,7 @@ interface TimelineItem {
   tonos_sociales: string[];     // Tono(s) social(es) del artículo (valores únicos de temas)
   fuente_institucional: string; // Nombre del medio
   tipo_fuente: string;          // Tipo de fuente (ver valores en README)
+  es_oficial: boolean;          // Indica si la fuente es oficial
   thumbnail: string | null;     // URL de imagen principal
   link_web: string;             // URL del artículo original
   actores_principales: string[];

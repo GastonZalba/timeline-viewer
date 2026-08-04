@@ -31,6 +31,23 @@
     position: relative;
   }
 
+  .card-oficial {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    color: var(--tv-text-on-primary);
+    background: var(--tv-accent);
+  }
+
+  .card-fuente .card-oficial {
+    margin-left: 6px;
+  }
+
   &.expanded {
     .featured-row {
       gap: 0;
