@@ -14,6 +14,7 @@ export default {
     tipo_fuente: 'Sitio web o portal',
     es_oficial: true,
     actores_principales: ['Ana García', 'Carlos Ruiz'],
+    adjuntos: ['informe-lanzamiento-framework.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia1a/300/200', full: 'https://picsum.photos/seed/noticia1a/600/400' },
@@ -38,6 +39,7 @@ export default {
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: false,
     actores_principales: ['Mozilla', 'Google Chrome Team'],
+    adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
@@ -57,6 +59,7 @@ export default {
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: true,
     actores_principales: ['OpenAI'],
+    adjuntos: ['comunicado-ia-desarrollo-web.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia3a/300/200', full: 'https://picsum.photos/seed/noticia3a/600/400' },
@@ -83,6 +86,7 @@ export default {
     tipo_fuente: 'Decreto o norma',
     es_oficial: true,
     actores_principales: ['W3C', 'Rachel Andrews', 'Jake Archibald'],
+    adjuntos: ['spec-css-2026.pdf', 'anexo-ejemplos-layout.html'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
@@ -105,6 +109,7 @@ export default {
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: true,
     actores_principales: ['Node.js Foundation'],
+    adjuntos: ['node24-lts-release-notes.pdf', 'benchmarks-memoria.xlsx', 'guia-migracion-node20-22.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia5a/300/200', full: 'https://picsum.photos/seed/noticia5a/600/400' },
@@ -132,6 +137,7 @@ export default {
     tipo_fuente: 'Sitio web o portal',
     es_oficial: false,
     actores_principales: [],
+    adjuntos: [],
     screenshot: null,
     imagenes: [],
     temas: []
@@ -149,6 +155,7 @@ export default {
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: false,
     actores_principales: ['Anders Hejlsberg', 'Microsoft'],
+    adjuntos: ['notas-release-ts6.md'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia7a/300/200', full: 'https://picsum.photos/seed/noticia7a/600/400' },
@@ -176,6 +183,7 @@ export default {
     tipo_fuente: 'Sitio web o portal',
     es_oficial: true,
     actores_principales: [],
+    adjuntos: ['wasm-server-benchmarks.pdf', 'runtime-comparativa.xlsx'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia8a/300/200', full: 'https://picsum.photos/seed/noticia8a/600/400' }
@@ -198,6 +206,7 @@ export default {
     tipo_fuente: 'Libro o publicación',
     es_oficial: false,
     actores_principales: ['María López', 'Google UX', 'Nielsen Norman Group'],
+    adjuntos: ['ux-trends-2026-reporte.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia9a/300/200', full: 'https://picsum.photos/seed/noticia9a/600/400' },
@@ -223,6 +232,7 @@ export default {
     tipo_fuente: 'Sitio web o portal',
     es_oficial: false,
     actores_principales: ['Vitest Team'],
+    adjuntos: ['vitest-config-ejemplo.ts', 'playwright-config-ejemplo.ts'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia10a/300/200', full: 'https://picsum.photos/seed/noticia10a/600/400' },
@@ -247,6 +257,7 @@ export default {
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: true,
     actores_principales: ['Vercel', 'Next.js Team', 'Juan Pérez'],
+    adjuntos: ['vercel-server-components-demo.zip', 'streaming-ssr-benchmarks.pdf', 'analisis-costos-servidor.xlsx'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia11a/300/200', full: 'https://picsum.photos/seed/noticia11a/600/400' }
@@ -269,6 +280,7 @@ export default {
     tipo_fuente: 'Sitio web o portal',
     es_oficial: false,
     actores_principales: ['Module Federation Team', 'Sarah Connor'],
+    adjuntos: ['caso-estudio-microfrontends.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia13a/300/200', full: 'https://picsum.photos/seed/noticia13a/600/400' },
@@ -293,6 +305,7 @@ export default {
     tipo_fuente: 'Decreto o norma',
     es_oficial: true,
     actores_principales: ['WAI', 'Laura Jiménez', 'GovUK', 'Marta Ruiz', 'Carlos Mendoza', 'Sofía Torres', 'Diego Hernández', 'Valentina Paz', 'Javier Acosta', 'Lucía Campos'],
+    adjuntos: ['wcag-3-0-draft.pdf', 'herramientas-accesibilidad-ci.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia12a/300/200', full: 'https://picsum.photos/seed/noticia12a/600/400' },
@@ -321,6 +334,7 @@ export default {
     tipo_fuente: 'Video',
     es_oficial: false,
     actores_principales: ['CSS Animations Channel'],
+    adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
@@ -340,6 +354,7 @@ export default {
     tipo_fuente: 'Red Social',
     es_oficial: false,
     actores_principales: ['dev_tips_css'],
+    adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
@@ -359,6 +374,7 @@ export default {
     tipo_fuente: 'Red Social',
     es_oficial: true,
     actores_principales: ['react_dev_tips'],
+    adjuntos: ['hilo-twitter-react-tips.txt'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
@@ -379,6 +395,7 @@ export default {
     tipo_fuente: 'Red Social',
     es_oficial: false,
     actores_principales: ['Comunidad Web Dev'],
+    adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [

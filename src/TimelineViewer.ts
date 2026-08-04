@@ -48,6 +48,7 @@ export interface TimelineItem {
   thumbnail: string | null;
   link_web: string;
   actores_principales: string[];
+  adjuntos: string[];
   screenshot: string | null;
   imagenes: { thumb: string; full: string }[];
   temas: ItemTema[];
@@ -360,6 +361,7 @@ export default class Timeline {
       <div class="card-footer-actions">
         ${card.screenshot ? '<button class="card-footer-btn card-screenshot-btn" title="Ver captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Ver captura</button>' : ''}
         ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
+        ${card.adjuntos && card.adjuntos.length ? `<div class="card-adjuntos"><button class="card-footer-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-footer-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${a}" target="_blank" rel="noopener">${a}</a>`).join('')}</div></div>` : ''}
         <button class="card-footer-btn card-open" title="Abrir enlace">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Ir
@@ -424,7 +426,10 @@ export default class Timeline {
     }
     const cardEl = el.querySelector('.timeline-card') as HTMLElement;
     cardEl.addEventListener('click', (e: Event) => {
-      if (e.target && (e.target as HTMLElement).closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu'))
+      if (
+        e.target &&
+        (e.target as HTMLElement).closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos')
+      )
         return;
       cardEl.classList.add('expanded');
       const igWrap = cardEl.querySelector('.card-iframe-instagram') as HTMLElement | null;
@@ -529,6 +534,8 @@ export default class Timeline {
     (cardEl.querySelector('.card-info-btn') as HTMLElement).addEventListener('click', (e: Event) => {
       e.stopPropagation();
       (cardEl.querySelector('.card-info-menu') as HTMLElement).classList.toggle('open');
+      const adjuntosMenu = cardEl.querySelector('.card-adjuntos-menu') as HTMLElement | null;
+      if (adjuntosMenu) adjuntosMenu.classList.remove('open');
     });
     (cardEl.querySelector('.card-open') as HTMLElement).addEventListener('click', (e: Event) => {
       e.stopPropagation();
@@ -546,6 +553,17 @@ export default class Timeline {
       imagesBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
         this._openLightGallery(card.imagenes, card.nombre_fuente, true);
+      });
+    }
+    const adjuntosWrap = el.querySelector('.card-adjuntos') as HTMLElement | null;
+    if (adjuntosWrap) {
+      const adjuntosBtn = adjuntosWrap.querySelector('.card-adjuntos-btn') as HTMLElement;
+      const adjuntosMenu = adjuntosWrap.querySelector('.card-adjuntos-menu') as HTMLElement;
+      adjuntosBtn.addEventListener('click', (e: Event) => {
+        e.stopPropagation();
+        adjuntosMenu.classList.toggle('open');
+        const infoMenu = el.querySelector('.card-info-menu') as HTMLElement | null;
+        if (infoMenu) infoMenu.classList.remove('open');
       });
     }
     const prot = el.querySelector('.card-protagonista.has-more') as HTMLElement | null;

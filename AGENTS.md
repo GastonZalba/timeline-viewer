@@ -109,6 +109,7 @@ interface TimelineItem {
   thumbnail: string | null;     // URL de imagen principal
   link_web: string;             // URL del artículo original
   actores_principales: string[];
+  adjuntos: string[];            // Archivos/links adjuntos (puede estar vacío)
   screenshot: string | null;    // URL de captura de pantalla
   imagenes: { thumb: string; full: string }[];
   temas: ItemTema[];            // Subtemas del artículo
