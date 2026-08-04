@@ -21,7 +21,7 @@ new Timeline({ container, items, ... })
      │        ├── _buildFilterCheckboxes()              │
      │        │       Genera checkboxes de filtro       │
      │        │       desde valores únicos de           │
-     │        │       tono_social y tipo_fuente         │
+      │        │       tonos_sociales y tipo_fuente      │
      │        │                                          │
      │        ├── Sort data (fecha_publicacion DESC)    │
      │        │                                          │
@@ -229,7 +229,7 @@ Dos filtros disponibles, generados dinámicamente desde los datos:
 
 | Filtro | Campo | Descripción |
 |--------|-------|-------------|
-| Tono social | `tono_social` | Positivo / Negativo / Neutro |
+| Tono social | `tonos_sociales` | Array: Positivo / Negativo / Neutro |
 | Tipo de fuente | `tipo_fuente` | Valores únicos presentes en los datos |
 
 Flujo:

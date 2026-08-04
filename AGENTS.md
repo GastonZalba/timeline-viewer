@@ -89,7 +89,7 @@ El `build` ejecuta `format` automáticamente. Para formateo manual: `npm run for
 ### Strings
 
 - **Todo el texto visible al usuario está en español** (`es-ES`). Fechas, labels, botones, mensajes vacíos.
-- **Los nombres de campos del data model también están en español** (`nombre_fuente`, `resumen_ia`, `tono_social`, etc.). Esto es porque el componente se integra con un pipeline de scraping en español.
+- **Los nombres de campos del data model también están en español** (`nombre_fuente`, `resumen_ia`, `tonos_sociales`, etc.). Esto es porque el componente se integra con un pipeline de scraping en español.
 
 ## Modelo de datos
 
@@ -102,7 +102,7 @@ interface TimelineItem {
   resumen_ia: string;           // Resumen generado por IA
   fecha_publicacion: string;    // YYYY-MM-DD
   fecha_scrapeo: string;        // ISO datetime
-  tono_social: 'Positivo' | 'Negativo' | 'Neutro';
+  tonos_sociales: string[];     // Tono(s) social(es) del artículo (valores únicos de temas)
   fuente_institucional: string; // Nombre del medio
   tipo_fuente: string;          // Tipo de fuente (ver valores en README)
   thumbnail: string | null;     // URL de imagen principal

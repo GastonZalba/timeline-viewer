@@ -24,7 +24,7 @@ new Timeline({
       link_web: 'https://dev.to/news/javascript-framework-2026',
       fecha_publicacion: '2026-06-25',
       fecha_scrapeo: '2026-06-25T14:30:00',
-      tono_social: 'Positivo',
+      tonos_sociales: ['Positivo'],
       fuente_institucional: 'Dev.to',
       tipo_fuente: 'Digital',
       actores_principales: ['Ana García', 'Carlos Ruiz'],
@@ -69,7 +69,7 @@ Each object in `items` supports these fields:
 | `link_web`             | `string` (URL)              | External article link                    |
 | `fecha_publicacion`    | `string` (YYYY-MM-DD)       | Publication date                         |
 | `fecha_scrapeo`        | `string` (ISO)              | When it was crawled                      |
-| `tono_social`          | `"Positivo"` / `"Negativo"` / `"Neutro"` | Overall sentiment       |
+| `tonos_sociales`      | `string[]`                  | Overall sentiment(s) — unique tones present in the article's `temas` |
 | `fuente_institucional` | `string`                    | Source / publication name                |
 | `tipo_fuente`           | `string`                    | Source type. One of: `Diario o nota periodística`, `Decreto o norma`, `Boletín oficial`, `Expediente`, `Libro o publicación`, `Sitio web o portal`, `Red social`, `Gacetilla o comunicado de prensa` |
 | `actores_principales`  | `string[]`                  | Key people or entities                   |
