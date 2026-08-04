@@ -1,8 +1,9 @@
 import type { LightGallery } from 'lightgallery/lightgallery';
+export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 export interface ItemTema {
     titulo: string;
     resumen: string;
-    tono_social: 'Positivo' | 'Negativo' | 'Neutro';
+    tono_social: TonoSocial;
     fecha_narrativa?: string | null;
 }
 export interface TimelineItem {
@@ -11,7 +12,7 @@ export interface TimelineItem {
     resumen_ia: string;
     fecha_publicacion: string;
     fecha_scrapeo: string;
-    tono_social: 'Positivo' | 'Negativo' | 'Neutro';
+    tonos_sociales: TonoSocial[];
     fuente_institucional: string;
     tipo_fuente: string;
     thumbnail: string | null;
@@ -40,7 +41,7 @@ interface LinkInfo {
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 interface FilterDef {
-    field: 'tono_social' | 'tipo_fuente';
+    field: 'tonos_sociales' | 'tipo_fuente';
     label: string;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];

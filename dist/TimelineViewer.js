@@ -107,7 +107,7 @@ export default class Timeline {
         this.filterMenu = this.container.querySelector('#filter-menu');
         this.filters = [
             {
-                field: 'tono_social',
+                field: 'tonos_sociales',
                 label: 'Tono social',
                 options: this.container.querySelector('#filter-options-tone'),
                 checkboxes: []
@@ -277,12 +277,12 @@ export default class Timeline {
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
-      <div class="timeline-card${card.thumbnail ? '' : ' no-image'} tone-${card.tono_social.toLowerCase()}">
+      <div class="timeline-card${card.thumbnail ? '' : ' no-image'}">
         ${imgHtml}
         <div class="card-body">
           <div class="card-title">${card.nombre_fuente}</div>
           <div class="card-desc">${card.resumen_ia}</div>
-          <div class="card-tone">${toneLabel[card.tono_social]}</div>
+          ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}
           <div class="card-hint"><span class="card-hint-arrow"></span></div>
           <button class="card-collapse" title="Colapsar"></button>
@@ -675,10 +675,18 @@ export default class Timeline {
     /** Build filter checkboxes from the available tone and source type values */
     _buildFilterCheckboxes() {
         this.filters.forEach((f) => {
-            const values = [...new Set(this.items.map((c) => c[f.field]))];
+            const values = [
+                ...new Set(this.items.flatMap((c) => {
+                    const v = c[f.field];
+                    return Array.isArray(v) ? v : [v];
+                }))
+            ];
             const counts = {};
             values.forEach((val) => {
-                counts[val] = this.items.filter((c) => c[f.field] === val).length;
+                counts[val] = this.items.filter((c) => {
+                    const v = c[f.field];
+                    return Array.isArray(v) ? v.includes(val) : v === val;
+                }).length;
             });
             f.options.innerHTML = '';
             f.checkboxes = [];
@@ -705,7 +713,10 @@ export default class Timeline {
         this.filterToggle.classList.toggle('active', anyActive);
         this.allCards = this._originalCards.filter((c) => this.filters.every((f) => {
             const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
-            return active.length === 0 || active.includes(c[f.field]);
+            if (active.length === 0)
+                return true;
+            const fieldVal = c[f.field];
+            return Array.isArray(fieldVal) ? fieldVal.some((v) => active.includes(v)) : active.includes(fieldVal);
         }));
         if (this.sortAscending)
             this.allCards.reverse();

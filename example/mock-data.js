@@ -8,7 +8,7 @@ export default {
     thumbnail: 'https://picsum.photos/seed/noticia1/600/400',
     link_web: 'https://dev.to/news/javascript-framework-2026',
     fecha_publicacion: '2026-06-25',
-    fecha_scrapeo: '2026-06-25T14:30:00',
+    fecha_scrapeo: '2026-07-17T03:00:00.000Z',
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'Dev.to',
     tipo_fuente: 'Sitio web o portal',
