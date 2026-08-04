@@ -405,7 +405,7 @@ export default class Timeline {
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente">${card.fuente_institucional}${card.es_oficial ? '<svg class="card-oficial" title="Es oficial" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>
+          <div class="card-fuente">${card.fuente_institucional}${card.es_oficial ? '<span class="card-oficial-wrap" title="Es fuente oficial"><svg class="card-oficial" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="19 7.5 10.5 16.5 4.5 11.5"/></svg></span>' : ''}</div>
           ${iframeHtml}
           ${footerHtml}
         </div>
@@ -758,7 +758,7 @@ export default class Timeline {
       void this.featuredContainer.offsetHeight;
       cards.forEach((c) => ((c as HTMLElement).style.transition = ''));
 
-      this.section.classList.remove('expanded', 'scrolled');
+      this.section.classList.remove('expanded');
       this.timelineContainer.classList.remove('expanded');
       this.expandIcon.classList.remove('rotated');
       this.container.querySelectorAll('.timeline-item').forEach((item) => {
@@ -949,20 +949,13 @@ export default class Timeline {
       if (!(e.target as HTMLElement).closest('.card-info-btn, .card-info-menu')) {
         this.container.querySelectorAll('.card-info-menu.open').forEach((m) => m.classList.remove('open'));
       }
+      if (!(e.target as HTMLElement).closest('.card-adjuntos-btn, .card-adjuntos-menu')) {
+        this.container.querySelectorAll('.card-adjuntos-menu.open').forEach((m) => m.classList.remove('open'));
+      }
       if (!(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
         this.filterToggle.classList.remove('open');
       }
     });
-
-    window.addEventListener(
-      'scroll',
-      () => {
-        if (!this.isExpanded) return;
-        const rect = this.timelineContainer.getBoundingClientRect();
-        this.section.classList.toggle('scrolled', rect.top < 0);
-      },
-      { passive: true }
-    );
   }
 }

@@ -31,8 +31,18 @@
     position: relative;
   }
 
-  .card-oficial {
+  .card-oficial-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
     flex-shrink: 0;
+    margin-left: 6px;
+    width: 14px;
+    height: 14px;
+  }
+
+  .card-oficial {
     width: 14px;
     height: 14px;
     border-radius: 50%;
@@ -45,7 +55,7 @@
   }
 
   .card-fuente .card-oficial {
-    margin-left: 6px;
+    margin-left: 0;
   }
 
   &.expanded {
@@ -607,6 +617,12 @@
       overflow: hidden;
     }
 
+    &.expanded .card-desc {
+      display: block;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+    }
+
     .card-fuente {
       display: none;
       font-size: 0.8rem;
@@ -1124,7 +1140,7 @@
       font-weight: 700;
       text-transform: uppercase;
       margin-left: auto;
-      width: 120px;
+      width: 80px;
       justify-content: center;
 
       &:hover {
@@ -1170,8 +1186,6 @@
     padding: 0 9px;
     justify-content: center;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-    opacity: 0;
-    pointer-events: none;
     overflow: hidden;
     white-space: nowrap;
 

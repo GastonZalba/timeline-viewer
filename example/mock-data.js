@@ -4,7 +4,7 @@ export default {
   {
     id: 'FUE-00001',
     nombre_fuente: 'Lanzamiento del nuevo framework de JavaScript',
-    resumen_ia: 'El nuevo framework promete revolucionar la forma en que construimos aplicaciones web, con mejor rendimiento y una DX sin precedentes.',
+    resumen_ia: 'El nuevo framework promete revolucionar la forma en que construimos aplicaciones web, con mejor rendimiento y una DX sin precedentes. Entre las características mas destacadas se incluye un compilador optimizado que genera bundles hasta 60% mas livianos, un sistema de reactividad basado en señales que elimina la necesidad de reconciliaión virtual del DOM, y una arquitectura de renderizado por islas que permite hidratar solo las partes interactivas de la página. Los desarrolladores destacan también el hot module replacement nativo, que conserva el estado de la aplicación durante el desarrollo, y un sistema de errores con sugerencias contextuales en tiempo real. El equipo detrás del proyecto planea lanzar una versión estable a finales de año, con soporte oficial para TypeScript, integración con las principales herramientas de testing y un CLI unificado. La comunidad ya prepara tutoriales, cursos y conferencias para acompañar el lanzamiento, y los primeros benchmarks muestran resultados alentadores tanto en cargas iniciales como en interacciones complejas, posicionándolo como una alternativa seria a los frameworks tradicionales.',
     thumbnail: 'https://picsum.photos/seed/noticia1/600/400',
     link_web: 'https://dev.to/news/javascript-framework-2026',
     fecha_publicacion: '2026-06-25',
