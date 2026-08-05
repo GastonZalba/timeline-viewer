@@ -348,7 +348,7 @@ export default class Timeline {
               (t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
             <div class="tema-header">
-              <span class="tema-title">${t.titulo}${t.fecha_narrativa ? ` <span class="tema-fecha" title="Fecha narrativa">(${this._formatDate(t.fecha_narrativa)})</span>` : ''}</span>
+              <span class="tema-title">${t.titulo}${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
             </div>
             <div class="tema-desc">${t.resumen}</div>
@@ -370,7 +370,7 @@ export default class Timeline {
     </div>`;
     el.innerHTML = `
       <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
-        <div class="timeline-date">${this._formatDate(card.fecha_publicacion)}</div>
+        <div class="timeline-date" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>

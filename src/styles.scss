@@ -474,6 +474,7 @@
     align-items: center;
     gap: 0;
     margin-bottom: 40px;
+    position: relative;
     opacity: 0;
     transform: translateY(30px);
     transition:
@@ -486,6 +487,8 @@
     }
 
     &:has(.timeline-card.expanded) {
+      z-index: 5;
+
       .timeline-dot {
         border: none;
         width: 13px;
@@ -1061,10 +1064,11 @@
     }
 
     .tema-fecha {
-      font-size: 0.65rem;
-      font-weight: 400;
-      color: var(--tv-text-secondary);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--tv-accent);
       white-space: nowrap;
+      margin-left: 10px;
     }
 
     .tema-tone {
