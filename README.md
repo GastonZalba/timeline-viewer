@@ -83,7 +83,7 @@ Each object in `items` supports these fields:
 
 ### Embedded content
 
-When the card is expanded, `link_web` is automatically parsed for supported platforms and embedded just above the card footer:
+When the card is expanded, `link_web` is automatically parsed for supported platforms and embedded just above the card actions:
 
 | Platform  | URL pattern                    | Method                                                  |
 |-----------|--------------------------------|---------------------------------------------------------|

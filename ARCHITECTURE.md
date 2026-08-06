@@ -134,25 +134,25 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
               │   │   │   ├── .timeline-dot
               │   │   │   └── .timeline-hline
               │   │   └── .timeline-card.tone-{positivo|negativo|neutro}
-              │   │       ├── .card-image-wrap > img.card-image
-              │   │       ├── .card-body
-              │   │       │   ├── .card-title
-              │   │       │   ├── .card-desc (resumen_ia)
-              │   │       │   ├── .card-tone
-              │   │       │   ├── .card-temas > .tema-item × N
-              │   │       │   ├── .card-hint
-              │   │       │   ├── button.card-collapse
-              │   │       │   ├── button.card-info-btn
-              │   │       │   ├── .card-info-menu
-              │   │       │   ├── .card-protagonista
-              │   │       │   ├── .card-fuente
-              │   │       │   ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook)
-              │   │       │   └── .card-footer
-              │   │       │       ├── .card-footer-actions
-              │   │       │       │   ├── button.card-screenshot-btn (si hay screenshot)
-              │   │       │       │   ├── button.card-images-btn (si hay imágenes)
-              │   │       │       │   └── button.card-open (abrir enlace)
-              │   │       │       └── .card-footer-sep
+              │   │       ├── .card-image-wrap
+              │   │       │   ├── img.card-image
+              │   │       │   └── .card-title (sobre el thumbnail)
+              │   │       ├── .card-actions (barra de acciones debajo del thumbnail, oculto salvo expandido)
+              │   │       │   └── .card-actions-row
+              │   │       │       ├── button.card-screenshot-btn (si hay screenshot)
+              │   │       │       ├── button.card-images-btn (si hay imágenes)
+              │   │       │       └── button.card-open (abrir enlace)
+              │   │       └── .card-body
+              │   │           ├── .card-desc (resumen_ia)
+              │   │           ├── .card-tone
+              │   │           ├── .card-temas > .tema-item × N
+              │   │           ├── .card-hint
+              │   │           ├── button.card-collapse
+              │   │           ├── button.card-info-btn
+              │   │           ├── .card-info-menu
+              │   │           ├── .card-protagonista
+              │   │           ├── .card-fuente
+              │   │           └── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook)
               │   ├── .timeline-item.timeline-footer-item (si lastUpdated)
               │   ├── .timeline-item.timeline-load-more-item (si hay más páginas)
               │   └── .timeline-item.timeline-empty-item (si no hay resultados)
