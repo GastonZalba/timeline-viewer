@@ -15,9 +15,11 @@ export interface TimelineItem {
     tonos_sociales: TonoSocial[];
     fuente_institucional: string;
     tipo_fuente: string;
+    es_oficial: boolean;
     thumbnail: string | null;
     link_web: string;
     actores_principales: string[];
+    adjuntos: string[];
     screenshot: string | null;
     imagenes: {
         thumb: string;

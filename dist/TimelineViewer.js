@@ -76,6 +76,10 @@ export default class Timeline {
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
         </div>
         <div class="timeline-container" id="timeline-container">
+          <div class="ai-disclaimer">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.7a.9.9 0 0 1 1.7 0l1.4 4.2a.9.9 0 0 0 .6.6l4.2 1.4a.9.9 0 0 1 0 1.7l-4.2 1.4a.9.9 0 0 0-.6.6l-1.4 4.2a.9.9 0 0 1-1.7 0l-1.4-4.2a.9.9 0 0 0-.6-.6l-4.2-1.4a.9.9 0 0 1 0-1.7l4.2-1.4a.9.9 0 0 0 .6-.6z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+            <span>El contenido fue procesado con IA y puede contener imprecisiones</span>
+          </div>
           <div class="timeline-collapse-wrap">
             <div class="timeline-line"></div>
             <div class="timeline-content">
@@ -253,7 +257,7 @@ export default class Timeline {
                 .map((t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
             <div class="tema-header">
-              <span class="tema-title">${t.titulo}${t.fecha_narrativa ? ` <span class="tema-fecha" title="Fecha narrativa">(${this._formatDate(t.fecha_narrativa)})</span>` : ''}</span>
+              <span class="tema-title">${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}${t.titulo}</span>
               <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
             </div>
             <div class="tema-desc">${t.resumen}</div>
@@ -265,15 +269,16 @@ export default class Timeline {
       <div class="card-footer-actions">
         ${card.screenshot ? '<button class="card-footer-btn card-screenshot-btn" title="Ver captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Ver captura</button>' : ''}
         ${card.imagenes && card.imagenes.length ? '<button class="card-footer-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-footer-count">' + card.imagenes.length + '</span></button>' : ''}
-        <button class="card-footer-btn card-open" title="Abrir enlace">
+        ${card.adjuntos && card.adjuntos.length ? `<div class="card-adjuntos"><button class="card-footer-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-footer-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${a}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
+        <a class="card-footer-btn card-open"${card.link_web ? ` href="${card.link_web}"` : ''} target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Ir
-        </button>
+        </a>
       </div>
     </div>`;
         el.innerHTML = `
       <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
-        <div class="timeline-date">${this._formatDate(card.fecha_publicacion)}</div>
+        <div class="timeline-date" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
@@ -299,12 +304,16 @@ export default class Timeline {
               <span class="card-info-value">${card.tipo_fuente}</span>
             </div>
             <div class="card-info-row">
+              <span class="card-info-label">Oficial</span>
+              <span class="card-info-value">${card.es_oficial ? 'Sí' : 'No'}</span>
+            </div>
+            <div class="card-info-row">
               <span class="card-info-label">Captura</span>
               <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente">${card.fuente_institucional}</div>
+          <div class="card-fuente">${card.fuente_institucional}${card.es_oficial ? '<span class="card-oficial-wrap" title="Es fuente oficial"><svg class="card-oficial" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="19 7.5 10.5 16.5 4.5 11.5"/></svg></span>' : ''}</div>
           ${iframeHtml}
           ${footerHtml}
         </div>
@@ -327,7 +336,8 @@ export default class Timeline {
         }
         const cardEl = el.querySelector('.timeline-card');
         cardEl.addEventListener('click', (e) => {
-            if (e.target && e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu'))
+            if (e.target &&
+                e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos'))
                 return;
             cardEl.classList.add('expanded');
             const igWrap = cardEl.querySelector('.card-iframe-instagram');
@@ -438,11 +448,9 @@ export default class Timeline {
         cardEl.querySelector('.card-info-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             cardEl.querySelector('.card-info-menu').classList.toggle('open');
-        });
-        cardEl.querySelector('.card-open').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (card.link_web)
-                window.open(card.link_web, '_blank', 'noopener');
+            const adjuntosMenu = cardEl.querySelector('.card-adjuntos-menu');
+            if (adjuntosMenu)
+                adjuntosMenu.classList.remove('open');
         });
         const screenshotBtn = el.querySelector('.card-screenshot-btn');
         if (screenshotBtn) {
@@ -456,6 +464,18 @@ export default class Timeline {
             imagesBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this._openLightGallery(card.imagenes, card.nombre_fuente, true);
+            });
+        }
+        const adjuntosWrap = el.querySelector('.card-adjuntos');
+        if (adjuntosWrap) {
+            const adjuntosBtn = adjuntosWrap.querySelector('.card-adjuntos-btn');
+            const adjuntosMenu = adjuntosWrap.querySelector('.card-adjuntos-menu');
+            adjuntosBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                adjuntosMenu.classList.toggle('open');
+                const infoMenu = el.querySelector('.card-info-menu');
+                if (infoMenu)
+                    infoMenu.classList.remove('open');
             });
         }
         const prot = el.querySelector('.card-protagonista.has-more');
@@ -635,7 +655,7 @@ export default class Timeline {
             cards.forEach((c) => c.classList.remove('visible'));
             void this.featuredContainer.offsetHeight;
             cards.forEach((c) => (c.style.transition = ''));
-            this.section.classList.remove('expanded', 'scrolled');
+            this.section.classList.remove('expanded');
             this.timelineContainer.classList.remove('expanded');
             this.expandIcon.classList.remove('rotated');
             this.container.querySelectorAll('.timeline-item').forEach((item) => {
@@ -809,17 +829,14 @@ export default class Timeline {
             if (!e.target.closest('.card-info-btn, .card-info-menu')) {
                 this.container.querySelectorAll('.card-info-menu.open').forEach((m) => m.classList.remove('open'));
             }
+            if (!e.target.closest('.card-adjuntos-btn, .card-adjuntos-menu')) {
+                this.container.querySelectorAll('.card-adjuntos-menu.open').forEach((m) => m.classList.remove('open'));
+            }
             if (!e.target.closest('.filter-wrap')) {
                 this.filterMenu.classList.remove('open');
                 this.filterToggle.classList.remove('open');
             }
         });
-        window.addEventListener('scroll', () => {
-            if (!this.isExpanded)
-                return;
-            const rect = this.timelineContainer.getBoundingClientRect();
-            this.section.classList.toggle('scrolled', rect.top < 0);
-        }, { passive: true });
     }
 }
 //# sourceMappingURL=TimelineViewer.js.map
