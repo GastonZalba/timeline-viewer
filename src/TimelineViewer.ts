@@ -352,7 +352,7 @@ export default class Timeline {
               (t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
             <div class="tema-header">
-              <span class="tema-title">${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}${t.titulo}</span>
+              <span class="tema-title">${t.titulo}${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-tone">${toneLabelTema[t.tono_social]}</span>
             </div>
             <div class="tema-desc">${t.resumen}</div>
