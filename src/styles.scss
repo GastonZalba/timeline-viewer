@@ -602,7 +602,7 @@
     cursor: pointer;
 
     &.expanded {
-      cursor: default;
+      cursor: inherit;
       overflow: visible;
       border: 1px solid var(--tv-accent);
       box-shadow: 0 8px 20px rgba(4, 8, 15, 0.81);
