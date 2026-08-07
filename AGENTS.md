@@ -106,6 +106,7 @@ interface TimelineItem {
   fuente_institucional: string; // Nombre del medio
   tipo_fuente: string;          // Tipo de fuente (ver valores en README)
   es_oficial: boolean;          // Indica si la fuente es oficial
+  validado: boolean | null;     // Indica si el artículo fue validado (true/false/null = pendiente/desconocido)
   thumbnail: string | null;     // URL de imagen principal
   link_web: string;             // URL del artículo original
   actores_principales: string[];

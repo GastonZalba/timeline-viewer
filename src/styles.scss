@@ -601,11 +601,29 @@
       box-shadow 0.3s ease;
     cursor: pointer;
 
+    .card-no-validado {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      z-index: 2;
+      background: #cb3536;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
+      pointer-events: none;
+    }
+
     &.expanded {
       cursor: inherit;
       overflow: visible;
       border: 1px solid var(--tv-accent);
       box-shadow: 0 8px 20px rgba(4, 8, 15, 0.81);
+      .card-no-validado {
+        right: 38px;
+      }
     }
 
     &:hover:not(.expanded) {
@@ -656,10 +674,16 @@
 
     .card-fuente {
       display: none;
-      font-size: 0.8rem;
-      color: var(--tv-text-secondary);
+      font-size: 0.9rem;
+      color: var(--tv-tone-neutral);
       margin: 8px 0 6px;
       font-weight: 500;
+      line-height: 1.4;
+
+      .fuente-label {
+        color: var(--tv-text-primary);
+        font-weight: 600;
+      }
     }
 
     &.expanded .card-fuente {
@@ -753,9 +777,18 @@
       display: none;
     }
 
-    .card-iframe-wrap {
+    .card-iframe-subtitle {
       display: none;
       margin: 16px 0 0 0;
+    }
+
+    &.expanded .card-iframe-subtitle {
+      display: block;
+    }
+
+    .card-iframe-wrap {
+      display: none;
+      margin: 8px 0 0 0;
       border-radius: 8px;
       position: relative;
       overflow-y: auto;
@@ -1105,7 +1138,7 @@
     overflow: hidden;
   }
 
-  .temas-title {
+  .card-subtitle {
     font-size: 0.8em;
     font-weight: 600;
     color: #ffffff;
@@ -1144,7 +1177,8 @@
       padding: 2px 8px;
       border-radius: 4px;
       text-align: center;
-      width: 66px;
+      width: 70px;
+      min-width: 70px;
     }
 
     .tema-desc {

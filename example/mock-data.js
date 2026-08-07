@@ -13,12 +13,18 @@ export default {
     fuente_institucional: 'Dev.to',
     tipo_fuente: 'Sitio web o portal',
     es_oficial: true,
+    validado: true,
     actores_principales: ['Ana García', 'Carlos Ruiz'],
     adjuntos: ['https://archivos.ejemplo.com/informes/informe-lanzamiento-framework.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia1a/300/200', full: 'https://picsum.photos/seed/noticia1a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia1b/300/200', full: 'https://picsum.photos/seed/noticia1b/600/400' }
+    ],
+    links_videos: [
+      'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+      'https://www.youtube.com/watch?v=9bZkp7q19f0'
     ],
     temas: [
       { titulo: 'Rendimiento', resumen: 'Benchmarks muestran 40% mejora en tiempo de carga inicial', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' },
@@ -38,10 +44,12 @@ export default {
     fuente_institucional: 'Mozilla Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: false,
+    validado: false,
     actores_principales: ['Mozilla', 'Google Chrome Team'],
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
+    links_videos: ['https://www.youtube.com/watch?v=kXYiU_JCYtU'],
     temas: [
       { titulo: 'Parche critico', resumen: 'Parchean vulnerabilidad CVE-2026-1234 que afectaba a todos los navegadores basados en Chromium', tono_social: 'Negativo', fecha_narrativa: '2026-06-22' }
     ]
@@ -58,6 +66,7 @@ export default {
     fuente_institucional: 'OpenAI Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: true,
+    validado: true,
     actores_principales: ['OpenAI'],
     adjuntos: ['https://archivos.ejemplo.com/comunicados/comunicado-ia-desarrollo-web.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -65,6 +74,10 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia3a/300/200', full: 'https://picsum.photos/seed/noticia3a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia3b/300/200', full: 'https://picsum.photos/seed/noticia3b/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia3c/300/200', full: 'https://picsum.photos/seed/noticia3c/600/400' }
+    ],
+    links_videos: [
+      'https://www.youtube.com/watch?v=hY7m5jjJ5mQ',
+      'https://www.youtube.com/watch?v=oHg5SJYRHA0'
     ],
     temas: [
       { titulo: 'Generacion de codigo', resumen: 'Modelo especializado genera JSX, CSS y logica de estado', tono_social: 'Positivo', fecha_narrativa: '2026-06-19' },
@@ -85,12 +98,14 @@ export default {
     fuente_institucional: 'W3C',
     tipo_fuente: 'Decreto o norma',
     es_oficial: true,
+    validado: true,
     actores_principales: ['W3C', 'Rachel Andrews', 'Jake Archibald'],
     adjuntos: ['https://archivos.ejemplo.com/specs/spec-css-2026.pdf', 'https://archivos.ejemplo.com/specs/anexo-ejemplos-layout.html'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
     ],
+    links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A'],
     temas: [
       { titulo: 'Anchor positioning', resumen: 'Nueva spec para posicionar elementos relativos a otros sin JS', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
       { titulo: 'Scroll-driven animations', resumen: 'Animaciones nativas vinculadas al desplazamiento del usuario', tono_social: 'Positivo', fecha_narrativa: '2026-06-15' }
@@ -108,6 +123,7 @@ export default {
     fuente_institucional: 'Node.js Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: true,
+    validado: null,
     actores_principales: ['Node.js Foundation'],
     adjuntos: ['https://archivos.ejemplo.com/node/notas/node24-lts-release-notes.pdf', 'https://archivos.ejemplo.com/node/benchmarks/benchmarks-memoria.xlsx', 'https://archivos.ejemplo.com/node/guias/guia-migracion-node20-22.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -117,6 +133,11 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia5c/300/200', full: 'https://picsum.photos/seed/noticia5c/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia5d/300/200', full: 'https://picsum.photos/seed/noticia5d/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia5e/300/200', full: 'https://picsum.photos/seed/noticia5e/600/400' }
+    ],
+    links_videos: [
+      'https://www.youtube.com/watch?v=ckZ7mTfj2oE',
+      'https://www.youtube.com/watch?v=nfWlot6h_JM',
+      'https://www.youtube.com/watch?v=vLx9fBdfF0E'
     ],
     temas: [
       { titulo: 'Nuevas APIs', resumen: 'API nativa de testing y watch mode integrado', tono_social: 'Positivo', fecha_narrativa: '2026-06-10' },
@@ -136,6 +157,7 @@ export default {
     fuente_institucional: 'npm Blog',
     tipo_fuente: 'Sitio web o portal',
     es_oficial: false,
+    validado: true,
     actores_principales: [],
     adjuntos: [],
     screenshot: null,
@@ -154,6 +176,7 @@ export default {
     fuente_institucional: 'TypeScript Blog',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: false,
+    validado: false,
     actores_principales: ['Anders Hejlsberg', 'Microsoft'],
     adjuntos: ['https://archivos.ejemplo.com/typescript/notas-release-ts6.md'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -182,6 +205,7 @@ export default {
     fuente_institucional: 'WebAssembly',
     tipo_fuente: 'Sitio web o portal',
     es_oficial: true,
+    validado: true,
     actores_principales: [],
     adjuntos: ['https://archivos.ejemplo.com/wasm/wasm-server-benchmarks.pdf', 'https://archivos.ejemplo.com/wasm/runtime-comparativa.xlsx'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -205,6 +229,7 @@ export default {
     fuente_institucional: 'Nielsen Norman Group',
     tipo_fuente: 'Libro o publicación',
     es_oficial: false,
+    validado: null,
     actores_principales: ['María López', 'Google UX', 'Nielsen Norman Group'],
     adjuntos: ['https://archivos.ejemplo.com/ux/ux-trends-2026-reporte.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -231,6 +256,7 @@ export default {
     fuente_institucional: 'Vitest',
     tipo_fuente: 'Sitio web o portal',
     es_oficial: false,
+    validado: true,
     actores_principales: ['Vitest Team'],
     adjuntos: ['https://archivos.ejemplo.com/testing/vitest-config-ejemplo.ts', 'https://archivos.ejemplo.com/testing/playwright-config-ejemplo.ts'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -256,6 +282,7 @@ export default {
     fuente_institucional: 'Vercel',
     tipo_fuente: 'Gacetilla o comunicado de prensa',
     es_oficial: true,
+    validado: true,
     actores_principales: ['Vercel', 'Next.js Team', 'Juan Pérez'],
     adjuntos: ['https://archivos.ejemplo.com/vercel/demos/vercel-server-components-demo.zip', 'https://archivos.ejemplo.com/vercel/benchmarks/streaming-ssr-benchmarks.pdf', 'https://archivos.ejemplo.com/vercel/costos/analisis-costos-servidor.xlsx'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -279,6 +306,7 @@ export default {
     fuente_institucional: 'MicroFrontends.dev',
     tipo_fuente: 'Sitio web o portal',
     es_oficial: false,
+    validado: null,
     actores_principales: ['Module Federation Team', 'Sarah Connor'],
     adjuntos: ['https://archivos.ejemplo.com/microfrontends/caso-estudio-microfrontends.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -304,6 +332,7 @@ export default {
     fuente_institucional: 'W3C WAI',
     tipo_fuente: 'Decreto o norma',
     es_oficial: true,
+    validado: true,
     actores_principales: ['WAI', 'Laura Jiménez', 'GovUK', 'Marta Ruiz', 'Carlos Mendoza', 'Sofía Torres', 'Diego Hernández', 'Valentina Paz', 'Javier Acosta', 'Lucía Campos'],
     adjuntos: ['https://archivos.ejemplo.com/accesibilidad/wcag-3-0-draft.pdf', 'https://archivos.ejemplo.com/accesibilidad/herramientas-accesibilidad-ci.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -333,6 +362,7 @@ export default {
     fuente_institucional: 'YouTube',
     tipo_fuente: 'Video',
     es_oficial: false,
+    validado: true,
     actores_principales: ['CSS Animations Channel'],
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -353,6 +383,7 @@ export default {
     fuente_institucional: 'Instagram',
     tipo_fuente: 'Red Social',
     es_oficial: false,
+    validado: true,
     actores_principales: ['dev_tips_css'],
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -373,6 +404,7 @@ export default {
     fuente_institucional: 'Twitter',
     tipo_fuente: 'Red Social',
     es_oficial: true,
+    validado: true,
     actores_principales: ['react_dev_tips'],
     adjuntos: ['https://archivos.ejemplo.com/twitter/hilo-twitter-react-tips.txt'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -394,6 +426,7 @@ export default {
     fuente_institucional: 'Facebook',
     tipo_fuente: 'Red Social',
     es_oficial: false,
+    validado: true,
     actores_principales: ['Comunidad Web Dev'],
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
