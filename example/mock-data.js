@@ -27,9 +27,9 @@ export default {
       'https://www.youtube.com/watch?v=9bZkp7q19f0'
     ],
     temas: [
-      { titulo: 'Rendimiento', resumen: 'Benchmarks muestran 40% mejora en tiempo de carga inicial', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' },
-      { titulo: 'DX', resumen: 'Hot module replacement nativo y errores en tiempo real', tono_social: 'Positivo', fecha_narrativa: '2026-06-25' },
-      { titulo: 'Ecosistema', resumen: 'Ya cuenta con mas de 200 plugins comunitarios', tono_social: 'Neutro', fecha_narrativa: null }
+      { titulo: 'Rendimiento', resumen: 'Los benchmarks muestran una mejora del 40% en el tiempo de carga inicial, con reducciones aun mayores en moviles de gama baja. Las metricas de Core Web Vitals mejoran gracias al compilador optimizado y al renderizado por islas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' },
+      { titulo: 'DX', resumen: 'La experiencia de desarrollo mejora con hot module replacement nativo que conserva el estado, errores con sugerencias contextuales y una integracion profunda con editores populares. El CLI unificado simplifica la creacion de proyectos y reduce las tareas repetitivas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-25' },
+      { titulo: 'Ecosistema', resumen: 'El ecosistema supero los 200 plugins comunitarios activos, desde integraciones con bases de datos y frameworks de testing hasta utilidades de accesibilidad. La comunidad contribuye con documentacion y los mantenedores garantizan compatibilidad con las versiones estables.', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -51,7 +51,7 @@ export default {
     imagenes: [],
     links_videos: ['https://www.youtube.com/watch?v=kXYiU_JCYtU'],
     temas: [
-      { titulo: 'Parche critico', resumen: 'Parchean vulnerabilidad CVE-2026-1234 que afectaba a todos los navegadores basados en Chromium', tono_social: 'Negativo', fecha_narrativa: '2026-06-22' }
+      { titulo: 'Parche critico', resumen: 'Se parcheo la vulnerabilidad CVE-2026-1234, catalogada como critica, que afectaba a todos los navegadores basados en Chromium y permitia ejecucion remota de codigo. Se recomienda actualizar todas las versiones afectadas: hay explotaciones activas que instalan malware sin que el usuario lo note.', tono_social: 'Negativo', fecha_narrativa: '2026-06-22' }
     ]
   },
   {
@@ -80,10 +80,10 @@ export default {
       'https://www.youtube.com/watch?v=oHg5SJYRHA0'
     ],
     temas: [
-      { titulo: 'Generacion de codigo', resumen: 'Modelo especializado genera JSX, CSS y logica de estado', tono_social: 'Positivo', fecha_narrativa: '2026-06-19' },
-      { titulo: 'Editor inteligente', resumen: 'Plugin para VS Code con sugerencias contextuales', tono_social: 'Positivo', fecha_narrativa: '2026-06-20' },
-      { titulo: 'Productividad', resumen: 'Equipos reportan 3x mas rapidez en prototipado', tono_social: 'Positivo', fecha_narrativa: '2026-06-18' },
-      { titulo: 'Limites', resumen: 'Problemas con logica compleja y edge cases poco documentados', tono_social: 'Negativo', fecha_narrativa: null }
+      { titulo: 'Generacion de codigo', resumen: 'El modelo especializado produce componentes completos con JSX, estilos CSS y logica de estado a partir de descripciones en lenguaje natural. Los desarrolladores iteran rapidamente, refinan el resultado y lo exportan al editor, acelerando el prototipado.', tono_social: 'Positivo', fecha_narrativa: '2026-06-19' },
+      { titulo: 'Editor inteligente', resumen: 'El plugin de VS Code integra sugerencias contextuales basadas en el codigo abierto en el editor y en el contexto del proyecto. Ofrece autocompletado avanzado, deteccion de errores de estilo y accesibilidad, y genera codigo desde lenguaje natural sin salir del entorno.', tono_social: 'Positivo', fecha_narrativa: '2026-06-20' },
+      { titulo: 'Productividad', resumen: 'Los equipos que adoptaron la generacion asistida reportan hasta tres veces mas rapidez en prototipado y menos horas en interfaces repetitivas. El tiempo ahorrado se destina a revision de calidad, cobertura de pruebas y refinamiento de la experiencia de usuario.', tono_social: 'Positivo', fecha_narrativa: '2026-06-18' },
+      { titulo: 'Limites', resumen: 'El modelo presenta limitaciones en logica de negocio compleja y en edge cases poco documentados. Las respuestas se vuelven incoherentes con multiples dependencias o reglas de validacion ambiguas, por lo que requiere correccion manual. Se recomienda usarlo como punto de partida.', tono_social: 'Negativo', fecha_narrativa: null }
     ]
   },
   {
@@ -107,8 +107,8 @@ export default {
     ],
     links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A'],
     temas: [
-      { titulo: 'Anchor positioning', resumen: 'Nueva spec para posicionar elementos relativos a otros sin JS', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
-      { titulo: 'Scroll-driven animations', resumen: 'Animaciones nativas vinculadas al desplazamiento del usuario', tono_social: 'Positivo', fecha_narrativa: '2026-06-15' }
+      { titulo: 'Anchor positioning', resumen: 'La especificacion de anchor positioning posiciona elementos relativos a otros del documento sin JavaScript. Simplifica tooltips, dropdowns, popovers y menus que antes requerian calculos manuales o librerias externas. Los navegadores modernos ya la soportan nativamente.', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
+      { titulo: 'Scroll-driven animations', resumen: 'Las animaciones vinculadas al desplazamiento se ejecutan nativamente, sincronizadas con la posicion de la pagina en lugar del tiempo. Permiten storytelling, barras de progreso y efectos de parallax sin librerias de terceros ni scroll listeners, con mejor rendimiento.', tono_social: 'Positivo', fecha_narrativa: '2026-06-15' }
     ]
   },
   {
@@ -140,9 +140,9 @@ export default {
       'https://www.youtube.com/watch?v=vLx9fBdfF0E'
     ],
     temas: [
-      { titulo: 'Nuevas APIs', resumen: 'API nativa de testing y watch mode integrado', tono_social: 'Positivo', fecha_narrativa: '2026-06-10' },
-      { titulo: 'Rendimiento', resumen: '40% menos uso de memoria en aplicaciones Express', tono_social: 'Positivo', fecha_narrativa: null },
-      { titulo: 'Migracion', resumen: 'Guia oficial para migrar desde Node 20 y 22', tono_social: 'Neutro', fecha_narrativa: '2026-06-09' }
+      { titulo: 'Nuevas APIs', resumen: 'La version LTS incorpora una API nativa de testing que elimina dependencias externas para los casos mas comunes, y un watch mode integrado. Tambien se estabilizan APIs de red y streams, manteniendo compatibilidad hacia atras para una adopcion gradual.', tono_social: 'Positivo', fecha_narrativa: '2026-06-10' },
+      { titulo: 'Rendimiento', resumen: 'Las mediciones sobre Express muestran una reduccion del 40% en uso de memoria gracias a la optimizacion del motor V8 y la cache interna. En alta concurrencia, el throughput mejoro con latencia mas estable y menor consumo de CPU.', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Migracion', resumen: 'La guia oficial detalla la migracion desde Node 20 y 22, con APIs deprecadas y alternativas, ejemplos antes y despues, y scripts para detectar usos incompatibles. Incluye una tabla de compatibilidad; la migracion de proyectos medianos toma medio dia.', tono_social: 'Neutro', fecha_narrativa: '2026-06-09' }
     ]
   },
   {
@@ -187,10 +187,10 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia7d/300/200', full: 'https://picsum.photos/seed/noticia7d/600/400' }
     ],
     temas: [
-      { titulo: 'Patron matching', resumen: 'Nueva sintaxis match/case con exhaustiveness checking', tono_social: 'Positivo', fecha_narrativa: '2026-05-28' },
-      { titulo: 'Decorators nativos', resumen: 'Soporte oficial sin necesidad de compiladores adicionales', tono_social: 'Positivo', fecha_narrativa: '2026-05-27' },
-      { titulo: 'Inferencia mejorada', resumen: 'Tipos condicionales mas precisos en funciones genericas', tono_social: 'Positivo', fecha_narrativa: null },
-      { titulo: 'Breaking changes', resumen: 'Algunas sintaxis obsoletas seran eliminadas en TS 7', tono_social: 'Negativo', fecha_narrativa: '2026-05-26' }
+      { titulo: 'Patron matching', resumen: 'La nueva sintaxis match/case ofrece coincidencia de patrones con exhaustiveness checking, que obliga a cubrir todos los casos posibles. Elimina errores por condiciones incompletas y soporta desestructuracion, guardas y rangos, integrándose con el sistema de tipos.', tono_social: 'Positivo', fecha_narrativa: '2026-05-28' },
+      { titulo: 'Decorators nativos', resumen: 'El soporte oficial de decorators llega sin transpiladores adicionales, simplificando la configuracion. Funcionan nativamente en clases y metodos, y su integracion con la inferencia de tipos permite abstracciones mas seguras para inyeccion de dependencias y validacion.', tono_social: 'Positivo', fecha_narrativa: '2026-05-27' },
+      { titulo: 'Inferencia mejorada', resumen: 'La inferencia de tipos en funciones genericas es mucho mas precisa, en especial con tipos condicionales y mapeo de uniones. El compilador deduce tipos donde antes se requerian anotaciones manuales, mejorando el autocompletado y detectando errores mas temprano.', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Breaking changes', resumen: 'Aunque mantiene compatibilidad total hacia atras, varias sintaxis deprecadas seran eliminadas en TypeScript 7. Las herramientas de migracion automatizan la transformacion, pero los patrones muy antiguos requieren revision manual, por lo que conviene planificar la actualizacion con anticipacion.', tono_social: 'Negativo', fecha_narrativa: '2026-05-26' }
     ]
   },
   {
@@ -213,8 +213,8 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia8a/300/200', full: 'https://picsum.photos/seed/noticia8a/600/400' }
     ],
     temas: [
-      { titulo: 'WASM runtime', resumen: 'Nuevos runtimes optimizados para entornos serverless', tono_social: 'Positivo', fecha_narrativa: '2026-05-15' },
-      { titulo: 'Casos de uso', resumen: 'Procesamiento de imagenes, parseo y computacion cientifica', tono_social: 'Neutro', fecha_narrativa: null }
+      { titulo: 'WASM runtime', resumen: 'Los nuevos runtimes optimizados para serverless ejecutan modulos WebAssembly con arranque minimo y bajo consumo de recursos. Compilar codigo intensivo a WASM y desplegarlo en funciones de borde acerca el procesamiento al usuario, con overhead cada vez menor.', tono_social: 'Positivo', fecha_narrativa: '2026-05-15' },
+      { titulo: 'Casos de uso', resumen: 'Los usos mas frecuentes del WASM fuera del navegador incluyen procesamiento de imagenes y video, parseo de PDFs y hojas de calculo, y computacion cientifica intensiva. Se benefician de la velocidad nativa y del aislamiento de memoria, reduciendo costos.', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -239,9 +239,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia9c/300/200', full: 'https://picsum.photos/seed/noticia9c/600/400' }
     ],
     temas: [
-      { titulo: 'Micro-interacciones', resumen: 'Animaciones sutiles que mejoran la percepcion de respuesta', tono_social: 'Positivo', fecha_narrativa: '2026-04-30' },
-      { titulo: 'Modo oscuro', resumen: 'Adaptacion automatica segun hora del dia y preferencias del SO', tono_social: 'Neutro', fecha_narrativa: null },
-      { titulo: 'Navegacion gestual', resumen: 'Swipes y gestos nativos para apps web progresivas', tono_social: 'Positivo', fecha_narrativa: '2026-04-29' }
+      { titulo: 'Micro-interacciones', resumen: 'Las micro-interacciones bien disenadas mejoran la percepcion de respuesta y guian al usuario. Hover con feedback tactil, transiciones entre estados de carga y confirmaciones animadas reducen la espera percibida y aumentan la confianza en el sistema.', tono_social: 'Positivo', fecha_narrativa: '2026-04-30' },
+      { titulo: 'Modo oscuro', resumen: 'La adaptacion automatica del tema considera la hora del dia y las preferencias del sistema operativo. El modo oscuro ajusta contraste, brillo y sombras para mantener legibilidad y reducir la fatiga visual, respetando la preferencia del usuario sin recargar la aplicacion.', tono_social: 'Neutro', fecha_narrativa: null },
+      { titulo: 'Navegacion gestual', resumen: 'Las apps web progresivas incorporan gestos nativos como swipes y arrastres para navegar y desplegar paneles. Estos patrones moviles llegan al navegador gracias a las APIs de puntero y tactil, ofreciendo una experiencia mas fluida en dispositivos tactiles.', tono_social: 'Positivo', fecha_narrativa: '2026-04-29' }
     ]
   },
   {
@@ -265,9 +265,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia10b/300/200', full: 'https://picsum.photos/seed/noticia10b/600/400' }
     ],
     temas: [
-      { titulo: 'Unit testing', resumen: 'Configuracion optima de Vitest con cobertura por componente', tono_social: 'Positivo', fecha_narrativa: '2026-04-10' },
-      { titulo: 'Integration tests', resumen: 'Testing Library para pruebas centradas en el usuario', tono_social: 'Neutro', fecha_narrativa: '2026-04-09' },
-      { titulo: 'E2E', resumen: 'Playwright con paralelizacion y captura de video', tono_social: 'Positivo', fecha_narrativa: null }
+      { titulo: 'Unit testing', resumen: 'La configuracion optima de Vitest se detalla con cobertura por componente, mocks de dependencias, temporizadores y peticiones de red. Se explican los modos watch y coverage y la integracion con pre-commit, logrando una suite rapida que detecta regresiones antes de produccion.', tono_social: 'Positivo', fecha_narrativa: '2026-04-10' },
+      { titulo: 'Integration tests', resumen: 'Las pruebas de integracion con Testing Library se centran en el usuario real, interactuando con roles accesibles en lugar de detalles de implementacion. Son mas robustas ante refactorizaciones y cubren flujos como registro, autenticacion y carrito de compras.', tono_social: 'Neutro', fecha_narrativa: '2026-04-09' },
+      { titulo: 'E2E', resumen: 'Playwright ejecuta pruebas end-to-end en paralelo en multiples navegadores, con captura de video y pantalla para diagnosticar fallas. La configuracion incluye redes interceptadas y sesion reutilizable, y el CI integra las pruebas en cada pull request.', tono_social: 'Positivo', fecha_narrativa: null }
     ]
   },
   {
@@ -290,9 +290,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia11a/300/200', full: 'https://picsum.photos/seed/noticia11a/600/400' }
     ],
     temas: [
-      { titulo: 'Server components', resumen: 'Componentes que se ejecutan exclusivamente en el servidor', tono_social: 'Positivo', fecha_narrativa: '2026-03-20' },
-      { titulo: 'Streaming SSR', resumen: 'Renderizado progresivo que mejora la percepcion de carga', tono_social: 'Positivo', fecha_narrativa: null },
-      { titulo: 'Costo', resumen: 'Mayor consumo de recursos en el servidor comparado con SPA tradicional', tono_social: 'Negativo', fecha_narrativa: '2026-03-19' }
+      { titulo: 'Server components', resumen: 'Los componentes que se ejecutan solo en el servidor eliminan el envio de JavaScript al cliente para el renderizado inicial, reduciendo el bundle. La informacion sensible y las consultas a bases de datos quedan fuera del navegador, simplificando la seguridad.', tono_social: 'Positivo', fecha_narrativa: '2026-03-20' },
+      { titulo: 'Streaming SSR', resumen: 'El renderizado progresivo envia fragmentos de HTML al cliente a medida que estan listos. Mejora la percepcion de carga y muestra contenido interactivo temprano, mientras las secciones lentas aparecen progresivamente sin bloquear la interaccion.', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Costo', resumen: 'La arquitectura de server components y streaming SSR implica mayor consumo de recursos en el servidor que una SPA tradicional. Cada renderizado demanda procesamiento y multiplica costos de hosting con trafico alto, por lo que conviene cache y descarga estatica.', tono_social: 'Negativo', fecha_narrativa: '2026-03-19' }
     ]
   },
   {
@@ -315,9 +315,9 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia13b/300/200', full: 'https://picsum.photos/seed/noticia13b/600/400' }
     ],
     temas: [
-      { titulo: 'Module Federation', resumen: 'Webpack 5 permite compartir modulos entre aplicaciones independientes', tono_social: 'Positivo', fecha_narrativa: null },
-      { titulo: 'Orquestacion', resumen: 'El shell principal maneja ruteo, autenticacion y estado global', tono_social: 'Neutro', fecha_narrativa: null },
-      { titulo: 'Despliegue', resumen: 'Cada micro-frontend se deploya independientemente sin afectar el resto', tono_social: 'Positivo', fecha_narrativa: null }
+      { titulo: 'Module Federation', resumen: 'Webpack 5 introdujo Module Federation, que permite compartir modulos entre aplicaciones independientes en tiempo de ejecucion sin instalar paquetes. Las aplicaciones exponen componentes que otros consumen de forma remota, facilitando plataformas modulares con equipos autonomas.', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Orquestacion', resumen: 'El shell principal maneja ruteo, autenticacion, estado compartido y coordinacion de los micro-frontends remotos. Define los contratos de comunicacion, maneja la carga perezosa y centraliza branding y layout, lo que es critico para la consistencia.', tono_social: 'Neutro', fecha_narrativa: null },
+      { titulo: 'Despliegue', resumen: 'Cada micro-frontend se despliega de forma independiente, sin coordinar con el resto de la plataforma ni esperar ventanas globales. Los cambios se verifican en aislamiento y el shell los consume de forma transparente, acelerando el ciclo de release.', tono_social: 'Positivo', fecha_narrativa: null }
     ]
   },
   {
@@ -344,10 +344,10 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia12e/300/200', full: 'https://picsum.photos/seed/noticia12e/600/400' }
     ],
     temas: [
-      { titulo: 'WCAG 3.0', resumen: 'Nuevo estandar con criterios de conformidad mas claros', tono_social: 'Positivo', fecha_narrativa: '2026-02-05' },
-      { titulo: 'Herramientas', resumen: 'Linters y auditores automaticos integrados en CI/CD', tono_social: 'Positivo', fecha_narrativa: '2026-02-04' },
-      { titulo: 'Legislacion', resumen: 'Multas por incumplimiento de accesibilidad aumentan un 200%', tono_social: 'Negativo', fecha_narrativa: '2026-02-03' },
-      { titulo: 'Educacion', resumen: 'Crece la demanda de profesionales certificados en accesibilidad', tono_social: 'Neutro', fecha_narrativa: null }
+      { titulo: 'WCAG 3.0', resumen: 'El estandar WCAG 3.0 introduce criterios de conformidad basados en resultados medibles en lugar de simples requisitos de implementacion. Contempla niveles de severidad y una puntuacion general, cubriendo navegacion por voz, movimiento reducido y contraste adaptativo.', tono_social: 'Positivo', fecha_narrativa: '2026-02-05' },
+      { titulo: 'Herramientas', resumen: 'Los linters y auditores de accesibilidad se integran en los pipelines de CI y devuelven reportes con las violaciones detectadas en cada cambio. Verifican contraste, atributos de imagenes y roles interactivos, reduciendo costos de correccion.', tono_social: 'Positivo', fecha_narrativa: '2026-02-04' },
+      { titulo: 'Legislacion', resumen: 'Las multas por incumplimiento de las normativas de accesibilidad aumentaron un 200%. Las empresas sin acceso equitativo enfrentan sanciones economicas y danos reputacionales, impulsando la contratacion de consultores y la adopcion de herramientas de auditoria.', tono_social: 'Negativo', fecha_narrativa: '2026-02-03' },
+      { titulo: 'Educacion', resumen: 'La demanda de profesionales certificados en accesibilidad crece sostenidamente, impulsada por los nuevos marcos regulatorios. Universidades y plataformas amplian cursos y diplomaturas en diseno inclusivo, y estos perfiles logran mejor remuneracion.', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -368,7 +368,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'Animaciones', resumen: 'Keyframes, transitions y animaciones en cascada explicadas paso a paso', tono_social: 'Positivo', fecha_narrativa: '2026-06-28' }
+      { titulo: 'Animaciones', resumen: 'El tutorial explica paso a paso animaciones complejas solo con CSS, desde keyframes basicos hasta transiciones en cascada. Incluye ejemplos de hover, animaciones al hacer scroll y efectos de entrada, mostrando el potencial expresivo sin JavaScript.', tono_social: 'Positivo', fecha_narrativa: '2026-06-28' }
     ]
   },
   {
@@ -389,7 +389,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'CSS framework', resumen: 'Nueva herramienta open-source para maquetacion veloz', tono_social: 'Positivo', fecha_narrativa: null }
+      { titulo: 'CSS framework', resumen: 'El framework CSS open-source acelera la maquetacion con sintaxis minimalista y archivo liviano. Incluye utilidades de grid y flexbox, componentes reutilizables y variables configurables, apuntando a desarrolladores que buscan resultados rapidos sin sistemas pesados.', tono_social: 'Positivo', fecha_narrativa: null }
     ]
   },
   {
@@ -410,8 +410,8 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'Performance', resumen: 'Tips para optimizar renders con useMemo y useCallback', tono_social: 'Positivo', fecha_narrativa: '2026-06-26' },
-      { titulo: 'React', resumen: 'Hilo con 20 consejos para escribir components mas eficientes', tono_social: 'Neutro', fecha_narrativa: null }
+      { titulo: 'Performance', resumen: 'El hilo comparte consejos para optimizar React con el uso correcto de useMemo y useCallback para evitar renders innecesarios. Explica patrones de memorizacion, errores comunes y la importancia de medir con el profiler en lugar de optimizar a ciegas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-26' },
+      { titulo: 'React', resumen: 'Un hilo con veinte consejos para escribir componentes mas eficientes, sobre ciclo de vida, estado y composicion. Abarca desde keys y renderizado condicional hasta custom hooks, con una justificacion breve y un ejemplo de codigo en cada recomendacion.', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
   {
@@ -432,7 +432,7 @@ export default {
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
     temas: [
-      { titulo: 'WCAG 3.0', resumen: 'Implementacion practica de los nuevos estandares de accesibilidad', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' }
+      { titulo: 'WCAG 3.0', resumen: 'El desarrollador comparte su experiencia implementando los nuevos estandares de accesibilidad en proyectos reales. Destaca involucrar al diseno desde el inicio, combinar auditoria automatica con evaluacion manual y planificar el presupuesto de correcciones.', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' }
     ]
   }
 ] };

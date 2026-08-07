@@ -777,6 +777,15 @@
       display: none;
     }
 
+    .card-videos {
+      display: none;
+      flex-direction: column;
+    }
+
+    &.expanded .card-videos {
+      display: flex;
+    }
+
     .card-iframe-subtitle {
       display: none;
       margin: 16px 0 0 0;
@@ -822,7 +831,12 @@
       display: none;
       margin: 24px 0;
       flex-direction: column;
-      gap: 8px;
+    }
+
+    .card-temas-list {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
     }
 
     &.expanded .card-temas {
@@ -1159,6 +1173,9 @@
       font-size: 0.8rem;
       font-weight: 600;
       color: var(--tv-text-primary);
+      gap: 10px;
+      display: flex;
+      margin-bottom: 4px;
     }
 
     .tema-fecha {
@@ -1166,7 +1183,6 @@
       font-weight: 600;
       color: #b9b9b9;
       white-space: nowrap;
-      margin-left: 10px;
     }
 
     .tema-tone {
