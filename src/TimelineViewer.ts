@@ -358,11 +358,11 @@ export default class Timeline {
       : '';
     const videosHtml =
       card.links_videos && card.links_videos.length
-        ? `<div class="card-videos"><div class="card-subtitle card-iframe-subtitle">Videos vinculados</div>${card.links_videos
+        ? `<div class="card-videos"><div class="card-subtitle card-iframe-subtitle">Videos vinculados</div><div class="card-videos-list">${card.links_videos
             .map((link) => this._parseLinkWeb(link))
             .filter((parsed): parsed is LinkInfo => parsed !== null)
             .map((parsed) => this._buildEmbed(parsed))
-            .join('')}</div>`
+            .join('')}</div></div>`
         : '';
     const temasHtml =
       card.temas && card.temas.length
@@ -374,7 +374,7 @@ export default class Timeline {
             (t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
             <div class="tema-content">
-              <span class="tema-title"><span class="tema-tone">${toneLabelTema[t.tono_social]}</span>${t.titulo}${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
+              <span class="tema-title"><span class="tema-tone">${toneLabelTema[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-desc">${t.resumen}</span>
             </div>
           </div>`
