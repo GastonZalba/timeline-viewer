@@ -16,6 +16,7 @@ export interface TimelineItem {
     fuente_institucional: string;
     tipo_fuente: string;
     es_oficial: boolean;
+    validado: boolean | null;
     thumbnail: string | null;
     link_web: string;
     actores_principales: string[];
@@ -25,6 +26,7 @@ export interface TimelineItem {
         thumb: string;
         full: string;
     }[];
+    links_videos?: string[];
     temas: ItemTema[];
 }
 export interface TimelineOptions {
@@ -82,6 +84,8 @@ export default class Timeline {
     protected _formatDateTime(dateStr: string): string;
     /** Parse a URL and return embed info based on the supported social platforms */
     protected _parseLinkWeb(url: string): LinkInfo | null;
+    /** Build the embed markup for a parsed link */
+    protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
     protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean): void;
     /** Render the featured (overlapping) cards row */

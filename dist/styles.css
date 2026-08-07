@@ -581,11 +581,28 @@
   transition: border 0.1s ease, box-shadow 0.3s ease;
   cursor: pointer;
 }
+.noticias-section .timeline-card .card-no-validado {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  background: #cb3536;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  pointer-events: none;
+}
 .noticias-section .timeline-card.expanded {
   cursor: inherit;
   overflow: visible;
   border: 1px solid var(--tv-accent);
   box-shadow: 0 8px 20px rgba(4, 8, 15, 0.81);
+}
+.noticias-section .timeline-card.expanded .card-no-validado {
+  right: 38px;
 }
 .noticias-section .timeline-card:hover:not(.expanded) {
   box-shadow: 0 8px 20px rgba(4, 8, 15, 0.81);
@@ -628,10 +645,15 @@
 }
 .noticias-section .timeline-card .card-fuente {
   display: none;
-  font-size: 0.8rem;
-  color: var(--tv-text-secondary);
+  font-size: 0.9rem;
+  color: var(--tv-tone-neutral);
   margin: 8px 0 6px;
   font-weight: 500;
+  line-height: 1.4;
+}
+.noticias-section .timeline-card .card-fuente .fuente-label {
+  color: var(--tv-text-primary);
+  font-weight: 600;
 }
 .noticias-section .timeline-card.expanded .card-fuente {
   display: block;
@@ -707,9 +729,16 @@
 .noticias-section .timeline-card.expanded .card-tone-wrap {
   display: none;
 }
-.noticias-section .timeline-card .card-iframe-wrap {
+.noticias-section .timeline-card .card-iframe-subtitle {
   display: none;
   margin: 16px 0 0 0;
+}
+.noticias-section .timeline-card.expanded .card-iframe-subtitle {
+  display: block;
+}
+.noticias-section .timeline-card .card-iframe-wrap {
+  display: none;
+  margin: 8px 0 0 0;
   border-radius: 8px;
   position: relative;
   overflow-y: auto;
@@ -1008,7 +1037,7 @@
   min-height: 350px;
   overflow: hidden;
 }
-.noticias-section .temas-title {
+.noticias-section .card-subtitle {
   font-size: 0.8em;
   font-weight: 600;
   color: #ffffff;
@@ -1043,7 +1072,8 @@
   padding: 2px 8px;
   border-radius: 4px;
   text-align: center;
-  width: 66px;
+  width: 70px;
+  min-width: 70px;
 }
 .noticias-section .tema-item .tema-desc {
   font-size: 0.75rem;

@@ -165,6 +165,19 @@ export default class Timeline {
             return { url: url, type: 'facebook' };
         return null;
     }
+    /** Build the embed markup for a parsed link */
+    _buildEmbed(embedUrl) {
+        if (embedUrl.type === 'instagram') {
+            return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}" data-embed-url="${embedUrl.url}"><div class="card-iframe-shimmer"></div></div>`;
+        }
+        if (embedUrl.type === 'facebook') {
+            return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><div class="fb-post" data-href="${embedUrl.url}" data-show-text="true" data-width="auto"></div></div>`;
+        }
+        if (embedUrl.type === 'twitter') {
+            return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="twitter-tweet" data-dnt="true"><a href="${embedUrl.url}"></a></blockquote></div>`;
+        }
+        return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`;
+    }
     /** Open a lightGallery modal with the provided images */
     _openLightGallery(images, title, showFileName) {
         if (this._lgInstance) {
@@ -243,18 +256,20 @@ export default class Timeline {
          </div>`
             : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
         const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
+        const embedHtml = embedUrl ? this._buildEmbed(embedUrl) : '';
         const iframeHtml = embedUrl
-            ? embedUrl.type === 'instagram'
-                ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}" data-embed-url="${embedUrl.url}"><div class="card-iframe-shimmer"></div></div>`
-                : embedUrl.type === 'facebook'
-                    ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><div class="fb-post" data-href="${embedUrl.url}" data-show-text="true" data-width="auto"></div></div>`
-                    : embedUrl.type === 'twitter'
-                        ? `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="twitter-tweet" data-dnt="true"><a href="${embedUrl.url}"></a></blockquote></div>`
-                        : `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`
+            ? `<div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}`
+            : '';
+        const videosHtml = card.links_videos && card.links_videos.length
+            ? `<div class="card-subtitle card-iframe-subtitle">Videos vinculados</div>${card.links_videos
+                .map((link) => this._parseLinkWeb(link))
+                .filter((parsed) => parsed !== null)
+                .map((parsed) => this._buildEmbed(parsed))
+                .join('')}`
             : '';
         const temasHtml = card.temas && card.temas.length
             ? `<div class="card-temas">
-        <div class="temas-title">Temas destacados</div>
+        <div class="card-subtitle">Temas destacados</div>
         ${card.temas
                 .map((t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
@@ -284,6 +299,7 @@ export default class Timeline {
         <div class="timeline-hline"></div>
       </div>
       <div class="timeline-card${card.thumbnail ? '' : ' no-image'}">
+        ${card.validado !== true ? '<span class="card-no-validado">No validado</span>' : ''}
         ${imgHtml}
         ${actionsHtml}
         <div class="card-body">
@@ -315,8 +331,9 @@ export default class Timeline {
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente">${card.fuente_institucional}${card.es_oficial ? '<span class="card-oficial-wrap" title="Es fuente oficial"><svg class="card-oficial" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="19 7.5 10.5 16.5 4.5 11.5"/></svg></span>' : ''}</div>
+          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional}${card.es_oficial ? '<span class="card-oficial-wrap" title="Es fuente oficial"><svg class="card-oficial" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="19 7.5 10.5 16.5 4.5 11.5"/></svg></span>' : ''}</div>
           ${iframeHtml}
+          ${videosHtml}
         </div>
       </div>
     `;
@@ -326,15 +343,14 @@ export default class Timeline {
             if (timelineImg.complete)
                 timelineImg.classList.add('loaded');
         }
-        const iframeWrap = el.querySelector('.card-iframe-wrap');
-        if (iframeWrap) {
-            const iframe = iframeWrap.querySelector('iframe');
+        el.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
+            const iframe = wrap.querySelector('iframe');
             if (iframe) {
-                iframe.addEventListener('load', () => iframeWrap.classList.add('loaded'));
+                iframe.addEventListener('load', () => wrap.classList.add('loaded'));
                 if (iframe.contentDocument?.readyState === 'complete')
-                    iframeWrap.classList.add('loaded');
+                    wrap.classList.add('loaded');
             }
-        }
+        });
         const cardEl = el.querySelector('.timeline-card');
         cardEl.addEventListener('click', (e) => {
             if (e.target &&
@@ -569,11 +585,16 @@ export default class Timeline {
     _preloadEmbedLibraries() {
         const types = new Set();
         this.allCards.forEach((card) => {
-            if (!card.link_web)
-                return;
-            const parsed = this._parseLinkWeb(card.link_web);
-            if (parsed)
-                types.add(parsed.type);
+            const urls = [];
+            if (card.link_web)
+                urls.push(card.link_web);
+            if (card.links_videos && card.links_videos.length)
+                urls.push(...card.links_videos);
+            urls.forEach((url) => {
+                const parsed = this._parseLinkWeb(url);
+                if (parsed)
+                    types.add(parsed.type);
+            });
         });
         const _watchEmbeds = (selector) => {
             const scan = setInterval(() => {
