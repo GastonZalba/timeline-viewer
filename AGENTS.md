@@ -113,11 +113,23 @@ interface TimelineItem {
   adjuntos: string[];            // Archivos/links adjuntos (puede estar vacío)
   screenshot: string | null;    // URL de captura de pantalla
   imagenes: { thumb: string; full: string }[];
+  links_videos?: string[];      // Links de videos relacionados (se renderizan como embeds al expandir la tarjeta)
   temas: ItemTema[];            // Subtemas del artículo
 }
 ```
 
 **No modificar esta interfaz** sin considerar que los datos vienen de un sistema externo.
+
+### Regla de oro: Mock ↔ Interfaces ↔ README
+
+`example/mock-data.js` es la **fuente de verdad** para probar el componente. Cualquier cambio en el mock **obliga** a aplicar el mismo cambio en el mismo commit:
+
+1. **Mock**: `example/mock-data.js` (agregar/renombrar/eliminar el campo en los 17 artículos).
+2. **Interfaz**: `TimelineItem` en `src/TimelineViewer.ts`.
+3. **Tipos distribuidos**: `dist/TimelineViewer.d.ts` (regenerado con `npm run build`).
+4. **Documentación**: tabla de campos en `README.md` (y este documento).
+
+No se puede modificar el mock sin actualizar interfaces y README en el mismo cambio, y viceversa.
 
 ## Embeds sociales — Dependencia crítica de carga
 
@@ -178,5 +190,6 @@ example/
 
 - **Agregar un nuevo tipo de embed social**: Agregar regex constante + caso en `_parseLinkWeb()` + HTML template en `_createTimelineItem()` + caso de carga en `_preloadEmbedLibraries()`. Verificar orden de carga.
 - **Agregar un nuevo campo a TimelineItem**: Agregar a la interfaz `TimelineItem` + usar en `_createTimelineItem()` + actualizar `dist/TimelineViewer.d.ts` con build.
+- **Modificar `example/mock-data.js`**: Aplicar el cambio en el mismo commit en la interfaz `TimelineItem`, regenerar los tipos distribuidos (`npm run build`) y actualizar la tabla de campos del README. Ver "Regla de oro: Mock ↔ Interfaces ↔ README".
 - **Agregar un nuevo filtro**: Agregar entrada en `this.filters` array en `_buildFilterCheckboxes()`.
 - **Modificar estilos**: Editar `src/styles.scss`. Todos los estilos están bajo `.noticias-section`. Las variables CSS custom están al inicio del archivo.

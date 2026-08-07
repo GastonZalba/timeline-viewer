@@ -301,6 +301,7 @@ export default {
     resumen_ia: 'Como implementar micro-frontends con Module Federation, con resultados mixtos en equipos distribuidos.',
     thumbnail: 'https://picsum.photos/seed/noticia13/600/400',
     link_web: 'https://microfrontends.dev/case-study',
+    fecha_publicacion: '',
     fecha_scrapeo: '2026-06-28T12:00:00',
     tonos_sociales: ['Positivo', 'Neutro'],
     fuente_institucional: 'MicroFrontends.dev',

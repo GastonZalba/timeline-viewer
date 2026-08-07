@@ -139,20 +139,22 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
               │   │       │   └── .card-title (sobre el thumbnail)
               │   │       ├── .card-actions (barra de acciones debajo del thumbnail, oculto salvo expandido)
               │   │       │   └── .card-actions-row
-              │   │       │       ├── button.card-screenshot-btn (si hay screenshot)
-              │   │       │       ├── button.card-images-btn (si hay imágenes)
-              │   │       │       └── button.card-open (abrir enlace)
-              │   │       └── .card-body
-              │   │           ├── .card-desc (resumen_ia)
-              │   │           ├── .card-tone
-              │   │           ├── .card-temas > .tema-item × N
-              │   │           ├── .card-hint
-              │   │           ├── button.card-collapse
-              │   │           ├── button.card-info-btn
-              │   │           ├── .card-info-menu
-              │   │           ├── .card-protagonista
-              │   │           ├── .card-fuente
-              │   │           └── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook)
+│   │       │   ├── button.card-screenshot-btn (si hay screenshot)
+│   │       │   ├── button.card-images-btn (si hay imágenes)
+│   │       │   ├── .card-adjuntos > button.card-adjuntos-btn + .card-adjuntos-menu (si hay adjuntos)
+│   │       │   └── button.card-open (abrir enlace)
+│   │       └── .card-body
+│   │           ├── .card-desc (resumen_ia)
+│   │           ├── .card-tone
+│   │           ├── .card-temas > .tema-item × N
+│   │           ├── .card-hint
+│   │           ├── button.card-collapse
+│   │           ├── button.card-info-btn
+│   │           ├── .card-info-menu
+│   │           ├── .card-protagonista
+│   │           ├── .card-fuente
+│   │           ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook, publicación original)
+│   │           └── .card-videos > .card-videos-list > .card-iframe-wrap × N (links_videos)
               │   ├── .timeline-item.timeline-footer-item (si lastUpdated)
               │   ├── .timeline-item.timeline-load-more-item (si hay más páginas)
               │   └── .timeline-item.timeline-empty-item (si no hay resultados)
@@ -296,3 +298,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 ## Artefactos de build (`dist/`)
 
 `dist/` contiene solo salida compilada (JS, `.d.ts`, CSS). No se edita a mano: cualquier cambio se hace en `src/` y se regenera con `npm run build`.
+
+## Mock ↔ Interfaces ↔ README
+
+`example/mock-data.js` es la fuente de verdad de los datos. Todo cambio de campos en el mock (agregar, renombrar o eliminar) debe aplicarse en el mismo commit a la interfaz `TimelineItem` (`src/TimelineViewer.ts`), regenerar `dist/TimelineViewer.d.ts` (`npm run build`) y actualizar la tabla de campos de `README.md`. Ver también `AGENTS.md`.

@@ -26,18 +26,19 @@ new Timeline({
       fecha_scrapeo: '2026-06-25T14:30:00',
       tonos_sociales: ['Positivo'],
       fuente_institucional: 'Dev.to',
-      tipo_fuente: 'Digital',
+      tipo_fuente: 'Sitio web o portal',
       es_oficial: true,
       validado: true,
       adjuntos: [],
       actores_principales: ['Ana García', 'Carlos Ruiz'],
       screenshot: 'https://picsum.photos/seed/captura/400/800',
       imagenes: [
-        { 
-          thumb: 'https://picsum.photos/seed/img1/300/200', 
+        {
+          thumb: 'https://picsum.photos/seed/img1/300/200',
           full: 'https://picsum.photos/seed/img1/600/400'
         }
       ],
+      links_videos: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
       temas: []
     }
   ],
@@ -74,14 +75,17 @@ Each object in `items` supports these fields:
 | `fecha_scrapeo`        | `string` (ISO)              | When it was crawled                      |
 | `tonos_sociales`      | `string[]`                  | Overall sentiment(s) — unique tones present in the article's `temas` |
 | `fuente_institucional` | `string`                    | Source / publication name                |
-| `tipo_fuente`           | `string`                    | Source type. One of: `Diario o nota periodística`, `Decreto o norma`, `Boletín oficial`, `Expediente`, `Libro o publicación`, `Sitio web o portal`, `Red social`, `Gacetilla o comunicado de prensa` |
+| `tipo_fuente`           | `string`                    | Source type. One of: `Decreto o norma`, `Libro o publicación`, `Sitio web o portal`, `Red Social`, `Gacetilla o comunicado de prensa`, `Video` |
 | `es_oficial`            | `boolean`                   | Whether the source is official (`true`) or not (`false`) |
 | `validado`              | `boolean` / `null`          | Whether the article has been validated (`true`), not validated (`false`), or pending/unknown (`null`) |
 | `adjuntos`              | `string[]`                  | Attached files/links — may be empty |
 | `actores_principales`  | `string[]`                  | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
 | `imagenes`             | `{ thumb: string; full: string }[]` | Image gallery with low-res `thumb` and full-res `full` URLs |
+| `links_videos`         | `string[]` (URL)          | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Only supported platforms (YouTube, etc.) are embedded; others are ignored |
 | `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null` |
+
+> **Importante:** `example/mock-data.js` es la fuente de verdad para probar el componente. Cualquier campo que se agregue, renombre o elimine en el mock **debe** actualizarse en el mismo cambio en la interfaz `TimelineItem` (`src/TimelineViewer.ts`), en la declaración de tipos generada (`dist/TimelineViewer.d.ts` vía `npm run build`) y en esta tabla de campos. Los valores de `tipo_fuente` y los `tonos_sociales` se documentan según los que existen en el mock.
 
 ### Embedded content
 
@@ -89,10 +93,10 @@ When the card is expanded, `link_web` is automatically parsed for supported plat
 
 | Platform  | URL pattern                    | Method                                                  |
 |-----------|--------------------------------|---------------------------------------------------------|
-| YouTube   | `/watch?v=`, `youtu.be/`, `/shorts/` | Direct `<iframe>` with 16:9 aspect ratio          |
+| YouTube   | `/watch?v=`, `youtu.be/`, `/embed/`, `/shorts/` | Direct `<iframe>` with 16:9 aspect ratio          |
 | Instagram | `/p/`, `/reel/`                | Official [embed.js](https://www.instagram.com/embed.js) via `<blockquote class="instagram-media">` |
 | Twitter/X | `/username/status/ID`          | Official [Twitter Widgets](https://platform.twitter.com/widgets.js) via `<blockquote class="twitter-tweet">` |
-| Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` |
+| Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `/story.php`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` |
 
 Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of raw iframes. The scripts are loaded **lazily**.
 
