@@ -354,7 +354,7 @@ export default class Timeline {
     const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
     const embedHtml = embedUrl ? this._buildEmbed(embedUrl) : '';
     const iframeHtml = embedUrl
-      ? `<div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}`
+      ? `<div class="card-embed"><div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}</div>`
       : '';
     const videosHtml =
       card.links_videos && card.links_videos.length

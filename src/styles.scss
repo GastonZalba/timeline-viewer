@@ -805,6 +805,16 @@
       display: block;
     }
 
+    .card-embed {
+      display: none;
+      flex-direction: column;
+      margin-top: 20px;
+    }
+
+    &.expanded .card-embed {
+      display: flex;
+    }
+
     .card-iframe-wrap {
       display: none;
       border-radius: 8px;
@@ -1188,6 +1198,7 @@
       gap: 10px;
       display: flex;
       margin-bottom: 4px;
+      line-height: 1.1;
     }
 
     .tema-fecha {
@@ -1207,6 +1218,7 @@
       text-align: center;
       width: 70px;
       min-width: 70px;
+      align-content: center;
     }
 
     .tema-desc {
@@ -1233,7 +1245,7 @@
   }
 
   .tone-tema-neutro {
-      border-color: var(--tv-tone-neutral);
+    border-color: var(--tv-tone-neutral);
     .tema-tone {
       color: var(--tv-tone-neutral);
       background: rgba(148, 163, 184, 0.1);
