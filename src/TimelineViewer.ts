@@ -91,6 +91,7 @@ export default class Timeline {
   allCards: TimelineItem[];
   isExpanded: boolean;
   featuredContainer: HTMLElement;
+  featuredRow: HTMLElement;
   timelineContainer: HTMLElement;
   timelineCards: HTMLElement;
   expandToggle: HTMLElement;
@@ -120,6 +121,7 @@ export default class Timeline {
     this.allCards = [];
     this.isExpanded = false;
     this.featuredContainer = null as unknown as HTMLElement;
+    this.featuredRow = null as unknown as HTMLElement;
     this.timelineContainer = null as unknown as HTMLElement;
     this.timelineCards = null as unknown as HTMLElement;
     this.expandToggle = null as unknown as HTMLElement;
@@ -193,6 +195,7 @@ export default class Timeline {
     `;
     this.section = this.container.querySelector('#noticias-section') as HTMLElement;
     this.featuredContainer = this.container.querySelector('#featured-cards') as HTMLElement;
+    this.featuredRow = this.container.querySelector('.featured-row') as HTMLElement;
     this.timelineContainer = this.container.querySelector('#timeline-container') as HTMLElement;
     this.timelineCards = this.container.querySelector('#timeline-cards') as HTMLElement;
     this.expandToggle = this.container.querySelector('#expand-toggle') as HTMLElement;
@@ -965,6 +968,13 @@ export default class Timeline {
     this.expandToggle.addEventListener('click', () => this._toggleExpand());
     this.fabCollapse.addEventListener('click', () => this._toggleExpand(true));
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
+    this.featuredRow.addEventListener('click', (e: Event) => {
+      if (
+        (e.target as HTMLElement).closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu')
+      )
+        return;
+      this._toggleExpand();
+    });
     this.sortToggle.addEventListener('click', () => this._toggleSort());
     this.filterToggle.addEventListener('click', (e: Event) => {
       e.stopPropagation();
