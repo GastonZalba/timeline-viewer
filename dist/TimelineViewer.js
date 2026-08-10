@@ -28,6 +28,7 @@ export default class Timeline {
         this.allCards = [];
         this.isExpanded = false;
         this.featuredContainer = null;
+        this.featuredRow = null;
         this.timelineContainer = null;
         this.timelineCards = null;
         this.expandToggle = null;
@@ -76,10 +77,6 @@ export default class Timeline {
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
         </div>
         <div class="timeline-container" id="timeline-container">
-          <div class="ai-disclaimer">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.7a.9.9 0 0 1 1.7 0l1.4 4.2a.9.9 0 0 0 .6.6l4.2 1.4a.9.9 0 0 1 0 1.7l-4.2 1.4a.9.9 0 0 0-.6.6l-1.4 4.2a.9.9 0 0 1-1.7 0l-1.4-4.2a.9.9 0 0 0-.6-.6l-4.2-1.4a.9.9 0 0 1 0-1.7l4.2-1.4a.9.9 0 0 0 .6-.6z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
-            <span>El contenido fue procesado con IA y puede contener imprecisiones</span>
-          </div>
           <div class="timeline-collapse-wrap">
             <div class="timeline-line"></div>
             <div class="timeline-content">
@@ -95,11 +92,16 @@ export default class Timeline {
               </div>
             </div>
           </div>
+          <div class="ai-disclaimer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.7a.9.9 0 0 1 1.7 0l1.4 4.2a.9.9 0 0 0 .6.6l4.2 1.4a.9.9 0 0 1 0 1.7l-4.2 1.4a.9.9 0 0 0-.6.6l-1.4 4.2a.9.9 0 0 1-1.7 0l-1.4-4.2a.9.9 0 0 0-.6-.6l-4.2-1.4a.9.9 0 0 1 0-1.7l4.2-1.4a.9.9 0 0 0 .6-.6z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+            <span>El contenido fue procesado con IA y puede contener imprecisiones</span>
+          </div>
         </div>
       </section>
     `;
         this.section = this.container.querySelector('#noticias-section');
         this.featuredContainer = this.container.querySelector('#featured-cards');
+        this.featuredRow = this.container.querySelector('.featured-row');
         this.timelineContainer = this.container.querySelector('#timeline-container');
         this.timelineCards = this.container.querySelector('#timeline-cards');
         this.expandToggle = this.container.querySelector('#expand-toggle');
@@ -258,28 +260,30 @@ export default class Timeline {
         const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
         const embedHtml = embedUrl ? this._buildEmbed(embedUrl) : '';
         const iframeHtml = embedUrl
-            ? `<div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}`
+            ? `<div class="card-embed"><div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}</div>`
             : '';
         const videosHtml = card.links_videos && card.links_videos.length
-            ? `<div class="card-subtitle card-iframe-subtitle">Videos vinculados</div>${card.links_videos
+            ? `<div class="card-videos"><div class="card-subtitle card-iframe-subtitle">Videos vinculados</div><div class="card-videos-list">${card.links_videos
                 .map((link) => this._parseLinkWeb(link))
                 .filter((parsed) => parsed !== null)
                 .map((parsed) => this._buildEmbed(parsed))
-                .join('')}`
+                .join('')}</div></div>`
             : '';
         const temasHtml = card.temas && card.temas.length
             ? `<div class="card-temas">
         <div class="card-subtitle">Temas destacados</div>
+        <div class="card-temas-list">
         ${card.temas
                 .map((t) => `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
-            <div class="tema-tone">${toneLabelTema[t.tono_social]}</div>
             <div class="tema-content">
-              <span class="tema-title">${t.titulo}${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
+              <span class="tema-title"><span class="tema-tone">${toneLabelTema[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-desc">${t.resumen}</span>
             </div>
           </div>`)
-                .join('')}</div>`
+                .join('')}
+        </div>
+        </div>`
             : '';
         const actionsHtml = `<div class="card-actions">
       <div class="card-actions-row">
@@ -841,6 +845,11 @@ export default class Timeline {
         this.expandToggle.addEventListener('click', () => this._toggleExpand());
         this.fabCollapse.addEventListener('click', () => this._toggleExpand(true));
         this.featuredContainer.addEventListener('click', () => this._toggleExpand());
+        this.featuredRow.addEventListener('click', (e) => {
+            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu'))
+                return;
+            this._toggleExpand();
+        });
         this.sortToggle.addEventListener('click', () => this._toggleSort());
         this.filterToggle.addEventListener('click', (e) => {
             e.stopPropagation();

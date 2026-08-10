@@ -60,6 +60,7 @@ export default class Timeline {
     allCards: TimelineItem[];
     isExpanded: boolean;
     featuredContainer: HTMLElement;
+    featuredRow: HTMLElement;
     timelineContainer: HTMLElement;
     timelineCards: HTMLElement;
     expandToggle: HTMLElement;
