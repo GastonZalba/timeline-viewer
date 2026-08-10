@@ -54,7 +54,7 @@ Estas son restricciones críticas. Violarlas rompe la filosofía del módulo:
 7. **NO cambiar la interfaz pública** (`TimelineOptions`, `TimelineItem`, `ItemTema`) sin actualizar la documentación y los tipos.
 8. **NO renombrar la clase exportada** `Timeline` ni cambiar el default export.
 9. **NO modificar la estructura de datos** `TimelineItem` sin considerar que viene de un pipeline de scraping externo.
-10. **NO agregar CSS que dependa de clases fuera de `.noticias-section`**. Todo el estilo está scoped.
+10. **NO agregar CSS que dependa de clases fuera de `.publicaciones-section`**. Todo el estilo está scoped.
 11. **NO modificar manualmente los archivos de `dist/`**. Son artefactos generados por el build (`npm run build`). Cualquier cambio se hace en `src/` y se regenera.
 
 ## Convenciones de código
@@ -81,7 +81,7 @@ El `build` ejecuta `format` automáticamente. Para formateo manual: `npm run for
 
 ### SCSS
 
-- **Namespace CSS**: Todo está scoped bajo `.noticias-section`. Las propiedades CSS custom usan el prefijo `--tv-` (ej: `--tv-bg-primary`, `--tv-accent`).
+- **Namespace CSS**: Todo está scoped bajo `.publicaciones-section`. Las propiedades CSS custom usan el prefijo `--tv-` (ej: `--tv-bg-primary`, `--tv-accent`).
 - **Nomenclatura BEM-like**: `.card-body`, `.card-title`, `.timeline-date-col`, `.featured-card`.
 - **Loop `@for`**: Las posiciones de las tarjetas featured se generan con `@for $i from 1 through 10` en SCSS.
 - **Selectors modernos**: Se usa `:has()` para estilos condicionales.
@@ -192,4 +192,4 @@ example/
 - **Agregar un nuevo campo a TimelineItem**: Agregar a la interfaz `TimelineItem` + usar en `_createTimelineItem()` + actualizar `dist/TimelineViewer.d.ts` con build.
 - **Modificar `example/mock-data.js`**: Aplicar el cambio en el mismo commit en la interfaz `TimelineItem`, regenerar los tipos distribuidos (`npm run build`) y actualizar la tabla de campos del README. Ver "Regla de oro: Mock ↔ Interfaces ↔ README".
 - **Agregar un nuevo filtro**: Agregar entrada en `this.filters` array en `_buildFilterCheckboxes()`.
-- **Modificar estilos**: Editar `src/styles.scss`. Todos los estilos están bajo `.noticias-section`. Las variables CSS custom están al inicio del archivo.
+- **Modificar estilos**: Editar `src/styles.scss`. Todos los estilos están bajo `.publicaciones-section`. Las variables CSS custom están al inicio del archivo.

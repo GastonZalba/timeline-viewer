@@ -19,3 +19,8 @@ body {
   justify-content: center;
   align-items: center;
 }
+
+.publicaciones-section {
+  width: 840px;
+  padding: 10px;
+}

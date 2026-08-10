@@ -104,7 +104,7 @@ new Timeline({ container, items, ... })
 El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 
 ```html
-<section class="noticias-section" id="noticias-section">
+<section class="publicaciones-section" id="publicaciones-section">
   ├── .featured-row
   │   ├── .noticias-top
   │   │   ├── button.expand-toggle (#expand-toggle)
@@ -164,10 +164,10 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 
 ## Sistema de theming CSS
 
-Todas las variables CSS custom están definidas al inicio de `styles.scss` bajo `.noticias-section`:
+Todas las variables CSS custom están definidas al inicio de `styles.scss` bajo `.publicaciones-section`:
 
 ```scss
-.noticias-section {
+.publicaciones-section {
   --tv-bg-primary: #1a2025;
   --tv-bg-secondary: #1a1a1a;
   --tv-bg-card: #1d2633;
@@ -192,7 +192,7 @@ Todas las variables CSS custom están definidas al inicio de `styles.scss` bajo 
 El consumidor puede personalizar estos valores sobreescribiéndolos en CSS:
 
 ```css
-#mi-container .noticias-section {
+#mi-container .publicaciones-section {
   --tv-accent: #ff6b6b;
   --tv-bg-card: #2d2d2d;
 }
@@ -244,7 +244,7 @@ Flujo:
 
 Usan `IntersectionObserver` (sin librerías externas):
 
-- **Featured cards**: Observer en `section.noticias-section` con threshold 0.1. Cuando es visible, agrega `.visible` a todas las featured cards.
+- **Featured cards**: Observer en `section.publicaciones-section` con threshold 0.1. Cuando es visible, agrega `.visible` a todas las featured cards.
 - **Timeline items**: Observer individual por cada `.timeline-item` con threshold 0.1 y rootMargin `0px 0px 100px 0px`. Cada item se anima individualmente al entrar en viewport.
 
 Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para crear un efecto cascada.
@@ -264,7 +264,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |
 | `filters` | `FilterDef[]` | Estado de los filtros |
-| `section` | `HTMLElement` | `.noticias-section` |
+| `section` | `HTMLElement` | `.publicaciones-section` |
 | `featuredContainer` | `HTMLElement` | `#featured-cards` |
 | `timelineContainer` | `HTMLElement` | `#timeline-container` |
 | `timelineCards` | `HTMLElement` | `#timeline-cards` |
@@ -282,8 +282,8 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 
 | Clase | Elemento | Descripción |
 |-------|----------|-------------|
-| `.expanded` | `.noticias-section` | Timeline visible, featured oculto |
-| `.scrolled` | `.noticias-section` | Timeline scrolled más allá del top |
+| `.expanded` | `.publicaciones-section` | Timeline visible, featured oculto |
+| `.scrolled` | `.publicaciones-section` | Timeline scrolled más allá del top |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
 | `.visible` | `.featured-card` | Tarjeta featured animada (entró en viewport) |
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |

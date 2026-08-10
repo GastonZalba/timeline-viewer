@@ -6,7 +6,9 @@
   initial-value: 0deg;
 }
 
-.noticias-section {
+.publicaciones-section {
+  container-type: inline-size;
+  container-name: publicaciones;
   --tv-bg-primary: #1a2025;
   --tv-bg-secondary: #1a1a1a;
   --tv-bg-card: #1d2633;
@@ -33,14 +35,14 @@
       margin 0.5s ease,
       gap 0.5s ease;
     min-height: 140px;
-    max-width: 650px;
+    max-width: 100%;
     justify-content: space-between;
     position: relative;
-    border-radius: 200px;
-    margin: -20px;
+    border-radius: 8px;
     padding: 10px 30px;
     border: 1px solid #2c73ff69;
-    background: rgb(59 130 246 / 5%);
+    background: rgb(59 130 246 / 10%);
+    gap: 10px;
 
     &:hover {
       cursor: pointer;
@@ -127,6 +129,30 @@
       border: none;
       background: none;
 
+      &:hover {
+        cursor: default;
+
+        .expand-toggle {
+          background: rgba(59, 130, 246, 0.25);
+          color: var(--tv-text-on-primary);
+
+          #remaining-count {
+            border-color: var(--tv-accent);
+            background: var(--tv-accent);
+            color: var(--tv-text-on-primary);
+          }
+
+          &:hover {
+            background: var(--tv-accent);
+
+            #remaining-count {
+              border-color: var(--tv-text-on-primary);
+              color: var(--tv-text-on-primary);
+            }
+          }
+        }
+      }
+
       &:hover::before {
         opacity: 0;
         animation: none;
@@ -134,9 +160,8 @@
     }
 
     .noticias-top {
-      display: flex;
       width: 100%;
-      align-items: center;
+      gap: 16px;
     }
 
     .expand-toggle {
@@ -234,9 +259,6 @@
     transition: none;
     display: none;
     align-items: center;
-    gap: 8px;
-    margin-left: auto;
-    margin-right: 137px;
     pointer-events: auto;
     color: var(--tv-text-on-primary);
     background: rgba(59, 130, 246, 0.25);
@@ -256,7 +278,6 @@
 
   .filter-wrap {
     position: relative;
-    margin-left: 8px;
   }
 
   .filter-toggle {
@@ -351,7 +372,7 @@
   .featured-cards {
     position: relative;
     height: 130px;
-    width: 290px;
+    width: 360px;
     cursor: pointer;
     perspective: 1000px;
     transition:
@@ -363,7 +384,7 @@
   .featured-card {
     position: absolute;
     top: 0;
-    width: 180px;
+    width: 250px;
     min-height: 130px;
     background: var(--tv-bg-card);
     border-radius: 8px;
@@ -394,7 +415,6 @@
       $delay: (0s, 0.1s, 0.2s, 0.3s, 0.4s, 0.5s, 0.6s, 0.7s, 0.8s, 0.9s);
       $s: (1, 0.97, 0.94, 0.91, 0.88, 0.85, 0.82, 0.79, 0.76, 0.73);
       $opacity: (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.9, 0.9);
-
       &:nth-child(#{$i}) {
         left: list.nth($left, $i);
         z-index: #{11 - $i};
@@ -429,11 +449,23 @@
     }
 
     .card-date {
+      display: flex;
+      align-items: center;
+      gap: 6px;
       font-size: 0.6rem;
       color: var(--tv-accent);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
+
+      &::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        background: var(--tv-accent);
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
     }
 
     .card-title {
@@ -698,12 +730,13 @@
       padding: 16px;
     }
 
-    .card-title {
-      font-size: 0.95em;
-      font-weight: 600;
-      color: var(--tv-text-on-primary);
-      margin-bottom: 6px;
-      line-height: 1.3;
+    .card-image-wrap {
+      .card-title {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: var(--tv-text-on-primary);
+        line-height: 1.3;
+      }
     }
 
     .card-desc {
@@ -905,7 +938,7 @@
     .card-temas-list {
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 22px;
     }
 
     &.expanded .card-temas {
@@ -1104,7 +1137,7 @@
       z-index: 1;
     }
 
-    > .card-title {
+    .card-title {
       position: absolute;
       left: 0;
       right: 0;
@@ -1473,11 +1506,38 @@
     font-size: 0.7rem;
     text-transform: uppercase;
     font-weight: 100;
+    position: relative;
     transition: all 0.3s ease;
 
+    &::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: inherit;
+      padding: 2px;
+      background: conic-gradient(
+        from var(--tv-row-angle),
+        transparent 0 70%,
+        var(--tv-accent) 90%,
+        var(--tv-accent-light) 100%
+      );
+      -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
     &:hover {
-      background: var(--tv-accent);
-      color: var(--tv-text-on-primary);
+      background: rgba(59, 130, 246, 0.15);
+
+      &::before {
+        opacity: 1;
+        animation: tv-row-spin 2s linear infinite;
+      }
     }
   }
 
@@ -1524,7 +1584,7 @@
     font-style: italic;
   }
 
-  @media (max-width: 768px) {
+  @container publicaciones (max-width: 768px) {
     .timeline-container {
       margin-top: 0;
     }
@@ -1549,7 +1609,14 @@
 
     .expand-toggle {
       font-size: 0.7rem;
-      padding: 4px 8px 4px 4px;
+      padding: 4px 11px 4px 4px;
+      height: 34px;
+
+      #remaining-count {
+        height: 18px;
+        width: 18px;
+        font-size: 0.6rem;
+      }
     }
 
     .card-actions-row {
@@ -1557,10 +1624,9 @@
     }
 
     .featured-row {
-      flex-direction: column-reverse;
-      align-items: start;
-      min-height: 110px;
-      max-width: 320px;
+      min-height: 80px;
+      padding: 8px 12px;
+      flex-wrap: wrap-reverse;
     }
 
     .timeline-item {
@@ -1581,8 +1647,8 @@
       overflow: auto;
     }
     .featured-cards {
-      height: 50px;
-      width: 250px;
+      height: 53px;
+      width: 180px;
       overflow: hidden;
     }
 
@@ -1595,13 +1661,14 @@
     }
 
     .featured-card {
-      width: 60px;
+      width: 70px;
       min-height: 30px;
     }
 
     .timeline-line {
       left: 63px;
-      top: 10px;
+      top: -24px;
+      bottom: 30px;
     }
 
     .timeline-date-col {
@@ -1613,17 +1680,19 @@
       right: -8px;
     }
 
+    .timeline-cards {
+      padding-bottom: 0;
+    }
+    .timeline-load-more-wrap {
+      margin-bottom: 0;
+    }
+
     .card-actions-btn {
       justify-content: center;
-      width: 100%;
+      width: 100% !important;
     }
 
     .card-adjuntos {
-      width: 100%;
-    }
-
-    .card-adjuntos .card-actions-btn {
-      justify-content: center;
       width: 100%;
     }
 
