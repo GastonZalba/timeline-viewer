@@ -48,7 +48,7 @@ export default class Timeline {
     /** Build the main DOM layout and cache element references */
     _buildLayout() {
         this.container.innerHTML = `
-      <section class="noticias-section" id="noticias-section">
+      <section class="publicaciones-section" id="publicaciones-section">
         <div class="featured-row">
           <div class="noticias-top">
             <button class="expand-toggle" id="expand-toggle">
@@ -67,6 +67,10 @@ export default class Timeline {
                 <div class="filter-section">
                   <div class="filter-header">Tipo de fuente</div>
                   <div class="filter-options" id="filter-options-source"></div>
+                </div>
+                <div class="filter-section">
+                  <div class="filter-header">Estado</div>
+                  <div class="filter-options" id="filter-options-validado"></div>
                 </div>
               </div>
             </div>
@@ -99,7 +103,7 @@ export default class Timeline {
         </div>
       </section>
     `;
-        this.section = this.container.querySelector('#noticias-section');
+        this.section = this.container.querySelector('#publicaciones-section');
         this.featuredContainer = this.container.querySelector('#featured-cards');
         this.featuredRow = this.container.querySelector('.featured-row');
         this.timelineContainer = this.container.querySelector('#timeline-container');
@@ -123,6 +127,14 @@ export default class Timeline {
                 label: 'Tipo de fuente',
                 options: this.container.querySelector('#filter-options-source'),
                 checkboxes: []
+            },
+            {
+                field: 'validado',
+                label: 'Validado',
+                options: this.container.querySelector('#filter-options-validado'),
+                checkboxes: [],
+                extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
+                formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
             }
         ];
     }
@@ -718,20 +730,22 @@ export default class Timeline {
         this.sortToggle.classList.toggle('asc', this.sortAscending);
         this._applyFilters();
     }
-    /** Build filter checkboxes from the available tone and source type values */
+    /** Build filter checkboxes from the available filter values */
     _buildFilterCheckboxes() {
         this.filters.forEach((f) => {
             const values = [
                 ...new Set(this.items.flatMap((c) => {
-                    const v = c[f.field];
-                    return Array.isArray(v) ? v : [v];
+                    const v = f.extract ? f.extract(c) : c[f.field];
+                    const arr = Array.isArray(v) ? v : [v];
+                    return arr.map((x) => String(x));
                 }))
             ];
             const counts = {};
             values.forEach((val) => {
                 counts[val] = this.items.filter((c) => {
-                    const v = c[f.field];
-                    return Array.isArray(v) ? v.includes(val) : v === val;
+                    const v = f.extract ? f.extract(c) : c[f.field];
+                    const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+                    return arr.includes(val);
                 }).length;
             });
             f.options.innerHTML = '';
@@ -744,7 +758,7 @@ export default class Timeline {
                 cb.value = val;
                 cb.checked = false;
                 const span = document.createElement('span');
-                span.textContent = `${val} (${counts[val]})`;
+                span.textContent = `${f.formatLabel ? f.formatLabel(val) : val} (${counts[val]})`;
                 label.appendChild(cb);
                 label.appendChild(span);
                 cb.addEventListener('change', () => this._applyFilters());
@@ -761,8 +775,9 @@ export default class Timeline {
             const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
             if (active.length === 0)
                 return true;
-            const fieldVal = c[f.field];
-            return Array.isArray(fieldVal) ? fieldVal.some((v) => active.includes(v)) : active.includes(fieldVal);
+            const v = f.extract ? f.extract(c) : c[f.field];
+            const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+            return arr.some((x) => active.includes(x));
         }));
         if (this.sortAscending)
             this.allCards.reverse();
@@ -846,6 +861,8 @@ export default class Timeline {
         this.fabCollapse.addEventListener('click', () => this._toggleExpand(true));
         this.featuredContainer.addEventListener('click', () => this._toggleExpand());
         this.featuredRow.addEventListener('click', (e) => {
+            if (this.isExpanded)
+                return;
             if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu'))
                 return;
             this._toggleExpand();

@@ -45,10 +45,12 @@ interface LinkInfo {
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 interface FilterDef {
-    field: 'tonos_sociales' | 'tipo_fuente';
+    field: 'tonos_sociales' | 'tipo_fuente' | 'validado';
     label: string;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];
+    extract?: (item: TimelineItem) => string | string[];
+    formatLabel?: (val: string) => string;
 }
 export default class Timeline {
     container: HTMLElement;
@@ -109,7 +111,7 @@ export default class Timeline {
     protected _scrollToSection(): void;
     /** Toggle timeline sort order between ascending and descending */
     protected _toggleSort(): void;
-    /** Build filter checkboxes from the available tone and source type values */
+    /** Build filter checkboxes from the available filter values */
     protected _buildFilterCheckboxes(): void;
     /** Apply active filters and re-render the full view */
     protected _applyFilters(): void;
