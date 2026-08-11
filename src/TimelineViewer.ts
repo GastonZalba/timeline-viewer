@@ -328,16 +328,11 @@ export default class Timeline {
       const imgHtml = card.thumbnail
         ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"></div>`
         : '';
-      const protHtml =
-        card.actores_principales && card.actores_principales.length
-          ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
-          : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
       el.innerHTML = `
         ${imgHtml}
         <div class="card-body">
           <div class="card-date">${this._formatDate(card.fecha_publicacion)}</div>
           <div class="card-title">${card.nombre_fuente}</div>
-          ${protHtml}
         </div>
       `;
       const featuredImg = el.querySelector('.card-image') as HTMLImageElement | null;
