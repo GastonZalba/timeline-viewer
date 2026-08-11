@@ -16,6 +16,7 @@ const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&vers
 export default class Timeline {
     constructor(config) {
         this.sortAscending = false;
+        this.searchTerm = '';
         this.container =
             typeof config.container === 'string'
                 ? document.querySelector(config.container)
@@ -40,6 +41,10 @@ export default class Timeline {
         this.filterMenu = null;
         this.section = null;
         this.filters = [];
+        this.searchWrap = null;
+        this.searchToggle = null;
+        this.searchInput = null;
+        this.searchTerm = '';
         this._lgInstance = null;
         this._lgContainer = null;
         this._originalCards = [];
@@ -55,6 +60,12 @@ export default class Timeline {
               <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">publicaciones relacionadas</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
+            <div class="search-wrap" id="search-wrap">
+              <button class="search-toggle" id="search-toggle" title="Buscar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </button>
+              <input class="search-input" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
+            </div>
             <div class="filter-wrap">
               <button class="filter-toggle" id="filter-toggle" title="Filtrar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -115,6 +126,9 @@ export default class Timeline {
         this.sortToggle = this.container.querySelector('#sort-toggle');
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
+        this.searchWrap = this.container.querySelector('#search-wrap');
+        this.searchToggle = this.container.querySelector('#search-toggle');
+        this.searchInput = this.container.querySelector('#search-input');
         this.filters = [
             {
                 field: 'tonos_sociales',
@@ -230,15 +244,11 @@ export default class Timeline {
             const imgHtml = card.thumbnail
                 ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"></div>`
                 : '';
-            const protHtml = card.actores_principales && card.actores_principales.length
-                ? `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> ${card.actores_principales.join(', ')}</div>`
-                : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
             el.innerHTML = `
         ${imgHtml}
         <div class="card-body">
           <div class="card-date">${this._formatDate(card.fecha_publicacion)}</div>
           <div class="card-title">${card.nombre_fuente}</div>
-          ${protHtml}
         </div>
       `;
             const featuredImg = el.querySelector('.card-image');
@@ -767,18 +777,40 @@ export default class Timeline {
             });
         });
     }
+    /** Normalize a string for accent- and case-insensitive search matching */
+    _normalizeSearch(value) {
+        return value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase();
+    }
+    /** Check whether a card matches the current search term */
+    _matchesSearch(card) {
+        const q = this._normalizeSearch(this.searchTerm.trim());
+        if (!q)
+            return true;
+        const haystacks = [
+            String(card.id),
+            card.nombre_fuente,
+            card.fuente_institucional,
+            (card.actores_principales || []).join(' ')
+        ];
+        return haystacks.some((v) => this._normalizeSearch(v).includes(q));
+    }
     /** Apply active filters and re-render the full view */
     _applyFilters() {
         const anyActive = this.filters.some((f) => f.checkboxes.some((cb) => cb.checked));
         this.filterToggle.classList.toggle('active', anyActive);
-        this.allCards = this._originalCards.filter((c) => this.filters.every((f) => {
-            const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
-            if (active.length === 0)
-                return true;
-            const v = f.extract ? f.extract(c) : c[f.field];
-            const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
-            return arr.some((x) => active.includes(x));
-        }));
+        this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
+        this.allCards = this._originalCards.filter((c) => this._matchesSearch(c) &&
+            this.filters.every((f) => {
+                const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+                if (active.length === 0)
+                    return true;
+                const v = f.extract ? f.extract(c) : c[f.field];
+                const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+                return arr.some((x) => active.includes(x));
+            }));
         if (this.sortAscending)
             this.allCards.reverse();
         if (this.itemsPerPage > 0)
@@ -863,7 +895,7 @@ export default class Timeline {
         this.featuredRow.addEventListener('click', (e) => {
             if (this.isExpanded)
                 return;
-            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu'))
+            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap'))
                 return;
             this._toggleExpand();
         });
@@ -872,6 +904,27 @@ export default class Timeline {
             e.stopPropagation();
             this.filterMenu.classList.toggle('open');
             this.filterToggle.classList.toggle('open');
+        });
+        this.searchToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.searchWrap.classList.toggle('open');
+            this.searchToggle.classList.toggle('open');
+            if (this.searchWrap.classList.contains('open')) {
+                this.searchInput.focus();
+            }
+        });
+        this.searchInput.addEventListener('input', () => {
+            this.searchTerm = this.searchInput.value;
+            this._applyFilters();
+        });
+        this.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.searchInput.value = '';
+                this.searchTerm = '';
+                this.searchWrap.classList.remove('open');
+                this.searchToggle.classList.remove('open');
+                this._applyFilters();
+            }
         });
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.card-info-btn, .card-info-menu')) {
@@ -883,6 +936,10 @@ export default class Timeline {
             if (!e.target.closest('.filter-wrap')) {
                 this.filterMenu.classList.remove('open');
                 this.filterToggle.classList.remove('open');
+            }
+            if (!e.target.closest('.search-wrap')) {
+                this.searchWrap.classList.remove('open');
+                this.searchToggle.classList.remove('open');
             }
         });
     }

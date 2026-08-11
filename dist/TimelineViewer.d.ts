@@ -75,6 +75,10 @@ export default class Timeline {
     filterToggle: HTMLElement;
     filterMenu: HTMLElement;
     filters: FilterDef[];
+    searchWrap: HTMLElement;
+    searchToggle: HTMLElement;
+    searchInput: HTMLInputElement;
+    searchTerm: string;
     _lgInstance: LightGallery | null;
     _lgContainer: HTMLElement | null;
     _originalCards: TimelineItem[];
@@ -113,6 +117,10 @@ export default class Timeline {
     protected _toggleSort(): void;
     /** Build filter checkboxes from the available filter values */
     protected _buildFilterCheckboxes(): void;
+    /** Normalize a string for accent- and case-insensitive search matching */
+    protected _normalizeSearch(value: string): string;
+    /** Check whether a card matches the current search term */
+    protected _matchesSearch(card: TimelineItem): boolean;
     /** Apply active filters and re-render the full view */
     protected _applyFilters(): void;
     /** Render featured cards, timeline, and load-more button if needed */
