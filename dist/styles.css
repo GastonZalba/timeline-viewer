@@ -3,9 +3,7 @@
   inherits: false;
   initial-value: 0deg;
 }
-.publicaciones-section {
-  container-type: inline-size;
-  container-name: publicaciones;
+:root {
   --tv-bg-primary: #1a2025;
   --tv-bg-secondary: #1a1a1a;
   --tv-bg-card: #1d2633;
@@ -24,6 +22,11 @@
   --tv-tone-negative: #ef4444;
   --tv-tone-neutral: #94a3b8;
   --tv-shadow-card: rgba(0, 0, 0, 0.541);
+}
+
+.publicaciones-section {
+  container-type: inline-size;
+  container-name: publicaciones;
 }
 .publicaciones-section .featured-row {
   display: flex;
