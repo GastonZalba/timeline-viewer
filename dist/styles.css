@@ -546,7 +546,6 @@
 }
 .publicaciones-section .featured-card .card-title {
   font-size: 0.72rem;
-  font-weight: 600;
   color: var(--tv-text-on-primary);
   line-height: 1.25;
   display: -webkit-box;
@@ -767,14 +766,13 @@
 }
 .publicaciones-section .timeline-card .card-image-wrap .card-title {
   font-size: 0.95em;
-  font-weight: 600;
   color: var(--tv-text-on-primary);
-  line-height: 1.3;
+  line-height: 1.1;
 }
 .publicaciones-section .timeline-card .card-desc {
-  font-size: 0.85em;
+  font-size: 0.8em;
   color: var(--tv-text-secondary);
-  line-height: 1.5;
+  line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -857,7 +855,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 18px;
 }
 .publicaciones-section .timeline-card .card-tone {
   display: inline-block;
@@ -1113,9 +1111,9 @@
   bottom: 0;
   z-index: 2;
   margin: 0;
-  padding: 14px 12px 10px;
+  padding: 14px 12px 8px;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 500;
   color: #fff;
   line-height: 1.3;
   display: -webkit-box;
