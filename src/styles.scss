@@ -188,6 +188,10 @@
       display: inline-flex;
     }
 
+    .search-toggle {
+      display: inline-flex;
+    }
+
     .featured-cards {
       opacity: 0;
       transform: translateY(-20px) scale(0.95);
@@ -315,6 +319,84 @@
       background: var(--tv-accent);
       border: 1px solid #1e2a3a;
     }
+  }
+
+  .search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .search-toggle {
+    position: relative;
+    background: none;
+    border: 1px solid var(--tv-accent);
+    color: var(--tv-text-on-primary);
+    padding: 8px;
+    border-radius: 42px;
+    height: 34px;
+    width: 34px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: rgba(59, 130, 246, 0.25);
+
+    &:hover,
+    &.open {
+      background: var(--tv-accent);
+    }
+
+    &.active::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      right: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--tv-accent);
+      border: 1px solid #1e2a3a;
+    }
+  }
+
+  .search-input {
+    width: 0;
+    opacity: 0;
+    padding: 0;
+    border: 1px solid var(--tv-accent);
+    border-radius: 42px;
+    height: 34px;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--tv-text-on-primary);
+    font-size: 0.75rem;
+    outline: none;
+    transition:
+      width 0.3s ease,
+      opacity 0.3s ease,
+      padding 0.3s ease,
+      margin 0.3s ease;
+
+    &::placeholder {
+      color: var(--tv-text-muted);
+    }
+
+    &:focus {
+      border-color: var(--tv-accent-light);
+    }
+
+    &::-webkit-search-cancel-button {
+      filter: invert(0.6);
+      cursor: pointer;
+    }
+  }
+
+  .search-wrap.open .search-input {
+    width: 180px;
+    opacity: 1;
+    padding: 0 12px;
+    margin-left: 8px;
   }
 
   .filter-menu {
@@ -1702,8 +1784,13 @@
       width: 100%;
     }
 
-    .sort-toggle {
-      margin-right: 40px;
+    .noticias-top {
+      flex-wrap: wrap;
+      gap: 8px !important;
+    }
+
+    .search-wrap.open .search-input {
+      width: 120px;
     }
 
     .timeline-card .card-image {

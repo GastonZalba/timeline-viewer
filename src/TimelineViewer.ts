@@ -106,6 +106,10 @@ export default class Timeline {
   filterToggle: HTMLElement;
   filterMenu: HTMLElement;
   filters: FilterDef[];
+  searchWrap: HTMLElement;
+  searchToggle: HTMLElement;
+  searchInput: HTMLInputElement;
+  searchTerm: string = '';
   _lgInstance: LightGallery | null;
   _lgContainer: HTMLElement | null;
   _originalCards: TimelineItem[];
@@ -135,6 +139,10 @@ export default class Timeline {
     this.filterMenu = null as unknown as HTMLElement;
     this.section = null as unknown as HTMLElement;
     this.filters = [];
+    this.searchWrap = null as unknown as HTMLElement;
+    this.searchToggle = null as unknown as HTMLElement;
+    this.searchInput = null as unknown as HTMLInputElement;
+    this.searchTerm = '';
     this._lgInstance = null;
     this._lgContainer = null;
     this._originalCards = [];
@@ -151,6 +159,12 @@ export default class Timeline {
               <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">publicaciones relacionadas</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
+            <div class="search-wrap" id="search-wrap">
+              <button class="search-toggle" id="search-toggle" title="Buscar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </button>
+              <input class="search-input" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
+            </div>
             <div class="filter-wrap">
               <button class="filter-toggle" id="filter-toggle" title="Filtrar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
@@ -211,6 +225,9 @@ export default class Timeline {
     this.sortToggle = this.container.querySelector('#sort-toggle') as HTMLElement;
     this.filterToggle = this.container.querySelector('#filter-toggle') as HTMLElement;
     this.filterMenu = this.container.querySelector('#filter-menu') as HTMLElement;
+    this.searchWrap = this.container.querySelector('#search-wrap') as HTMLElement;
+    this.searchToggle = this.container.querySelector('#search-toggle') as HTMLElement;
+    this.searchInput = this.container.querySelector('#search-input') as HTMLInputElement;
     this.filters = [
       {
         field: 'tonos_sociales',
@@ -880,18 +897,42 @@ export default class Timeline {
     });
   }
 
+  /** Normalize a string for accent- and case-insensitive search matching */
+  protected _normalizeSearch(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  /** Check whether a card matches the current search term */
+  protected _matchesSearch(card: TimelineItem): boolean {
+    const q = this._normalizeSearch(this.searchTerm.trim());
+    if (!q) return true;
+    const haystacks = [
+      String(card.id),
+      card.nombre_fuente,
+      card.fuente_institucional,
+      (card.actores_principales || []).join(' ')
+    ];
+    return haystacks.some((v) => this._normalizeSearch(v).includes(q));
+  }
+
   /** Apply active filters and re-render the full view */
   protected _applyFilters(): void {
     const anyActive = this.filters.some((f) => f.checkboxes.some((cb) => cb.checked));
     this.filterToggle.classList.toggle('active', anyActive);
-    this.allCards = this._originalCards.filter((c) =>
-      this.filters.every((f) => {
-        const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
-        if (active.length === 0) return true;
-        const v = f.extract ? f.extract(c) : c[f.field];
-        const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
-        return arr.some((x) => active.includes(x));
-      })
+    this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
+    this.allCards = this._originalCards.filter(
+      (c) =>
+        this._matchesSearch(c) &&
+        this.filters.every((f) => {
+          const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+          if (active.length === 0) return true;
+          const v = f.extract ? f.extract(c) : c[f.field];
+          const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+          return arr.some((x) => active.includes(x));
+        })
     );
     if (this.sortAscending) this.allCards.reverse();
     if (this.itemsPerPage > 0) this._displayedCount = this.itemsPerPage;
@@ -983,7 +1024,9 @@ export default class Timeline {
     this.featuredRow.addEventListener('click', (e: Event) => {
       if (this.isExpanded) return;
       if (
-        (e.target as HTMLElement).closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu')
+        (e.target as HTMLElement).closest(
+          '.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap'
+        )
       )
         return;
       this._toggleExpand();
@@ -993,6 +1036,27 @@ export default class Timeline {
       e.stopPropagation();
       this.filterMenu.classList.toggle('open');
       this.filterToggle.classList.toggle('open');
+    });
+    this.searchToggle.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      this.searchWrap.classList.toggle('open');
+      this.searchToggle.classList.toggle('open');
+      if (this.searchWrap.classList.contains('open')) {
+        this.searchInput.focus();
+      }
+    });
+    this.searchInput.addEventListener('input', () => {
+      this.searchTerm = this.searchInput.value;
+      this._applyFilters();
+    });
+    this.searchInput.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        this.searchInput.value = '';
+        this.searchTerm = '';
+        this.searchWrap.classList.remove('open');
+        this.searchToggle.classList.remove('open');
+        this._applyFilters();
+      }
     });
 
     document.addEventListener('click', (e: Event) => {
@@ -1005,6 +1069,10 @@ export default class Timeline {
       if (!(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
         this.filterToggle.classList.remove('open');
+      }
+      if (!(e.target as HTMLElement).closest('.search-wrap')) {
+        this.searchWrap.classList.remove('open');
+        this.searchToggle.classList.remove('open');
       }
     });
   }
