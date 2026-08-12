@@ -113,8 +113,13 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │   ├── .filter-wrap
   │   │   │   ├── button.filter-toggle (#filter-toggle)
   │   │   │   └── div.filter-menu (#filter-menu)
-  │   │   │       ├── .filter-section > .filter-header + .filter-options#filter-options-tone
-  │   │   │       └── .filter-section > .filter-header + .filter-options#filter-options-source
+  │   │   │       ├── .filter-column
+  │   │   │       │   ├── .filter-section > .filter-header + .filter-options#filter-options-tone
+  │   │   │       │   ├── .filter-section > .filter-header + .filter-options#filter-options-year
+  │   │   │       │   └── .filter-section > .filter-header + .filter-options#filter-options-content
+  │   │   │       └── .filter-column
+  │   │   │           ├── .filter-section > .filter-header + .filter-options#filter-options-source
+  │   │   │           └── .filter-section > .filter-header + .filter-options#filter-options-validado
   │   │   └── button.sort-toggle (#sort-toggle)
   │   └── .featured-cards (#featured-cards)
   │       └── .featured-card × N (generados por _renderFeatured)
@@ -227,12 +232,15 @@ El sistema de paginación es **manual** (no infinito scroll):
 
 ## Sistema de filtros
 
-Dos filtros disponibles, generados dinámicamente desde los datos:
+Cinco filtros disponibles, generados dinámicamente desde los datos, distribuidos en dos columnas dentro del menú:
 
 | Filtro | Campo | Descripción |
 |--------|-------|-------------|
 | Tono social | `tonos_sociales` | Array: Positivo / Negativo / Neutro |
+| Año publicación | `fecha_publicacion` | Año extraído de `YYYY-MM-DD` (ordena descendente) |
 | Tipo de fuente | `tipo_fuente` | Valores únicos presentes en los datos |
+| Estado | `validado` | Validado / No validado |
+| Contenido | `adjuntos`, `links_videos`, `imagenes` | Con adjuntos / Con video / Con imágenes |
 
 Flujo:
 1. `_buildFilterCheckboxes()` extrae valores únicos y crea checkboxes con conteo

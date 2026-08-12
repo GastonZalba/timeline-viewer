@@ -21,6 +21,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia1a/300/200', full: 'https://picsum.photos/seed/noticia1a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia1b/300/200', full: 'https://picsum.photos/seed/noticia1b/600/400' }
     ],
+    hasVideos: true,
     links_videos: [
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       'https://www.youtube.com/watch?v=jNQXAC9IVRw',
@@ -49,6 +50,7 @@ export default {
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
+    hasVideos: true,
     links_videos: ['https://www.youtube.com/watch?v=kXYiU_JCYtU'],
     temas: [
       { titulo: 'Parche critico de seguridad para la vulnerabilidad CVE-2026-1234 en navegadores', resumen: 'Se parcheo la vulnerabilidad CVE-2026-1234, catalogada como critica, que afectaba a todos los navegadores basados en Chromium y permitia ejecucion remota de codigo. Se recomienda actualizar todas las versiones afectadas: hay explotaciones activas que instalan malware sin que el usuario lo note.', tono_social: 'Negativo', fecha_narrativa: '2026-06-22' }
@@ -75,6 +77,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia3b/300/200', full: 'https://picsum.photos/seed/noticia3b/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia3c/300/200', full: 'https://picsum.photos/seed/noticia3c/600/400' }
     ],
+    hasVideos: true,
     links_videos: [
       'https://www.youtube.com/watch?v=hY7m5jjJ5mQ',
       'https://www.youtube.com/watch?v=oHg5SJYRHA0'
@@ -105,6 +108,7 @@ export default {
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
     ],
+    hasVideos: true,
     links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A'],
     temas: [
       { titulo: 'Anchor positioning y el nuevo modelo de posicionamiento relativo al documento', resumen: 'La especificacion de anchor positioning posiciona elementos relativos a otros del documento sin JavaScript. Simplifica tooltips, dropdowns, popovers y menus que antes requerian calculos manuales o librerias externas. Los navegadores modernos ya la soportan nativamente.', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
@@ -134,6 +138,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia5d/300/200', full: 'https://picsum.photos/seed/noticia5d/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia5e/300/200', full: 'https://picsum.photos/seed/noticia5e/600/400' }
     ],
+    hasVideos: true,
     links_videos: [
       'https://www.youtube.com/watch?v=ckZ7mTfj2oE',
       'https://www.youtube.com/watch?v=nfWlot6h_JM',
@@ -162,6 +167,7 @@ export default {
     adjuntos: [],
     screenshot: null,
     imagenes: [],
+    hasVideos: false,
     temas: []
   },
   {
@@ -186,6 +192,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia7c/300/200', full: 'https://picsum.photos/seed/noticia7c/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia7d/300/200', full: 'https://picsum.photos/seed/noticia7d/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'Patron matching con exhaustiveness checking y desestructuracion de tipos', resumen: 'La nueva sintaxis match/case ofrece coincidencia de patrones con exhaustiveness checking, que obliga a cubrir todos los casos posibles. Elimina errores por condiciones incompletas y soporta desestructuracion, guardas y rangos, integrándose con el sistema de tipos.', tono_social: 'Positivo', fecha_narrativa: '2026-05-28' },
       { titulo: 'Decorators nativos sin transpiladores adicionales en clases y metodos', resumen: 'El soporte oficial de decorators llega sin transpiladores adicionales, simplificando la configuracion. Funcionan nativamente en clases y metodos, y su integracion con la inferencia de tipos permite abstracciones mas seguras para inyeccion de dependencias y validacion.', tono_social: 'Positivo', fecha_narrativa: '2026-05-27' },
@@ -212,6 +219,7 @@ export default {
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia8a/300/200', full: 'https://picsum.photos/seed/noticia8a/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'WASM runtime optimizado para funciones serverless de borde', resumen: 'Los nuevos runtimes optimizados para serverless ejecutan modulos WebAssembly con arranque minimo y bajo consumo de recursos. Compilar codigo intensivo a WASM y desplegarlo en funciones de borde acerca el procesamiento al usuario, con overhead cada vez menor.', tono_social: 'Positivo', fecha_narrativa: '2026-05-15' },
       { titulo: 'Casos de uso frecuentes de WebAssembly fuera del navegador', resumen: 'Los usos mas frecuentes del WASM fuera del navegador incluyen procesamiento de imagenes y video, parseo de PDFs y hojas de calculo, y computacion cientifica intensiva. Se benefician de la velocidad nativa y del aislamiento de memoria, reduciendo costos.', tono_social: 'Neutro', fecha_narrativa: null }
@@ -238,6 +246,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia9b/300/200', full: 'https://picsum.photos/seed/noticia9b/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia9c/300/200', full: 'https://picsum.photos/seed/noticia9c/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'Micro-interacciones', resumen: 'Las micro-interacciones bien disenadas mejoran la percepcion de respuesta y guian al usuario. Hover con feedback tactil, transiciones entre estados de carga y confirmaciones animadas reducen la espera percibida y aumentan la confianza en el sistema.', tono_social: 'Positivo', fecha_narrativa: '2026-04-30' },
       { titulo: 'Modo oscuro adaptativo segun la hora del dia y las preferencias del sistema operativo', resumen: 'La adaptacion automatica del tema considera la hora del dia y las preferencias del sistema operativo. El modo oscuro ajusta contraste, brillo y sombras para mantener legibilidad y reducir la fatiga visual, respetando la preferencia del usuario sin recargar la aplicacion.', tono_social: 'Neutro', fecha_narrativa: null },
@@ -264,6 +273,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia10a/300/200', full: 'https://picsum.photos/seed/noticia10a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia10b/300/200', full: 'https://picsum.photos/seed/noticia10b/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'Unit testing con Vitest y cobertura por componente para detectar regresiones', resumen: 'La configuracion optima de Vitest se detalla con cobertura por componente, mocks de dependencias, temporizadores y peticiones de red. Se explican los modos watch y coverage y la integracion con pre-commit, logrando una suite rapida que detecta regresiones antes de produccion.', tono_social: 'Positivo', fecha_narrativa: '2026-04-10' },
       { titulo: 'Integration tests centrados en roles accesibles y en el usuario real', resumen: 'Las pruebas de integracion con Testing Library se centran en el usuario real, interactuando con roles accesibles en lugar de detalles de implementacion. Son mas robustas ante refactorizaciones y cubren flujos como registro, autenticacion y carrito de compras.', tono_social: 'Neutro', fecha_narrativa: '2026-04-09' },
@@ -276,7 +286,7 @@ export default {
     resumen_ia: 'Meta-frameworks borran la linea entre servidor y cliente con server components y streaming.',
     thumbnail: 'https://picsum.photos/seed/noticia11/600/400',
     link_web: 'https://vercel.com/blog/frontend-backend-convergence',
-    fecha_publicacion: '2026-03-20',
+    fecha_publicacion: '2024-03-20',
     fecha_scrapeo: '2026-03-20T15:15:00',
     tonos_sociales: ['Positivo', 'Negativo'],
     fuente_institucional: 'Vercel',
@@ -289,6 +299,7 @@ export default {
     imagenes: [
       { thumb: 'https://picsum.photos/seed/noticia11a/300/200', full: 'https://picsum.photos/seed/noticia11a/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'Server components que eliminan el JavaScript del renderizado inicial del cliente', resumen: 'Los componentes que se ejecutan solo en el servidor eliminan el envio de JavaScript al cliente para el renderizado inicial, reduciendo el bundle. La informacion sensible y las consultas a bases de datos quedan fuera del navegador, simplificando la seguridad.', tono_social: 'Positivo', fecha_narrativa: '2026-03-20' },
       { titulo: 'Streaming SSR y el renderizado progresivo de fragmentos sin bloquear la interaccion', resumen: 'El renderizado progresivo envia fragmentos de HTML al cliente a medida que estan listos. Mejora la percepcion de carga y muestra contenido interactivo temprano, mientras las secciones lentas aparecen progresivamente sin bloquear la interaccion.', tono_social: 'Positivo', fecha_narrativa: null },
@@ -315,6 +326,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia13a/300/200', full: 'https://picsum.photos/seed/noticia13a/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia13b/300/200', full: 'https://picsum.photos/seed/noticia13b/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'Module Federation y el compartir modulos entre aplicaciones en tiempo de ejecucion', resumen: 'Webpack 5 introdujo Module Federation, que permite compartir modulos entre aplicaciones independientes en tiempo de ejecucion sin instalar paquetes. Las aplicaciones exponen componentes que otros consumen de forma remota, facilitando plataformas modulares con equipos autonomas.', tono_social: 'Positivo', fecha_narrativa: null },
       { titulo: 'Orquestacion del shell principal con autenticacion, ruteo y estado compartido', resumen: 'El shell principal maneja ruteo, autenticacion, estado compartido y coordinacion de los micro-frontends remotos. Define los contratos de comunicacion, maneja la carga perezosa y centraliza branding y layout, lo que es critico para la consistencia.', tono_social: 'Neutro', fecha_narrativa: null },
@@ -327,7 +339,7 @@ export default {
     resumen_ia: 'Nuevas herramientas y estandares facilitan la creacion de experiencias inclusivas para todos los usuarios.',
     thumbnail: 'https://picsum.photos/seed/noticia12/600/400',
     link_web: 'https://w3.org/wai/accessibility-2026',
-    fecha_publicacion: '2026-02-05',
+    fecha_publicacion: '2025-02-05',
     fecha_scrapeo: '2026-02-05T10:00:00',
     tonos_sociales: ['Positivo', 'Negativo', 'Neutro'],
     fuente_institucional: 'W3C WAI',
@@ -344,6 +356,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia12d/300/200', full: 'https://picsum.photos/seed/noticia12d/600/400' },
       { thumb: 'https://picsum.photos/seed/noticia12e/300/200', full: 'https://picsum.photos/seed/noticia12e/600/400' }
     ],
+    hasVideos: false,
     temas: [
       { titulo: 'WCAG 3.0 y los criterios de conformidad basados en resultados medibles', resumen: 'El estandar WCAG 3.0 introduce criterios de conformidad basados en resultados medibles en lugar de simples requisitos de implementacion. Contempla niveles de severidad y una puntuacion general, cubriendo navegacion por voz, movimiento reducido y contraste adaptativo.', tono_social: 'Positivo', fecha_narrativa: '2026-02-05' },
       { titulo: 'Herramientas de auditoria automatica integradas en el pipeline de CI', resumen: 'Los linters y auditores de accesibilidad se integran en los pipelines de CI y devuelven reportes con las violaciones detectadas en cada cambio. Verifican contraste, atributos de imagenes y roles interactivos, reduciendo costos de correccion.', tono_social: 'Positivo', fecha_narrativa: '2026-02-04' },
@@ -357,7 +370,7 @@ export default {
     resumen_ia: 'Un video tutorial que muestra como crear animaciones complejas con solo CSS, sin necesidad de JavaScript.',
     thumbnail: 'https://picsum.photos/seed/youtube1/600/400',
     link_web: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
-    fecha_publicacion: '2026-06-28',
+    fecha_publicacion: '2025-06-28',
     fecha_scrapeo: '2026-06-28T10:00:00',
     tonos_sociales: ['Positivo'],
     fuente_institucional: 'YouTube',
@@ -368,6 +381,7 @@ export default {
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
+    hasVideos: true,
     temas: [
       { titulo: 'Animaciones complejas con keyframes basicos, hover y transiciones en cascada', resumen: 'El tutorial explica paso a paso animaciones complejas solo con CSS, desde keyframes basicos hasta transiciones en cascada. Incluye ejemplos de hover, animaciones al hacer scroll y efectos de entrada, mostrando el potencial expresivo sin JavaScript.', tono_social: 'Positivo', fecha_narrativa: '2026-06-28' }
     ]
@@ -377,7 +391,7 @@ export default {
     nombre_fuente: 'Nuevo framework CSS anunciado en Instagram',
     resumen_ia: 'Un desarrollador muestra en un reel de Instagram su nuevo framework CSS ligero para prototipado rapido.',
     thumbnail: 'https://picsum.photos/seed/instagram1/600/400',
-    link_web: 'https://www.instagram.com/p/DQ3zR6-DPGm/?img_index=1',
+    link_web: 'https://www.instagram.com/reel/DQ3zR6-DPGm/',
     fecha_publicacion: '2026-06-27',
     fecha_scrapeo: '2026-06-27T14:20:00',
     tonos_sociales: ['Positivo'],
@@ -389,6 +403,7 @@ export default {
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
+    hasVideos: true,
     temas: [
       { titulo: 'CSS framework ligero con utilidades de grid y flexbox para prototipado rapido', resumen: 'El framework CSS open-source acelera la maquetacion con sintaxis minimalista y archivo liviano. Incluye utilidades de grid y flexbox, componentes reutilizables y variables configurables, apuntando a desarrolladores que buscan resultados rapidos sin sistemas pesados.', tono_social: 'Positivo', fecha_narrativa: null }
     ]
@@ -410,6 +425,7 @@ export default {
     adjuntos: ['https://archivos.ejemplo.com/twitter/hilo-twitter-react-tips.txt'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
+    hasVideos: false,
     temas: [
       { titulo: 'Performance y la optimizacion de renders con useMemo y useCallback', resumen: 'El hilo comparte consejos para optimizar React con el uso correcto de useMemo y useCallback para evitar renders innecesarios. Explica patrones de memorizacion, errores comunes y la importancia de medir con el profiler en lugar de optimizar a ciegas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-26' },
       { titulo: 'React y las buenas practicas de ciclo de vida, estado y composicion', resumen: 'Un hilo con veinte consejos para escribir componentes mas eficientes, sobre ciclo de vida, estado y composicion. Abarca desde keys y renderizado condicional hasta custom hooks, con una justificacion breve y un ejemplo de codigo en cada recomendacion.', tono_social: 'Neutro', fecha_narrativa: null }
@@ -432,6 +448,7 @@ export default {
     adjuntos: [],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [],
+    hasVideos: false,
     temas: [
       { titulo: 'WCAG 3.0 aplicado en proyectos reales de produccion con consejos practicos', resumen: 'El desarrollador comparte su experiencia implementando los nuevos estandares de accesibilidad en proyectos reales. Destaca involucrar al diseno desde el inicio, combinar auditoria automatica con evaluacion manual y planificar el presupuesto de correcciones.', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' }
     ]

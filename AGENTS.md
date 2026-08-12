@@ -27,15 +27,16 @@ El diseño es intencional: un componente autocontenido que se puede copiar, impo
 
 No hay bundler. El pipeline de build es: **Prettier** (format) → `tsc` (TS→JS) → `sass` (SCSS→CSS). El resultado en `dist/` es lo que se distribuye.
 
+
 ## Comandos
 
 ```bash
-npm run build        # Formatea + Build completo (TS + SCSS)
+npm run build        # Formatea + Build completo (TS + plugin zoom + SCSS)
 npm run build:ts     # Solo TypeScript
 npm run build:css    # Solo SCSS
 npm run format       # Formatea código con Prettier
 npm run format:check # Verifica formato sin modificar
-npm run dev          # Watch mode + dev server en :3010
+npm run dev          # Copia el plugin zoom + Watch mode + dev server en :3010
 npm start            # Solo dev server en :3010
 ```
 
@@ -45,7 +46,7 @@ El `build` ejecuta Prettier automáticamente antes de compilar. **No hay tests c
 
 Estas son restricciones críticas. Violarlas rompe la filosofía del módulo:
 
-1. **NO agregar bundlers** (Webpack, Vite, Rollup, esbuild). La compilación es `tsc` + `sass`.
+1. **NO agregar bundlers** (Webpack, Vite, Rollup, esbuild). La compilación es `tsc` + `sass` + un paso de copia del plugin zoom vendado (`build:lgzoom`).
 2. **NO partir el archivo TS en múltiples archivos**. Todo va en `TimelineViewer.ts`.
 3. **NO agregar frameworks** (React, Vue, Svelte, etc.). Es vanilla DOM.
 4. **NO agregar dependencias runtime**. `lightgallery` es peer dependency, no se incluye en el bundle.
@@ -114,6 +115,7 @@ interface TimelineItem {
   screenshot: string | null;    // URL de captura de pantalla
   imagenes: { thumb: string; full: string }[];
   links_videos?: string[];      // Links de videos relacionados (se renderizan como embeds al expandir la tarjeta)
+  has_video: boolean;           // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
   temas: ItemTema[];            // Subtemas del artículo
 }
 ```
@@ -152,8 +154,10 @@ Es un **peer dependency** (`^2.9.0`). El componente importa:
 ```typescript
 import lightGallery from 'lightgallery';
 import lgThumbnail from 'lightgallery/plugins/thumbnail';
-import lgZoom from 'lightgallery/plugins/zoom';
+import lgZoomCustom from './lg-zoom-custom/lg-zoom.es5.js';
 ```
+
+El plugin zoom usa una **copia vendada** en `src/lg-zoom-custom/` (basada en lightgallery 2.7.1) porque `TimelineViewer.ts` la modifica en runtime (scroll wheel zoom en `_openLightGallery`). `tsc` no copia `.js` a `dist/`, por eso `build:lgzoom` copia la carpeta `lg-zoom-custom` completa a `dist/`. No usar `lightgallery/plugins/zoom` (el import original) para el zoom.
 
 El consumidor debe proveer lightGallery en su bundle o via importmap (como hace `example/index.html`). El componente NO incluye lightGallery en su build.
 
@@ -165,11 +169,13 @@ Para testing local, el example usa CDN via importmap.
 src/
   TimelineViewer.ts    ← Toda la lógica (único archivo TS)
   styles.scss          ← Todos los estilos (único archivo SCSS)
+  lg-zoom-custom/      ← Plugin zoom vendado de lightgallery (js + .d.ts)
 
 dist/
   TimelineViewer.js    ← ES module compilado
   TimelineViewer.d.ts  ← Type declarations
   styles.css           ← CSS compilado
+  lg-zoom-custom/      ← Copia del plugin zoom vendado (via build:lgzoom)
 
 example/
   index.html           ← Demo page con importmap para lightGallery CDN

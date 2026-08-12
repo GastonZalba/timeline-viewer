@@ -407,12 +407,23 @@
     border: 1px solid var(--tv-border-card);
     border-radius: 8px;
     padding: 6px;
-    min-width: 220px;
+    min-width: 380px;
     z-index: 20;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 
     &.open {
-      display: block;
+      display: flex;
+      gap: 12px;
+    }
+
+    .filter-column {
+      flex: 1;
+      min-width: 0;
+
+      + .filter-column {
+        border-left: 1px solid var(--tv-border-card);
+        padding-left: 12px;
+      }
     }
 
     .filter-section + .filter-section {
@@ -440,6 +451,21 @@
       border-radius: 4px;
       transition: background 0.2s;
       white-space: nowrap;
+      overflow: hidden;
+
+      span {
+        min-width: 0;
+      }
+
+      .filter-option-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .filter-option-count {
+        flex-shrink: 0;
+      }
 
       &:hover {
         background: rgba(255, 255, 255, 0.05);
