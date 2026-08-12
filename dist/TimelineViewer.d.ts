@@ -27,6 +27,7 @@ export interface TimelineItem {
         full: string;
     }[];
     links_videos?: string[];
+    has_video: boolean;
     temas: ItemTema[];
 }
 export interface TimelineOptions {
@@ -45,12 +46,13 @@ interface LinkInfo {
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 interface FilterDef {
-    field: 'tonos_sociales' | 'tipo_fuente' | 'validado';
+    field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'adjuntos';
     label: string;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];
     extract?: (item: TimelineItem) => string | string[];
     formatLabel?: (val: string) => string;
+    sortValues?: (a: string, b: string) => number;
 }
 export default class Timeline {
     container: HTMLElement;

@@ -341,12 +341,21 @@
   border: 1px solid var(--tv-border-card);
   border-radius: 8px;
   padding: 6px;
-  min-width: 220px;
+  min-width: 380px;
   z-index: 20;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 .publicaciones-section .filter-menu.open {
-  display: block;
+  display: flex;
+  gap: 12px;
+}
+.publicaciones-section .filter-menu .filter-column {
+  flex: 1;
+  min-width: 0;
+}
+.publicaciones-section .filter-menu .filter-column + .filter-column {
+  border-left: 1px solid var(--tv-border-card);
+  padding-left: 12px;
 }
 .publicaciones-section .filter-menu .filter-section + .filter-section {
   border-top: 1px solid var(--tv-border-card);
@@ -371,6 +380,18 @@
   border-radius: 4px;
   transition: background 0.2s;
   white-space: nowrap;
+  overflow: hidden;
+}
+.publicaciones-section .filter-menu .filter-option span {
+  min-width: 0;
+}
+.publicaciones-section .filter-menu .filter-option .filter-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.publicaciones-section .filter-menu .filter-option .filter-option-count {
+  flex-shrink: 0;
 }
 .publicaciones-section .filter-menu .filter-option:hover {
   background: rgba(255, 255, 255, 0.05);

@@ -71,17 +71,29 @@ export default class Timeline {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
               <div class="filter-menu" id="filter-menu">
-                <div class="filter-section">
-                  <div class="filter-header">Tono social</div>
-                  <div class="filter-options" id="filter-options-tone"></div>
+                <div class="filter-column">
+                  <div class="filter-section">
+                    <div class="filter-header">Tono social</div>
+                    <div class="filter-options" id="filter-options-tone"></div>
+                  </div>
+                  <div class="filter-section">
+                    <div class="filter-header">Año publicación</div>
+                    <div class="filter-options" id="filter-options-year"></div>
+                  </div>
+                  <div class="filter-section">
+                    <div class="filter-header">Contenido</div>
+                    <div class="filter-options" id="filter-options-content"></div>
+                  </div>
                 </div>
-                <div class="filter-section">
-                  <div class="filter-header">Tipo de fuente</div>
-                  <div class="filter-options" id="filter-options-source"></div>
-                </div>
-                <div class="filter-section">
-                  <div class="filter-header">Estado</div>
-                  <div class="filter-options" id="filter-options-validado"></div>
+                <div class="filter-column">
+                  <div class="filter-section">
+                    <div class="filter-header">Tipo de fuente</div>
+                    <div class="filter-options" id="filter-options-source"></div>
+                  </div>
+                  <div class="filter-section">
+                    <div class="filter-header">Estado</div>
+                    <div class="filter-options" id="filter-options-validado"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -149,6 +161,38 @@ export default class Timeline {
                 checkboxes: [],
                 extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
                 formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
+            },
+            {
+                field: 'fecha_publicacion',
+                label: 'Año publicación',
+                options: this.container.querySelector('#filter-options-year'),
+                checkboxes: [],
+                extract: (item) => (item.fecha_publicacion ? item.fecha_publicacion.slice(0, 4) : 'sin-fecha'),
+                formatLabel: (val) => (val === 'sin-fecha' ? 'Sin fecha' : val),
+                sortValues: (a, b) => {
+                    if (a === 'sin-fecha')
+                        return 1;
+                    if (b === 'sin-fecha')
+                        return -1;
+                    return Number(b) - Number(a);
+                }
+            },
+            {
+                field: 'adjuntos',
+                label: 'Contenido',
+                options: this.container.querySelector('#filter-options-content'),
+                checkboxes: [],
+                extract: (item) => {
+                    const types = [];
+                    if (item.adjuntos.length > 0)
+                        types.push('adjuntos');
+                    if (item.links_videos && item.links_videos.length > 0)
+                        types.push('video');
+                    if (item.imagenes.length > 0)
+                        types.push('imagenes');
+                    return types;
+                },
+                formatLabel: (val) => (val === 'adjuntos' ? 'Con adjuntos' : val === 'video' ? 'Con video' : 'Con imágenes')
             }
         ];
     }
@@ -225,7 +269,9 @@ export default class Timeline {
                     ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>`
                     : ''
             })),
-            plugins: [lgThumbnail, lgZoom]
+            plugins: [lgZoom, lgThumbnail],
+            showZoomInOutIcons: true,
+            actualSize: false
         });
         this._lgContainer.addEventListener('lgAfterClose', () => {
             if (this._lgInstance) {
@@ -747,9 +793,11 @@ export default class Timeline {
                 ...new Set(this.items.flatMap((c) => {
                     const v = f.extract ? f.extract(c) : c[f.field];
                     const arr = Array.isArray(v) ? v : [v];
-                    return arr.map((x) => String(x));
+                    return arr.map((x) => String(x)).filter(Boolean);
                 }))
             ];
+            if (f.sortValues)
+                values.sort(f.sortValues);
             const counts = {};
             values.forEach((val) => {
                 counts[val] = this.items.filter((c) => {
@@ -768,9 +816,16 @@ export default class Timeline {
                 cb.value = val;
                 cb.checked = false;
                 const span = document.createElement('span');
-                span.textContent = `${f.formatLabel ? f.formatLabel(val) : val} (${counts[val]})`;
+                span.className = 'filter-option-label';
+                const display = f.formatLabel ? f.formatLabel(val) : val;
+                span.textContent = display;
+                const countSpan = document.createElement('span');
+                countSpan.className = 'filter-option-count';
+                countSpan.textContent = `(${counts[val]})`;
+                label.title = display;
                 label.appendChild(cb);
                 label.appendChild(span);
+                label.appendChild(countSpan);
                 cb.addEventListener('change', () => this._applyFilters());
                 f.options.appendChild(label);
                 f.checkboxes.push(cb);
