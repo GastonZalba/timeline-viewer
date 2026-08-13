@@ -77,7 +77,7 @@ interface LinkInfo {
 }
 
 interface FilterDef {
-  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido';
+  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial';
   label: string;
   options: HTMLElement;
   checkboxes: HTMLInputElement[];
@@ -196,6 +196,10 @@ export default class Timeline {
                     <div class="filter-header">Estado</div>
                     <div class="filter-options" id="filter-options-validado"></div>
                   </div>
+                  <div class="filter-section">
+                    <div class="filter-header">Fuente oficial</div>
+                    <div class="filter-options" id="filter-options-oficial"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -263,6 +267,14 @@ export default class Timeline {
         checkboxes: [],
         extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
         formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
+      },
+      {
+        field: 'es_oficial',
+        label: 'Fuente oficial',
+        options: this.container.querySelector('#filter-options-oficial') as HTMLElement,
+        checkboxes: [],
+        extract: (item) => (item.es_oficial ? 'oficial' : 'no-oficial'),
+        formatLabel: (val) => (val === 'oficial' ? 'Sí' : 'No')
       },
       {
         field: 'fecha_publicacion',
@@ -380,6 +392,11 @@ export default class Timeline {
     this._lgInstance.openGallery();
   }
 
+  /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
+  protected _oficialIconSvg(): string {
+    return `<svg class="card-oficial" width="16" height="16" viewBox="0 0 199.34 223.41" fill="currentColor"><path d="M326.17,272.12c1.65-23.24,24.28-61.59,72-65.81,2.05-.1,3.55-.1,8.91-.1,45.23,4,68.94,39.6,72,65.91Z" transform="translate(-302.78 -206.21)"/><path d="M494,300.26H310.92V279.78H494Z" transform="translate(-302.78 -206.21)"/><path d="M302.78,429.62V412.78H502.11v16.84Z" transform="translate(-302.78 -206.21)"/><path d="M337.89,401.27H318.84V306h19.05Z" transform="translate(-302.78 -206.21)"/><path d="M412.12,401.32H392.89V306h19.23Z" transform="translate(-302.78 -206.21)"/><path d="M467.14,306h19.12v95.2H467.14Z" transform="translate(-302.78 -206.21)"/><path d="M356,401.21V305.73c5.89,0,11.6-.07,17.31.09.7,0,1.5,1.17,2,1.95.29.44.08,1.22.08,1.84q0,44,0,88c0,1.11-.11,2.21-.18,3.6Z" transform="translate(-302.78 -206.21)"/><path d="M449.05,401.36H429.87c-.08-1.36-.21-2.67-.21-4,0-29.22,0-58.43-.07-87.65,0-3,.68-4.24,3.9-4.1,5.08.24,10.18.07,15.56.07Z" transform="translate(-302.78 -206.21)"/></svg>`;
+  }
+
   /** Render the featured (overlapping) cards row */
   protected _renderFeatured(cards: TimelineItem[]): void {
     this.featuredContainer.innerHTML = '';
@@ -411,7 +428,7 @@ export default class Timeline {
     el.className = 'timeline-item';
     el.style.transitionDelay = `${index * 0.08}s`;
     const imgHtml = card.thumbnail
-      ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"><div class="card-title">${card.nombre_fuente}</div></div>`
+      ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"><div class="card-title">${card.nombre_fuente}${card.es_oficial ? `<span class="card-img-oficial card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div></div>`
       : '';
     const toneLabel: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
     const toneLabelTema: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
@@ -506,7 +523,7 @@ export default class Timeline {
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional}${card.es_oficial ? '<span class="card-oficial-wrap" title="Es fuente oficial"><svg class="card-oficial" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="19 7.5 10.5 16.5 4.5 11.5"/></svg></span>' : ''}</div>
+          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
           ${iframeHtml}
           ${videosHtml}
         </div>

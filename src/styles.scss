@@ -107,20 +107,20 @@
     vertical-align: middle;
     flex-shrink: 0;
     margin-left: 6px;
-    width: 14px;
-    height: 14px;
+    width: 22px;
+    height: 22px;
+    background: var(--tv-accent);
+    border-radius: 50%;
   }
 
   .card-oficial {
     width: 14px;
     height: 14px;
-    border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     vertical-align: middle;
     color: var(--tv-text-on-primary);
-    background: var(--tv-accent);
   }
 
   .card-fuente .card-oficial {
@@ -1268,6 +1268,18 @@
       text-overflow: ellipsis;
       word-break: break-word;
     }
+  }
+
+  .card-img-oficial {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--tv-accent);
+    color: var(--tv-text-on-primary);
+  }
+
+  .timeline-card.expanded .card-img-oficial {
+    display: none;
   }
 
   @keyframes card-image-shimmer {
