@@ -15,12 +15,13 @@
   --tv-border-card: #0e1116;
   --tv-border-section: #2a2a2a;
   --tv-text-primary: #e0e0e0;
-  --tv-text-secondary: #999;
+  --tv-text-secondary: #a3a3a3;
   --tv-text-muted: #a4a4a4;
   --tv-text-dark: #444;
   --tv-text-on-primary: #fff;
-  --tv-accent: #3b82f6;
-  --tv-accent-light: #60a5fa;
+  --tv-accent: #3792c4;
+  --tv-accent-light: #38b2f4;
+  --tv-accent-dark: #1f4457;
   --tv-tone-positive: #22c55e;
   --tv-tone-negative: #ef4444;
   --tv-tone-neutral: #94a3b8;
@@ -43,7 +44,7 @@
     position: relative;
     border-radius: 8px;
     padding: 10px 30px;
-    border: 1px solid #2c73ff69;
+    border: 1px solid var(--tv-accent-dark);
     background: rgb(59 130 246 / 10%);
     gap: 10px;
 
@@ -210,7 +211,7 @@
   .expand-toggle {
     background: none;
     border: 1px solid var(--tv-accent);
-    color: var(--tv-accent);
+    color: var(--tv-accent-light);
     padding: 8px 14px 8px 7px;
     border-radius: 42px;
     cursor: pointer;
@@ -566,7 +567,7 @@
       align-items: center;
       gap: 6px;
       font-size: 0.6rem;
-      color: var(--tv-accent);
+      color: var(--tv-accent-light);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -575,7 +576,7 @@
         content: '';
         width: 7px;
         height: 7px;
-        background: var(--tv-accent);
+        background: var(--tv-accent-light);
         border-radius: 50%;
         flex-shrink: 0;
       }
@@ -747,7 +748,7 @@
 
   .timeline-date {
     font-size: 0.8rem;
-    color: var(--tv-accent);
+    color: var(--tv-accent-light);
     font-weight: 600;
     line-height: 1;
   }
@@ -759,7 +760,7 @@
     transform: translateY(-50%);
     width: 19px;
     height: 19px;
-    background: var(--tv-accent);
+    background: var(--tv-accent-light);
     border: 5px solid var(--tv-bg-primary);
     border-radius: 50%;
     z-index: 2;
@@ -773,7 +774,7 @@
     transform: translateY(-50%);
     width: 19px;
     height: 1px;
-    background: var(--tv-accent);
+    background: var(--tv-accent-light);
   }
 
   .timeline-item:has(.timeline-card.expanded) .timeline-hline {

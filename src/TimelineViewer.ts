@@ -50,6 +50,7 @@ export interface TimelineItem {
   link_web: string;
   actores_principales: string[];
   adjuntos: string[];
+  contenido: string;
   screenshot: string | null;
   imagenes: { thumb: string; full: string }[];
   links_videos?: string[];
@@ -76,7 +77,7 @@ interface LinkInfo {
 }
 
 interface FilterDef {
-  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'adjuntos';
+  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido';
   label: string;
   options: HTMLElement;
   checkboxes: HTMLInputElement[];
@@ -277,14 +278,14 @@ export default class Timeline {
         }
       },
       {
-        field: 'adjuntos',
+        field: 'contenido',
         label: 'Contenido',
         options: this.container.querySelector('#filter-options-content') as HTMLElement,
         checkboxes: [],
         extract: (item) => {
           const types: string[] = [];
           if (item.adjuntos.length > 0) types.push('adjuntos');
-          if (item.links_videos && item.links_videos.length > 0) types.push('video');
+          if (item.has_video) types.push('video');
           if (item.imagenes.length > 0) types.push('imagenes');
           return types;
         },
