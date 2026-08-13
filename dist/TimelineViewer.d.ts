@@ -21,6 +21,7 @@ export interface TimelineItem {
     link_web: string;
     actores_principales: string[];
     adjuntos: string[];
+    contenido: string;
     screenshot: string | null;
     imagenes: {
         thumb: string;
@@ -46,7 +47,7 @@ interface LinkInfo {
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 interface FilterDef {
-    field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'adjuntos';
+    field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial';
     label: string;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];
@@ -97,6 +98,8 @@ export default class Timeline {
     protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
     protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean): void;
+    /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
+    protected _oficialIconSvg(): string;
     /** Render the featured (overlapping) cards row */
     protected _renderFeatured(cards: TimelineItem[]): void;
     /** Create a single timeline card element with all its event listeners */
