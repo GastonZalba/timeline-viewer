@@ -3,7 +3,7 @@ import lgThumbnail from 'lightgallery/plugins/thumbnail';
 import lgZoom from 'lightgallery/plugins/zoom';
 const YOUTUBE_REGEX = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
 const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
-const INSTAGRAM_REGEX = /(?:instagram\.com)\/(p|reel)\/([a-zA-Z0-9_-]+)/;
+const INSTAGRAM_REGEX = /(?:instagram\.com)\/(p|reel|tv)\/([a-zA-Z0-9_-]+)/;
 const INSTAGRAM_EMBED_BASE = 'https://www.instagram.com/';
 const INSTAGRAM_EMBED_SCRIPT = 'https://www.instagram.com/embed.js';
 const TWITTER_REGEX = /(?:twitter\.com|x\.com)\/(\w+)\/status\/(\d+)/;
@@ -445,25 +445,27 @@ export default class Timeline {
                 e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos'))
                 return;
             cardEl.classList.add('expanded');
-            const igWrap = cardEl.querySelector('.card-iframe-instagram');
-            if (igWrap) {
+            const igWraps = cardEl.querySelectorAll('.card-iframe-instagram');
+            if (igWraps.length) {
                 setTimeout(() => {
-                    if (!igWrap.querySelector('.instagram-media')) {
-                        const embedUrl = igWrap.getAttribute('data-embed-url');
-                        if (embedUrl) {
-                            const blockquote = document.createElement('blockquote');
-                            blockquote.className = 'instagram-media';
-                            blockquote.setAttribute('data-instgrm-permalink', embedUrl);
-                            blockquote.setAttribute('data-instgrm-version', '14');
-                            blockquote.style.cssText =
-                                'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
-                            igWrap.insertAdjacentElement('afterbegin', blockquote);
+                    igWraps.forEach((igWrap) => {
+                        if (!igWrap.querySelector('.instagram-media')) {
+                            const embedUrl = igWrap.getAttribute('data-embed-url');
+                            if (embedUrl) {
+                                const blockquote = document.createElement('blockquote');
+                                blockquote.className = 'instagram-media';
+                                blockquote.setAttribute('data-instgrm-permalink', embedUrl);
+                                blockquote.setAttribute('data-instgrm-version', '14');
+                                blockquote.style.cssText =
+                                    'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
+                                igWrap.insertAdjacentElement('afterbegin', blockquote);
+                            }
                         }
-                    }
+                    });
                     if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
                         instgrm.Embeds.process();
                     }
-                    else if (!igWrap.querySelector('iframe')) {
+                    else if (!cardEl.querySelector('.card-iframe-instagram iframe')) {
                         const waitForInstgrm = setInterval(() => {
                             if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
                                 instgrm.Embeds.process();
@@ -472,77 +474,87 @@ export default class Timeline {
                         }, 200);
                         setTimeout(() => clearInterval(waitForInstgrm), 15000);
                     }
-                    if (!igWrap.classList.contains('loaded')) {
-                        const check = setInterval(() => {
-                            const iframe = igWrap.querySelector('iframe');
-                            if (!iframe)
-                                return;
-                            clearInterval(check);
-                            iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
-                            setTimeout(() => igWrap.classList.add('loaded'), 3000);
-                        }, 100);
-                        setTimeout(() => igWrap.classList.add('loaded'), 10000);
-                    }
+                    igWraps.forEach((igWrap) => {
+                        if (!igWrap.classList.contains('loaded')) {
+                            const check = setInterval(() => {
+                                const iframe = igWrap.querySelector('iframe');
+                                if (!iframe)
+                                    return;
+                                clearInterval(check);
+                                iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
+                                setTimeout(() => igWrap.classList.add('loaded'), 3000);
+                            }, 100);
+                            setTimeout(() => igWrap.classList.add('loaded'), 10000);
+                        }
+                    });
                 }, 150);
             }
-            const twWrap = cardEl.querySelector('.card-iframe-twitter');
-            if (twWrap) {
+            const twWraps = cardEl.querySelectorAll('.card-iframe-twitter');
+            if (twWraps.length) {
                 setTimeout(() => {
-                    if (!twWrap.querySelector('iframe')) {
-                        if (typeof twttr !== 'undefined' && twttr.widgets) {
-                            twttr.widgets.load(twWrap);
+                    twWraps.forEach((twWrap) => {
+                        if (!twWrap.querySelector('iframe')) {
+                            if (typeof twttr !== 'undefined' && twttr.widgets) {
+                                twttr.widgets.load(twWrap);
+                            }
+                            else {
+                                const waitForTwttr = setInterval(() => {
+                                    if (typeof twttr !== 'undefined' && twttr.widgets) {
+                                        twttr.widgets.load(twWrap);
+                                        clearInterval(waitForTwttr);
+                                    }
+                                }, 200);
+                                setTimeout(() => clearInterval(waitForTwttr), 15000);
+                            }
                         }
-                        else {
-                            const waitForTwttr = setInterval(() => {
-                                if (typeof twttr !== 'undefined' && twttr.widgets) {
-                                    twttr.widgets.load(twWrap);
-                                    clearInterval(waitForTwttr);
-                                }
-                            }, 200);
-                            setTimeout(() => clearInterval(waitForTwttr), 15000);
+                    });
+                    twWraps.forEach((twWrap) => {
+                        if (!twWrap.classList.contains('loaded')) {
+                            const check = setInterval(() => {
+                                const iframe = twWrap.querySelector('iframe');
+                                if (!iframe)
+                                    return;
+                                clearInterval(check);
+                                iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
+                                setTimeout(() => twWrap.classList.add('loaded'), 3000);
+                            }, 100);
+                            setTimeout(() => twWrap.classList.add('loaded'), 10000);
                         }
-                    }
-                    if (!twWrap.classList.contains('loaded')) {
-                        const check = setInterval(() => {
-                            const iframe = twWrap.querySelector('iframe');
-                            if (!iframe)
-                                return;
-                            clearInterval(check);
-                            iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
-                            setTimeout(() => twWrap.classList.add('loaded'), 3000);
-                        }, 100);
-                        setTimeout(() => twWrap.classList.add('loaded'), 10000);
-                    }
+                    });
                 }, 150);
             }
-            const fbWrap = cardEl.querySelector('.card-iframe-facebook');
-            if (fbWrap) {
+            const fbWraps = cardEl.querySelectorAll('.card-iframe-facebook');
+            if (fbWraps.length) {
                 setTimeout(() => {
-                    if (!fbWrap.querySelector('iframe')) {
-                        if (typeof FB !== 'undefined' && FB.XFBML) {
-                            FB.XFBML.parse(fbWrap);
+                    fbWraps.forEach((fbWrap) => {
+                        if (!fbWrap.querySelector('iframe')) {
+                            if (typeof FB !== 'undefined' && FB.XFBML) {
+                                FB.XFBML.parse(fbWrap);
+                            }
+                            else {
+                                const waitForFB = setInterval(() => {
+                                    if (typeof FB !== 'undefined' && FB.XFBML) {
+                                        FB.XFBML.parse(fbWrap);
+                                        clearInterval(waitForFB);
+                                    }
+                                }, 200);
+                                setTimeout(() => clearInterval(waitForFB), 15000);
+                            }
                         }
-                        else {
-                            const waitForFB = setInterval(() => {
-                                if (typeof FB !== 'undefined' && FB.XFBML) {
-                                    FB.XFBML.parse(fbWrap);
-                                    clearInterval(waitForFB);
-                                }
-                            }, 200);
-                            setTimeout(() => clearInterval(waitForFB), 15000);
+                    });
+                    fbWraps.forEach((fbWrap) => {
+                        if (!fbWrap.classList.contains('loaded')) {
+                            const check = setInterval(() => {
+                                const iframe = fbWrap.querySelector('iframe');
+                                if (!iframe)
+                                    return;
+                                clearInterval(check);
+                                iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
+                                setTimeout(() => fbWrap.classList.add('loaded'), 3000);
+                            }, 100);
+                            setTimeout(() => fbWrap.classList.add('loaded'), 10000);
                         }
-                    }
-                    if (!fbWrap.classList.contains('loaded')) {
-                        const check = setInterval(() => {
-                            const iframe = fbWrap.querySelector('iframe');
-                            if (!iframe)
-                                return;
-                            clearInterval(check);
-                            iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
-                            setTimeout(() => fbWrap.classList.add('loaded'), 3000);
-                        }, 100);
-                        setTimeout(() => fbWrap.classList.add('loaded'), 10000);
-                    }
+                    });
                 }, 150);
             }
         });
