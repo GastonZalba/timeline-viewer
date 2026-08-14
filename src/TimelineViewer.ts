@@ -496,7 +496,11 @@ export default class Timeline {
         ${imgHtml}
         ${actionsHtml}
         <div class="card-body">
-          ${card.thumbnail ? '' : `<div class="card-title">${card.nombre_fuente}</div>`}
+          ${
+            card.thumbnail
+              ? ''
+              : `<div class="card-title">${card.nombre_fuente}${card.es_oficial ? `<span class="card-img-oficial card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>`
+          }
           <div class="card-desc">${card.resumen_ia}</div>
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}

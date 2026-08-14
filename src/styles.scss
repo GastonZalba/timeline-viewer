@@ -841,14 +841,22 @@
 
     .card-body {
       padding: 16px;
+      .card-title {
+        margin-bottom: 7px;
+      }
     }
 
-    .card-image-wrap {
-      .card-title {
-        font-size: 0.95em;
-        color: var(--tv-text-on-primary);
-        line-height: 1.1;
-      }
+    .card-title {
+      font-size: 0.95em;
+      color: var(--tv-text-on-primary);
+      font-weight: 500;
+      line-height: 1.3;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: break-word;
     }
 
     .card-desc {
@@ -1257,16 +1265,6 @@
       z-index: 2;
       margin: 0;
       padding: 14px 12px 8px;
-      font-size: 0.95rem;
-      font-weight: 500;
-      color: #fff;
-      line-height: 1.3;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      word-break: break-word;
     }
   }
 
