@@ -109,7 +109,7 @@ export default {
       { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
     ],
     has_video: true,
-    links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A'],
+    links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A', 'https://www.instagram.com/reel/DFwJRp9sp1i/','https://www.instagram.com/tv/CD1ra-YgcBe/'],
     temas: [
       { titulo: 'Anchor positioning y el nuevo modelo de posicionamiento relativo al documento', resumen: 'La especificacion de anchor positioning posiciona elementos relativos a otros del documento sin JavaScript. Simplifica tooltips, dropdowns, popovers y menus que antes requerian calculos manuales o librerias externas. Los navegadores modernos ya la soportan nativamente.', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
       { titulo: 'Scroll-driven animations y el renderizado progresivo vinculado al desplazamiento de la pagina', resumen: 'Las animaciones vinculadas al desplazamiento se ejecutan nativamente, sincronizadas con la posicion de la pagina en lugar del tiempo. Permiten storytelling, barras de progreso y efectos de parallax sin librerias de terceros ni scroll listeners, con mejor rendimiento.', tono_social: 'Positivo', fecha_narrativa: '2026-06-15' }

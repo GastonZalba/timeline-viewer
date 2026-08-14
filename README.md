@@ -95,7 +95,7 @@ When the card is expanded, `link_web` is automatically parsed for supported plat
 | Platform  | URL pattern                    | Method                                                  |
 |-----------|--------------------------------|---------------------------------------------------------|
 | YouTube   | `/watch?v=`, `youtu.be/`, `/embed/`, `/shorts/` | Direct `<iframe>` with 16:9 aspect ratio          |
-| Instagram | `/p/`, `/reel/`                | Official [embed.js](https://www.instagram.com/embed.js) via `<blockquote class="instagram-media">` |
+| Instagram | `/p/`, `/reel/`, `/tv/`        | Official [embed.js](https://www.instagram.com/embed.js) via `<blockquote class="instagram-media">` |
 | Twitter/X | `/username/status/ID`          | Official [Twitter Widgets](https://platform.twitter.com/widgets.js) via `<blockquote class="twitter-tweet">` |
 | Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `/story.php`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` |
 
