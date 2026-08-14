@@ -933,7 +933,9 @@ export default class Timeline {
 
   /** Build filter checkboxes from the available filter values */
   protected _buildFilterCheckboxes(): void {
+    let anyVisible = false;
     this.filters.forEach((f) => {
+      const section = f.options.closest('.filter-section') as HTMLElement | null;
       const values = [
         ...new Set(
           this.items.flatMap((c) => {
@@ -943,6 +945,13 @@ export default class Timeline {
           })
         )
       ];
+      if (values.length <= 1) {
+        f.checkboxes = [];
+        if (section) section.hidden = true;
+        return;
+      }
+      if (section) section.hidden = false;
+      anyVisible = true;
       if (f.sortValues) values.sort(f.sortValues);
       const counts: Record<string, number> = {};
       values.forEach((val) => {
@@ -977,6 +986,7 @@ export default class Timeline {
         f.checkboxes.push(cb);
       });
     });
+    this.filterToggle.style.display = anyVisible ? '' : 'none';
   }
 
   /** Normalize a string for accent- and case-insensitive search matching */
