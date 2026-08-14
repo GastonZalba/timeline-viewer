@@ -816,7 +816,9 @@ export default class Timeline {
     }
     /** Build filter checkboxes from the available filter values */
     _buildFilterCheckboxes() {
+        let anyVisible = false;
         this.filters.forEach((f) => {
+            const section = f.options.closest('.filter-section');
             const values = [
                 ...new Set(this.items.flatMap((c) => {
                     const v = f.extract ? f.extract(c) : c[f.field];
@@ -824,6 +826,15 @@ export default class Timeline {
                     return arr.map((x) => String(x)).filter(Boolean);
                 }))
             ];
+            if (values.length <= 1) {
+                f.checkboxes = [];
+                if (section)
+                    section.hidden = true;
+                return;
+            }
+            if (section)
+                section.hidden = false;
+            anyVisible = true;
             if (f.sortValues)
                 values.sort(f.sortValues);
             const counts = {};
@@ -859,6 +870,7 @@ export default class Timeline {
                 f.checkboxes.push(cb);
             });
         });
+        this.filterToggle.style.display = anyVisible ? '' : 'none';
     }
     /** Normalize a string for accent- and case-insensitive search matching */
     _normalizeSearch(value) {
