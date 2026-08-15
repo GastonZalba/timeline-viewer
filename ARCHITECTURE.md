@@ -90,7 +90,9 @@ new Timeline({ container, items, ... })
 |--------|-------|-------------|
 | `_formatDate(dateStr)` | 198 | Fecha YYYY-MM-DD → string locale `es-ES` |
 | `_formatDateTime(dateStr)` | 205 | Datetime ISO → string locale `es-ES` |
-| `_openLightGallery(images, title, showFileName)` | 228 | Abre modal lightGallery con galería de imágenes |
+| `_getFileExt(url)` | — | Extrae la extensión de una URL en minúsculas |
+| `_fileIconSvg(ext)` | — | SVG de icono de archivo según extensión (pdf vs genérico) |
+| `_openLightGallery(images, title, showFileName, startIndex?)` | 228 | Abre modal lightGallery con galería de imágenes |
 
 ### Observers
 
@@ -269,6 +271,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `featured_count` | `number` | Cantidad de cards en el stack featured |
 | `itemsPerPage` | `number` | Items por página (0 = sin paginación) |
 | `inlineImages` | `boolean` | Muestra thumbnails de `imagenes` inline en la tarjeta expandida (opción del constructor) |
+| `inlineAdjuntos` | `boolean` | Muestra `adjuntos` inline en la tarjeta expandida (nombre + icono por tipo) (opción del constructor) |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |

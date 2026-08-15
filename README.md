@@ -45,6 +45,7 @@ new Timeline({
   featuredCount: 6,
   itemsPerPage: 10,
   inlineImages: true,
+  inlineAdjuntos: true,
   lastUpdated: '2026-06-25T14:30:00'
 });
 ```
@@ -61,6 +62,7 @@ The `Timeline` constructor accepts a single config object:
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
+| `inlineAdjuntos`| `boolean`                      | `false`    | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button |
 
 ### Item fields
 

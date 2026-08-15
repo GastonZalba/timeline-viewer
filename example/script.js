@@ -7,5 +7,6 @@ new Timeline({
   lastUpdated: mockData.lastUpdated,
   featuredCount: 10,
   itemsPerPage: 10,
-  inlineImages: true
+  inlineImages: true,
+  inlineAdjuntos: true
 });

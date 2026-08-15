@@ -66,6 +66,7 @@ export interface TimelineOptions {
   lastUpdated?: string;
   itemsPerPage?: number;
   inlineImages?: boolean;
+  inlineAdjuntos?: boolean;
 }
 
 interface ImageInfo {
@@ -95,6 +96,7 @@ export default class Timeline {
   lastUpdated: string;
   itemsPerPage: number;
   inlineImages: boolean;
+  inlineAdjuntos: boolean;
   _displayedCount: number;
   allCards: TimelineItem[];
   isExpanded: boolean;
@@ -130,6 +132,7 @@ export default class Timeline {
     this.lastUpdated = config.lastUpdated || '';
     this.itemsPerPage = config.itemsPerPage || 10;
     this.inlineImages = config.inlineImages || false;
+    this.inlineAdjuntos = config.inlineAdjuntos || false;
     this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
@@ -401,6 +404,22 @@ export default class Timeline {
     return `<svg class="card-oficial" width="16" height="16" viewBox="0 0 199.34 223.41" fill="currentColor"><path d="M326.17,272.12c1.65-23.24,24.28-61.59,72-65.81,2.05-.1,3.55-.1,8.91-.1,45.23,4,68.94,39.6,72,65.91Z" transform="translate(-302.78 -206.21)"/><path d="M494,300.26H310.92V279.78H494Z" transform="translate(-302.78 -206.21)"/><path d="M302.78,429.62V412.78H502.11v16.84Z" transform="translate(-302.78 -206.21)"/><path d="M337.89,401.27H318.84V306h19.05Z" transform="translate(-302.78 -206.21)"/><path d="M412.12,401.32H392.89V306h19.23Z" transform="translate(-302.78 -206.21)"/><path d="M467.14,306h19.12v95.2H467.14Z" transform="translate(-302.78 -206.21)"/><path d="M356,401.21V305.73c5.89,0,11.6-.07,17.31.09.7,0,1.5,1.17,2,1.95.29.44.08,1.22.08,1.84q0,44,0,88c0,1.11-.11,2.21-.18,3.6Z" transform="translate(-302.78 -206.21)"/><path d="M449.05,401.36H429.87c-.08-1.36-.21-2.67-.21-4,0-29.22,0-58.43-.07-87.65,0-3,.68-4.24,3.9-4.1,5.08.24,10.18.07,15.56.07Z" transform="translate(-302.78 -206.21)"/></svg>`;
   }
 
+  /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */
+  protected _getFileExt(url: string): string {
+    const clean = url.split('?')[0].split('#')[0];
+    return clean.includes('.') ? clean.substring(clean.lastIndexOf('.') + 1).toLowerCase() : '';
+  }
+
+  /** SVG del icono de archivo según su extensión (pdf vs genérico) */
+  protected _fileIconSvg(ext: string): string {
+    const generic =
+      '<svg class="card-inline-adjunto-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+    if (ext === 'pdf') {
+      return '<svg class="card-inline-adjunto-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="12" y="16.5" text-anchor="middle" font-size="6" font-weight="700" fill="currentColor">PDF</text></svg>';
+    }
+    return generic;
+  }
+
   /** Render the featured (overlapping) cards row */
   protected _renderFeatured(cards: TimelineItem[]): void {
     this.featuredContainer.innerHTML = '';
@@ -482,15 +501,25 @@ export default class Timeline {
         ? `<div class="card-inline-images"><div class="card-subtitle">Imágenes</div><div class="card-inline-images-list">${card.imagenes
             .map(
               (img, i) =>
-                `<button class="card-inline-thumb" data-index="${i}" title="Ver imagen ampliada"><img src="${img.thumb}" alt="" loading="lazy"></button>`
+                `<button class="card-inline-thumb" data-index="${i}"><img src="${img.thumb}" alt="" loading="lazy"></button>`
             )
+            .join('')}</div></div>`
+        : '';
+    const inlineAdjuntosHtml =
+      this.inlineAdjuntos && card.adjuntos && card.adjuntos.length
+        ? `<div class="card-inline-adjuntos"><div class="card-subtitle">Adjuntos</div><div class="card-inline-adjuntos-list">${card.adjuntos
+            .map((a) => {
+              const ext = this._getFileExt(a);
+              const name = a.substring(a.lastIndexOf('/') + 1);
+              return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${a}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
+            })
             .join('')}</div></div>`
         : '';
     const actionsHtml = `<div class="card-actions">
       <div class="card-actions-row">
         ${card.screenshot ? '<button class="card-actions-btn card-screenshot-btn" title="Ver captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Captura</button>' : ''}
         ${card.imagenes && card.imagenes.length && !this.inlineImages ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + card.imagenes.length + '</span></button>' : ''}
-        ${card.adjuntos && card.adjuntos.length ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${a}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
+        ${card.adjuntos && card.adjuntos.length && !this.inlineAdjuntos ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${a}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
         <a class="card-actions-btn card-open"${card.link_web ? ` href="${card.link_web}"` : ''} target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           Ir
@@ -518,6 +547,7 @@ export default class Timeline {
           ${inlineImagesHtml}
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}
+          ${inlineAdjuntosHtml}
           <div class="card-hint"><span class="card-hint-arrow"></span></div>
           <button class="card-collapse" title="Colapsar"></button>
           <button class="card-info-btn" title="Información">
@@ -572,7 +602,7 @@ export default class Timeline {
       if (
         e.target &&
         (e.target as HTMLElement).closest(
-          '.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images'
+          '.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images, .card-inline-adjuntos'
         )
       )
         return;
