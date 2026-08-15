@@ -268,6 +268,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `_displayedCount` | `number` | Cantidad de items visibles (paginación) |
 | `featured_count` | `number` | Cantidad de cards en el stack featured |
 | `itemsPerPage` | `number` | Items por página (0 = sin paginación) |
+| `inlineImages` | `boolean` | Muestra thumbnails de `imagenes` inline en la tarjeta expandida (opción del constructor) |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |
@@ -296,6 +297,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `.visible` | `.featured-card` | Tarjeta featured animada (entró en viewport) |
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |
 | `.loaded` | `.card-image` | Imagen cargada (quita shimmer) |
+| `.loaded` | `.card-inline-thumb` | Thumbnail inline cargado (quita shimmer) |
 | `.loaded` | `.card-iframe-wrap` | Iframe/embed cargado |
 | `.open` | `.filter-menu` | Menú de filtros abierto |
 | `.open` | `.card-info-menu` | Menú de info de tarjeta abierto |

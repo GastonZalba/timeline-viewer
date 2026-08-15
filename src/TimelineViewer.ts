@@ -65,6 +65,7 @@ export interface TimelineOptions {
   featuredCount?: number;
   lastUpdated?: string;
   itemsPerPage?: number;
+  inlineImages?: boolean;
 }
 
 interface ImageInfo {
@@ -93,6 +94,7 @@ export default class Timeline {
   featured_count: number;
   lastUpdated: string;
   itemsPerPage: number;
+  inlineImages: boolean;
   _displayedCount: number;
   allCards: TimelineItem[];
   isExpanded: boolean;
@@ -127,6 +129,7 @@ export default class Timeline {
     this.featured_count = config.featuredCount || 6;
     this.lastUpdated = config.lastUpdated || '';
     this.itemsPerPage = config.itemsPerPage || 10;
+    this.inlineImages = config.inlineImages || false;
     this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
@@ -358,7 +361,7 @@ export default class Timeline {
   }
 
   /** Open a lightGallery modal with the provided images */
-  protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean): void {
+  protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean, startIndex = 0): void {
     if (this._lgInstance) {
       this._lgInstance.destroy();
       this._lgInstance = null;
@@ -390,7 +393,7 @@ export default class Timeline {
       },
       { once: true }
     );
-    this._lgInstance.openGallery();
+    this._lgInstance.openGallery(startIndex);
   }
 
   /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
@@ -474,10 +477,19 @@ export default class Timeline {
         </div>
         </div>`
         : '';
+    const inlineImagesHtml =
+      this.inlineImages && card.imagenes && card.imagenes.length
+        ? `<div class="card-inline-images"><div class="card-subtitle">Imágenes</div><div class="card-inline-images-list">${card.imagenes
+            .map(
+              (img, i) =>
+                `<button class="card-inline-thumb" data-index="${i}" title="Ver imagen ampliada"><img src="${img.thumb}" alt="" loading="lazy"></button>`
+            )
+            .join('')}</div></div>`
+        : '';
     const actionsHtml = `<div class="card-actions">
       <div class="card-actions-row">
         ${card.screenshot ? '<button class="card-actions-btn card-screenshot-btn" title="Ver captura de la fuente"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg> Captura</button>' : ''}
-        ${card.imagenes && card.imagenes.length ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + card.imagenes.length + '</span></button>' : ''}
+        ${card.imagenes && card.imagenes.length && !this.inlineImages ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + card.imagenes.length + '</span></button>' : ''}
         ${card.adjuntos && card.adjuntos.length ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${a}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
         <a class="card-actions-btn card-open"${card.link_web ? ` href="${card.link_web}"` : ''} target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -503,6 +515,7 @@ export default class Timeline {
           }
           <div class="card-fecha-pub" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
           <div class="card-desc">${card.resumen_ia}</div>
+          ${inlineImagesHtml}
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}
           <div class="card-hint"><span class="card-hint-arrow"></span></div>
@@ -540,6 +553,13 @@ export default class Timeline {
       timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
       if (timelineImg.complete) timelineImg.classList.add('loaded');
     }
+    el.querySelectorAll('.card-inline-thumb').forEach((thumb) => {
+      const img = thumb.querySelector('img') as HTMLImageElement | null;
+      if (img) {
+        img.addEventListener('load', () => thumb.classList.add('loaded'));
+        if (img.complete) thumb.classList.add('loaded');
+      }
+    });
     el.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
       const iframe = wrap.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
@@ -551,7 +571,9 @@ export default class Timeline {
     cardEl.addEventListener('click', (e: Event) => {
       if (
         e.target &&
-        (e.target as HTMLElement).closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos')
+        (e.target as HTMLElement).closest(
+          '.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images'
+        )
       )
         return;
       cardEl.classList.add('expanded');
@@ -684,6 +706,16 @@ export default class Timeline {
       imagesBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
         this._openLightGallery(card.imagenes, card.nombre_fuente, true);
+      });
+    }
+    const inlineImages = el.querySelector('.card-inline-images') as HTMLElement | null;
+    if (inlineImages) {
+      inlineImages.addEventListener('click', (e: Event) => {
+        const thumb = (e.target as HTMLElement).closest('.card-inline-thumb') as HTMLElement | null;
+        if (!thumb) return;
+        e.stopPropagation();
+        const index = Number(thumb.dataset.index) || 0;
+        this._openLightGallery(card.imagenes, card.nombre_fuente, true, index);
       });
     }
     const adjuntosWrap = el.querySelector('.card-adjuntos') as HTMLElement | null;
