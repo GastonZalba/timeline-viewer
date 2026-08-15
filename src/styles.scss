@@ -114,8 +114,8 @@
   }
 
   .card-oficial {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -387,7 +387,7 @@
     }
 
     &::-webkit-search-cancel-button {
-      filter: invert(0.6);
+      filter: #{'invert(0.6)'};
       cursor: pointer;
     }
   }
@@ -1177,7 +1177,8 @@
       }
 
       .card-inline-adjunto {
-        display: flex;
+        display: inline-flex;
+        align-self: flex-start;
         align-items: center;
         gap: 8px;
         font-size: 0.8rem;
@@ -1206,10 +1207,6 @@
 
       .card-inline-adjunto-pdf {
         .card-inline-adjunto-icon {
-          color: #e74c3c;
-        }
-
-        &:hover .card-inline-adjunto-icon {
           color: #e74c3c;
         }
       }
