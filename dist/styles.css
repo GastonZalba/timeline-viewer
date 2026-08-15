@@ -94,8 +94,8 @@
   border-radius: 50%;
 }
 .publicaciones-section .card-oficial {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -555,7 +555,6 @@
   color: var(--tv-accent-light);
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 .publicaciones-section .featured-card .card-date::before {
   content: "";
@@ -681,12 +680,13 @@
   right: -7px;
 }
 .publicaciones-section .timeline-item:has(.timeline-card.expanded) .timeline-date {
-  font-size: 0.95rem;
+  display: none;
 }
 .publicaciones-section .timeline-date-col {
   width: 110px;
   flex-shrink: 0;
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
   padding-right: 16px;
   position: relative;
   text-transform: uppercase;
@@ -705,6 +705,10 @@
   color: var(--tv-accent-light);
   font-weight: 600;
   line-height: 1;
+  width: max-content;
+  margin-right: 0;
+  border-radius: 4px;
+  padding: 3px;
 }
 .publicaciones-section .timeline-dot {
   position: absolute;
@@ -785,10 +789,20 @@
 .publicaciones-section .timeline-card .card-body {
   padding: 16px;
 }
-.publicaciones-section .timeline-card .card-image-wrap .card-title {
+.publicaciones-section .timeline-card .card-body .card-title {
+  margin-bottom: 7px;
+}
+.publicaciones-section .timeline-card .card-title {
   font-size: 0.95em;
   color: var(--tv-text-on-primary);
-  line-height: 1.1;
+  font-weight: 500;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
 }
 .publicaciones-section .timeline-card .card-desc {
   font-size: 0.8em;
@@ -798,6 +812,27 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+.publicaciones-section .timeline-card .card-fecha-pub {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--tv-accent-light);
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.publicaciones-section .timeline-card .card-fecha-pub::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--tv-accent-light);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.publicaciones-section .timeline-card.expanded .card-fecha-pub {
+  display: flex;
 }
 .publicaciones-section .timeline-card.expanded .card-desc {
   display: block;
@@ -810,7 +845,7 @@
   color: var(--tv-tone-neutral);
   margin: 8px 0 6px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1;
 }
 .publicaciones-section .timeline-card .card-fuente .fuente-label {
   color: var(--tv-text-primary);
@@ -956,6 +991,103 @@
   gap: 22px;
 }
 .publicaciones-section .timeline-card.expanded .card-temas {
+  display: flex;
+}
+.publicaciones-section .timeline-card .card-inline-images {
+  display: none;
+  flex-direction: column;
+  margin-top: 18px;
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-images-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb {
+  width: 72px;
+  height: 54px;
+  padding: 0;
+  border: 1px solid #000;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  background: var(--tv-bg-card);
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3803921569);
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  filter: grayscale(0.5);
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb.loaded img {
+  opacity: 1;
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--tv-bg-card) 0%, rgba(255, 255, 255, 0.06) 50%, var(--tv-bg-card) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb.loaded::before {
+  display: none;
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb:hover {
+  border: 1px solid var(--tv-accent-light);
+}
+.publicaciones-section .timeline-card .card-inline-images .card-inline-thumb:hover img {
+  filter: grayscale(0);
+}
+.publicaciones-section .timeline-card.expanded .card-inline-images {
+  display: flex;
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos {
+  display: none;
+  flex-direction: column;
+  margin-top: 18px;
+  margin-bottom: 20px;
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjuntos-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjunto {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--tv-text-secondary);
+  text-decoration: none;
+  padding: 4px 0;
+  transition: color 0.2s ease;
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjunto .card-inline-adjunto-icon {
+  flex-shrink: 0;
+  color: var(--tv-text-muted);
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjunto .card-inline-adjunto-name {
+  word-break: break-all;
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjunto:hover {
+  color: var(--tv-accent-light);
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjunto:hover .card-inline-adjunto-icon {
+  color: var(--tv-accent-light);
+}
+.publicaciones-section .timeline-card .card-inline-adjuntos .card-inline-adjunto-pdf .card-inline-adjunto-icon {
+  color: #e74c3c;
+}
+.publicaciones-section .timeline-card.expanded .card-inline-adjuntos {
   display: flex;
 }
 .publicaciones-section .timeline-card .card-actions {
@@ -1133,16 +1265,6 @@
   z-index: 2;
   margin: 0;
   padding: 14px 12px 8px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: #fff;
-  line-height: 1.3;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  word-break: break-word;
 }
 .publicaciones-section .card-img-oficial {
   display: inline-flex;
@@ -1253,8 +1375,8 @@
   flex-direction: column;
 }
 .publicaciones-section .tema-item .tema-title {
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--tv-text-primary);
   gap: 10px;
   display: flex;

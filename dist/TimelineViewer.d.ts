@@ -37,6 +37,8 @@ export interface TimelineOptions {
     featuredCount?: number;
     lastUpdated?: string;
     itemsPerPage?: number;
+    inlineImages?: boolean;
+    inlineAdjuntos?: boolean;
 }
 interface ImageInfo {
     thumb: string;
@@ -61,6 +63,8 @@ export default class Timeline {
     featured_count: number;
     lastUpdated: string;
     itemsPerPage: number;
+    inlineImages: boolean;
+    inlineAdjuntos: boolean;
     _displayedCount: number;
     allCards: TimelineItem[];
     isExpanded: boolean;
@@ -97,9 +101,13 @@ export default class Timeline {
     /** Build the embed markup for a parsed link */
     protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
-    protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean): void;
+    protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean, startIndex?: number): void;
     /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
     protected _oficialIconSvg(): string;
+    /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */
+    protected _getFileExt(url: string): string;
+    /** SVG del icono de archivo según su extensión (pdf vs genérico) */
+    protected _fileIconSvg(ext: string): string;
     /** Render the featured (overlapping) cards row */
     protected _renderFeatured(cards: TimelineItem[]): void;
     /** Create a single timeline card element with all its event listeners */
