@@ -570,7 +570,6 @@
       color: var(--tv-accent-light);
       font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
 
       &::before {
         content: '';
@@ -719,7 +718,7 @@
       }
 
       .timeline-date {
-        font-size: 0.95rem;
+        display: none;
       }
     }
   }
@@ -727,7 +726,8 @@
   .timeline-date-col {
     width: 110px;
     flex-shrink: 0;
-    text-align: right;
+    display: flex;
+    justify-content: flex-end;
     padding-right: 16px;
     position: relative;
     text-transform: uppercase;
@@ -751,6 +751,10 @@
     color: var(--tv-accent-light);
     font-weight: 600;
     line-height: 1;
+    width: max-content;
+    margin-right: 0;
+    border-radius: 4px;
+    padding: 3px;
   }
 
   .timeline-dot {
@@ -867,6 +871,30 @@
       -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+
+    .card-fecha-pub {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.7rem;
+      color: var(--tv-accent-light);
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+
+      &::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        background: var(--tv-accent-light);
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+    }
+
+    &.expanded .card-fecha-pub {
+      display: flex;
     }
 
     &.expanded .card-desc {
