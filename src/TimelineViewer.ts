@@ -544,10 +544,8 @@ export default class Timeline {
           }
           <div class="card-fecha-pub" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
           <div class="card-desc">${card.resumen_ia}</div>
-          ${inlineImagesHtml}
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}
-          ${inlineAdjuntosHtml}
           <div class="card-hint"><span class="card-hint-arrow"></span></div>
           <button class="card-collapse" title="Colapsar"></button>
           <button class="card-info-btn" title="Información">
@@ -573,6 +571,8 @@ export default class Timeline {
           </div>
           ${protHtml}
           <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
+          ${inlineImagesHtml}
+          ${inlineAdjuntosHtml}
           ${iframeHtml}
           ${videosHtml}
         </div>
