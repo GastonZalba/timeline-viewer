@@ -1454,6 +1454,9 @@
   background: var(--tv-bg-hover);
   color: var(--tv-text-primary);
 }
+.publicaciones-section .card-actions .card-screenshot-btn svg {
+  fill: #fff;
+}
 .publicaciones-section .card-actions .card-open {
   border: 1px solid var(--tv-accent);
   background: var(--tv-accent);
