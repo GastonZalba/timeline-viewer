@@ -5,6 +5,7 @@ export interface ItemTema {
     resumen: string;
     tono_social: TonoSocial;
     fecha_narrativa?: string | null;
+    notas_de_trabajo?: string | null;
 }
 export interface TimelineItem {
     id: number | string;
@@ -18,7 +19,7 @@ export interface TimelineItem {
     es_oficial: boolean;
     validado: boolean | null;
     thumbnail: string | null;
-    link_web: string;
+    link_web: string | null;
     actores_principales: string[];
     adjuntos: string[];
     contenido: string;
@@ -29,6 +30,7 @@ export interface TimelineItem {
     }[];
     links_videos?: string[];
     has_video: boolean;
+    notas_de_trabajo?: string | null;
     temas: ItemTema[];
 }
 export interface TimelineOptions {

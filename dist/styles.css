@@ -804,6 +804,27 @@
   text-overflow: ellipsis;
   word-break: break-word;
 }
+.publicaciones-section .timeline-card .card-notas-trabajo {
+  background: #cb3536;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+.publicaciones-section .timeline-card.expanded .card-notas-trabajo {
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
 .publicaciones-section .timeline-card .card-desc {
   font-size: 0.8em;
   color: var(--tv-text-secondary);
@@ -1405,6 +1426,23 @@
   font-size: 0.75rem;
   color: var(--tv-text-secondary);
   line-height: 1.3;
+}
+.publicaciones-section .tema-item .tema-notas-trabajo {
+  background: #cb3536;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  margin-top: 6px;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
 }
 .publicaciones-section .tone-tema-positivo {
   border-color: var(--tv-tone-positive);
