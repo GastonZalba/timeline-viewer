@@ -57,6 +57,7 @@ export interface TimelineItem {
   imagenes: { thumb: string; full: string }[];
   links_videos?: string[];
   has_video: boolean; // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
+  link_edit_entry?: string;
   notas_de_trabajo?: string | null;
   temas: ItemTema[];
 }
@@ -531,6 +532,14 @@ export default class Timeline {
         </a>`
             : ''
         }
+        ${
+          card.link_edit_entry
+            ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          Editar
+        </a>`
+            : ''
+        }
       </div>
     </div>`;
     el.innerHTML = `
@@ -610,7 +619,7 @@ export default class Timeline {
       if (
         e.target &&
         (e.target as HTMLElement).closest(
-          '.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images, .card-inline-adjuntos'
+          '.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images, .card-inline-adjuntos, .card-edit'
         )
       )
         return;

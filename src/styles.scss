@@ -1703,6 +1703,24 @@
       }
     }
 
+    .card-edit {
+      border: 1px solid #dc3545;
+      background: #dc3545;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 0 10px;
+      justify-content: center;
+
+      &:hover {
+        background: #c82333;
+        border-color: #bd2130;
+        color: #fff;
+      }
+    }
+
     .card-actions-count {
       display: inline-flex;
       align-items: center;

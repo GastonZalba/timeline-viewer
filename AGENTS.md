@@ -116,6 +116,7 @@ interface TimelineItem {
   imagenes: { thumb: string; full: string }[];
   links_videos?: string[];      // Links de videos relacionados (se renderizan como embeds al expandir la tarjeta)
   has_video: boolean;           // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
+  link_edit_entry?: string;     // URL de formulario de edición (muestra botón rojo "Editar" en la tarjeta)
   temas: ItemTema[];            // Subtemas del artículo
 }
 ```
