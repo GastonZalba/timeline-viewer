@@ -410,6 +410,12 @@ export default class Timeline {
           Ir
         </a>`
             : ''}
+        ${card.link_edit_entry
+            ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          Editar
+        </a>`
+            : ''}
       </div>
     </div>`;
         el.innerHTML = `
@@ -488,7 +494,7 @@ export default class Timeline {
         const cardEl = el.querySelector('.timeline-card');
         cardEl.addEventListener('click', (e) => {
             if (e.target &&
-                e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images, .card-inline-adjuntos'))
+                e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images, .card-inline-adjuntos, .card-edit'))
                 return;
             cardEl.classList.add('expanded');
             const igWraps = cardEl.querySelectorAll('.card-iframe-instagram');

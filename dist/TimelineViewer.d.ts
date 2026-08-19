@@ -30,6 +30,7 @@ export interface TimelineItem {
     }[];
     links_videos?: string[];
     has_video: boolean;
+    link_edit_entry?: string;
     notas_de_trabajo?: string | null;
     temas: ItemTema[];
 }
