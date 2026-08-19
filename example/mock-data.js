@@ -442,7 +442,7 @@ export default {
     nombre_fuente: 'Post de Facebook sobre accesibilidad web',
     resumen_ia: 'Un desarrollador comparte en Facebook su experiencia implementando WCAG 3.0 en proyectos reales con consejos practicos.',
     thumbnail: 'https://picsum.photos/seed/facebook1/600/400',
-    link_web: 'https://www.facebook.com/delegacionmunicipalbosques/posts/-saneamiento-del-arroyo-san-juan-bosques-seguimos-trabajando-en-la-limpieza-del-/1310896004546788/',
+    link_web: null,
     fecha_publicacion: '2026-06-24',
     fecha_scrapeo: '2026-06-24T11:30:00',
     tonos_sociales: ['Positivo'],
