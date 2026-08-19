@@ -34,6 +34,7 @@ export interface ItemTema {
   resumen: string;
   tono_social: TonoSocial;
   fecha_narrativa?: string | null;
+  notas_de_trabajo?: string | null;
 }
 
 export interface TimelineItem {
@@ -56,6 +57,7 @@ export interface TimelineItem {
   imagenes: { thumb: string; full: string }[];
   links_videos?: string[];
   has_video: boolean; // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
+  notas_de_trabajo?: string | null;
   temas: ItemTema[];
 }
 
@@ -489,6 +491,7 @@ export default class Timeline {
             <div class="tema-content">
               <span class="tema-title"><span class="tema-tone">${toneLabelTema[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-desc">${t.resumen}</span>
+              ${t.notas_de_trabajo ? `<div class="tema-notas-trabajo">${t.notas_de_trabajo}</div>` : ''}
             </div>
           </div>`
           )
@@ -543,6 +546,7 @@ export default class Timeline {
               : `<div class="card-title">${card.nombre_fuente}${card.es_oficial ? `<span class="card-img-oficial card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>`
           }
           <div class="card-fecha-pub" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
+          ${card.notas_de_trabajo ? `<div class="card-notas-trabajo">${card.notas_de_trabajo}</div>` : ''}
           <div class="card-desc">${card.resumen_ia}</div>
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}

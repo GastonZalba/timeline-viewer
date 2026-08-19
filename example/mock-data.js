@@ -15,6 +15,7 @@ export default {
     es_oficial: true,
     validado: true,
     actores_principales: ['Ana García', 'Carlos Ruiz'],
+    notas_de_trabajo: 'Verificar si el framework ya tiene soporte oficial para SSR. Preguntar al equipo de backend si podemos integrarlo en el sprint 14.',
     adjuntos: ['https://archivos.ejemplo.com/informes/informe-lanzamiento-framework.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -28,9 +29,9 @@ export default {
       'https://www.youtube.com/watch?v=9bZkp7q19f0'
     ],
     temas: [
-      { titulo: 'Rendimiento y optimizacion del tiempo de carga inicial en dispositivos moviles', resumen: 'Los benchmarks muestran una mejora del 40% en el tiempo de carga inicial, con reducciones aun mayores en moviles de gama baja. Las metricas de Core Web Vitals mejoran gracias al compilador optimizado y al renderizado por islas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-24' },
+      { titulo: 'Rendimiento y optimizacion del tiempo de carga inicial en dispositivos moviles', resumen: 'Los benchmarks muestran una mejora del 40% en el tiempo de carga inicial, con reducciones aun mayores en moviles de gama baja. Las metricas de Core Web Vitals mejoran gracias al compilador optimizado y al renderizado por islas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-24', notas_de_trabajo: 'Preguntar al equipo de frontend si estos benchmarks replican en nuestro stack actual. Medir antes y despues de la migracion.' },
       { titulo: 'Experiencia de desarrollo (DX) para equipos que trabajan de forma remota', resumen: 'La experiencia de desarrollo mejora con hot module replacement nativo que conserva el estado, errores con sugerencias contextuales y una integracion profunda con editores populares. El CLI unificado simplifica la creacion de proyectos y reduce las tareas repetitivas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-25' },
-      { titulo: 'Ecosistema de plugins y el rol de la comunidad alrededor del framework', resumen: 'El ecosistema supero los 200 plugins comunitarios activos, desde integraciones con bases de datos y frameworks de testing hasta utilidades de accesibilidad. La comunidad contribuye con documentacion y los mantenedores garantizan compatibilidad con las versiones estables.', tono_social: 'Neutro', fecha_narrativa: null }
+      { titulo: 'Ecosistema de plugins y el rol de la comunidad alrededor del framework', resumen: 'El ecosistema supero los 200 plugins comunitarios activos, desde integraciones con bases de datos y frameworks de testing hasta utilidades de accesibilidad. La comunidad contribuye con documentacion y los mantenedores garantizan compatibilidad con las versiones estables.', tono_social: 'Neutro', fecha_narrativa: null, notas_de_trabajo: 'Verificar si los plugins criticos que usamos ya tienen soporte oficial. Si no, evaluar contribuir o buscar alternativas.' }
     ]
   },
   {
@@ -70,6 +71,7 @@ export default {
     es_oficial: true,
     validado: true,
     actores_principales: ['OpenAI'],
+    notas_de_trabajo: 'Pendiente revisar impacto en usuarios finales. Coordinar con el equipo de QA para priorizar las pruebas de regresion antes del release.',
     adjuntos: ['https://archivos.ejemplo.com/comunicados/comunicado-ia-desarrollo-web.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -83,9 +85,9 @@ export default {
       'https://www.youtube.com/watch?v=oHg5SJYRHA0'
     ],
     temas: [
-      { titulo: 'Generacion de codigo', resumen: 'El modelo especializado produce componentes completos con JSX, estilos CSS y logica de estado a partir de descripciones en lenguaje natural. Los desarrolladores iteran rapidamente, refinan el resultado y lo exportan al editor, acelerando el prototipado.', tono_social: 'Positivo', fecha_narrativa: '2026-06-19' },
+      { titulo: 'Generacion de codigo', resumen: 'El modelo especializado produce componentes completos con JSX, estilos CSS y logica de estado a partir de descripciones en lenguaje natural. Los desarrolladores iteran rapidamente, refinan el resultado y lo exportan al editor, acelerando el prototipado.', tono_social: 'Positivo', fecha_narrativa: '2026-06-19', notas_de_trabajo: 'Probar el generador con un componente real del proyecto para evaluar calidad del output y si es util en nuestro workflow.' },
       { titulo: 'Editor inteligente', resumen: 'El plugin de VS Code integra sugerencias contextuales basadas en el codigo abierto en el editor y en el contexto del proyecto. Ofrece autocompletado avanzado, deteccion de errores de estilo y accesibilidad, y genera codigo desde lenguaje natural sin salir del entorno.', tono_social: 'Positivo', fecha_narrativa: '2026-06-20' },
-      { titulo: 'Productividad', resumen: 'Los equipos que adoptaron la generacion asistida reportan hasta tres veces mas rapidez en prototipado y menos horas en interfaces repetitivas. El tiempo ahorrado se destina a revision de calidad, cobertura de pruebas y refinamiento de la experiencia de usuario.', tono_social: 'Positivo', fecha_narrativa: '2026-06-18' },
+      { titulo: 'Productividad', resumen: 'Los equipos que adoptaron la generacion asistida reportan hasta tres veces mas rapidez en prototipado y menos horas en interfaces repetitivas. El tiempo ahorrado se destina a revision de calidad, cobertura de pruebas y refinamiento de la experiencia de usuario.', tono_social: 'Positivo', fecha_narrativa: '2026-06-18', notas_de_trabajo: 'Las metricas de productividad suenan prometedoras. Pedir al equipo que registre su experiencia durante dos semanas para comparar.' },
       { titulo: 'Limites', resumen: 'El modelo presenta limitaciones en logica de negocio compleja y en edge cases poco documentados. Las respuestas se vuelven incoherentes con multiples dependencias o reglas de validacion ambiguas, por lo que requiere correccion manual. Se recomienda usarlo como punto de partida.', tono_social: 'Negativo', fecha_narrativa: null }
     ]
   },
@@ -103,6 +105,7 @@ export default {
     es_oficial: true,
     validado: true,
     actores_principales: ['W3C', 'Rachel Andrews', 'Jake Archibald'],
+    notas_de_trabajo: 'Evaluar si anchor positioning cubre los casos de dropdowns del proyecto. Si no, mantener la libreria actual como fallback hasta que madure.',
     adjuntos: ['https://archivos.ejemplo.com/specs/spec-css-2026.pdf', 'https://archivos.ejemplo.com/specs/anexo-ejemplos-layout.html'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -112,7 +115,7 @@ export default {
     links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A', 'https://www.instagram.com/reel/DFwJRp9sp1i/','https://www.instagram.com/tv/CD1ra-YgcBe/'],
     temas: [
       { titulo: 'Anchor positioning y el nuevo modelo de posicionamiento relativo al documento', resumen: 'La especificacion de anchor positioning posiciona elementos relativos a otros del documento sin JavaScript. Simplifica tooltips, dropdowns, popovers y menus que antes requerian calculos manuales o librerias externas. Los navegadores modernos ya la soportan nativamente.', tono_social: 'Positivo', fecha_narrativa: '2026-06-14' },
-      { titulo: 'Scroll-driven animations y el renderizado progresivo vinculado al desplazamiento de la pagina', resumen: 'Las animaciones vinculadas al desplazamiento se ejecutan nativamente, sincronizadas con la posicion de la pagina en lugar del tiempo. Permiten storytelling, barras de progreso y efectos de parallax sin librerias de terceros ni scroll listeners, con mejor rendimiento.', tono_social: 'Positivo', fecha_narrativa: '2026-06-15' }
+      { titulo: 'Scroll-driven animations y el renderizado progresivo vinculado al desplazamiento de la pagina', resumen: 'Las animaciones vinculadas al desplazamiento se ejecutan nativamente, sincronizadas con la posicion de la pagina en lugar del tiempo. Permiten storytelling, barras de progreso y efectos de parallax sin librerias de terceros ni scroll listeners, con mejor rendimiento.', tono_social: 'Positivo', fecha_narrativa: '2026-06-15', notas_de_trabajo: 'Las scroll-driven animations parecen ideales para la seccion de presentacion del producto. Hacer un proof of concept esta semana.' }
     ]
   },
   {
@@ -129,6 +132,7 @@ export default {
     es_oficial: true,
     validado: null,
     actores_principales: ['Node.js Foundation'],
+    notas_de_trabajo: 'La guia de migracion es bastante clara. Proponer una reunion con el equipo para definir el plan de migracion desde Node 20 antes de que termine el trimestre.',
     adjuntos: ['https://archivos.ejemplo.com/node/notas/node24-lts-release-notes.pdf', 'https://archivos.ejemplo.com/node/benchmarks/benchmarks-memoria.xlsx', 'https://archivos.ejemplo.com/node/guias/guia-migracion-node20-22.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -145,8 +149,8 @@ export default {
       'https://www.youtube.com/watch?v=vLx9fBdfF0E'
     ],
     temas: [
-      { titulo: 'Nuevas APIs estables de testing nativo y watch mode integrado', resumen: 'La version LTS incorpora una API nativa de testing que elimina dependencias externas para los casos mas comunes, y un watch mode integrado. Tambien se estabilizan APIs de red y streams, manteniendo compatibilidad hacia atras para una adopcion gradual.', tono_social: 'Positivo', fecha_narrativa: '2026-06-10' },
-      { titulo: 'Rendimiento en memoria y latencia bajo alta concurrencia de peticiones', resumen: 'Las mediciones sobre Express muestran una reduccion del 40% en uso de memoria gracias a la optimizacion del motor V8 y la cache interna. En alta concurrencia, el throughput mejoro con latencia mas estable y menor consumo de CPU.', tono_social: 'Positivo', fecha_narrativa: null },
+      { titulo: 'Nuevas APIs estables de testing nativo y watch mode integrado', resumen: 'La version LTS incorpora una API nativa de testing que elimina dependencias externas para los casos mas comunes, y un watch mode integrado. Tambien se estabilizan APIs de red y streams, manteniendo compatibilidad hacia atras para una adopcion gradual.', tono_social: 'Positivo', fecha_narrativa: '2026-06-10', notas_de_trabajo: 'La API de testing nativa podria reemplazar vitest en algunos proyectos. Hacer una prueba de concepto con un modulo pequeño.' },
+      { titulo: 'Rendimiento en memoria y latencia bajo alta concurrencia de peticiones', resumen: 'Las mediciones sobre Express muestran una reduccion del 40% en uso de memoria gracias a la optimizacion del motor V8 y la cache interna. En alta concurrencia, el throughput mejoro con latencia mas estable y menor consumo de CPU.', tono_social: 'Positivo', fecha_narrativa: null, notas_de_trabajo: 'Comparar estos resultados con nuestro servidor actual. Si la mejora es real, justifica la migracion al LTS.' },
       { titulo: 'Migracion gradual desde Node 20 y 22 con la guia oficial de compatibilidad', resumen: 'La guia oficial detalla la migracion desde Node 20 y 22, con APIs deprecadas y alternativas, ejemplos antes y despues, y scripts para detectar usos incompatibles. Incluye una tabla de compatibilidad; la migracion de proyectos medianos toma medio dia.', tono_social: 'Neutro', fecha_narrativa: '2026-06-09' }
     ]
   },
@@ -214,6 +218,7 @@ export default {
     es_oficial: true,
     validado: true,
     actores_principales: [],
+    notas_de_trabajo: 'Comparar con Alternativas. Pedir a los desarrolladores que hagan un benchmark con el runtime actual y evaluamos si vale la pena migrar en Q3.',
     adjuntos: ['https://archivos.ejemplo.com/wasm/wasm-server-benchmarks.pdf', 'https://archivos.ejemplo.com/wasm/runtime-comparativa.xlsx'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -221,7 +226,7 @@ export default {
     ],
     has_video: false,
     temas: [
-      { titulo: 'WASM runtime optimizado para funciones serverless de borde', resumen: 'Los nuevos runtimes optimizados para serverless ejecutan modulos WebAssembly con arranque minimo y bajo consumo de recursos. Compilar codigo intensivo a WASM y desplegarlo en funciones de borde acerca el procesamiento al usuario, con overhead cada vez menor.', tono_social: 'Positivo', fecha_narrativa: '2026-05-15' },
+      { titulo: 'WASM runtime optimizado para funciones serverless de borde', resumen: 'Los nuevos runtimes optimizados para serverless ejecutan modulos WebAssembly con arranque minimo y bajo consumo de recursos. Compilar codigo intensivo a WASM y desplegarlo en funciones de borde acerca el procesamiento al usuario, con overhead cada vez menor.', tono_social: 'Positivo', fecha_narrativa: '2026-05-15', notas_de_trabajo: 'Evaluar si el runtime de borde es compatible con nuestro proveedor de hosting actual. Verificar limitaciones de memoria.' },
       { titulo: 'Casos de uso frecuentes de WebAssembly fuera del navegador', resumen: 'Los usos mas frecuentes del WASM fuera del navegador incluyen procesamiento de imagenes y video, parseo de PDFs y hojas de calculo, y computacion cientifica intensiva. Se benefician de la velocidad nativa y del aislamiento de memoria, reduciendo costos.', tono_social: 'Neutro', fecha_narrativa: null }
     ]
   },
@@ -294,6 +299,7 @@ export default {
     es_oficial: true,
     validado: true,
     actores_principales: ['Vercel', 'Next.js Team', 'Juan Pérez'],
+    notas_de_trabajo: 'Los costos de servidor son una preocupacion real. Revisar el analisis de costos antes de la proxima reunion de arquitectura y definir limites de uso.',
     adjuntos: ['https://archivos.ejemplo.com/vercel/demos/vercel-server-components-demo.zip', 'https://archivos.ejemplo.com/vercel/benchmarks/streaming-ssr-benchmarks.pdf', 'https://archivos.ejemplo.com/vercel/costos/analisis-costos-servidor.xlsx'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
@@ -302,8 +308,8 @@ export default {
     has_video: false,
     temas: [
       { titulo: 'Server components que eliminan el JavaScript del renderizado inicial del cliente', resumen: 'Los componentes que se ejecutan solo en el servidor eliminan el envio de JavaScript al cliente para el renderizado inicial, reduciendo el bundle. La informacion sensible y las consultas a bases de datos quedan fuera del navegador, simplificando la seguridad.', tono_social: 'Positivo', fecha_narrativa: '2026-03-20' },
-      { titulo: 'Streaming SSR y el renderizado progresivo de fragmentos sin bloquear la interaccion', resumen: 'El renderizado progresivo envia fragmentos de HTML al cliente a medida que estan listos. Mejora la percepcion de carga y muestra contenido interactivo temprano, mientras las secciones lentas aparecen progresivamente sin bloquear la interaccion.', tono_social: 'Positivo', fecha_narrativa: null },
-      { titulo: 'Costo de servidor y estrategias de cache para mitigar el consumo de recursos', resumen: 'La arquitectura de server components y streaming SSR implica mayor consumo de recursos en el servidor que una SPA tradicional. Cada renderizado demanda procesamiento y multiplica costos de hosting con trafico alto, por lo que conviene cache y descarga estatica.', tono_social: 'Negativo', fecha_narrativa: '2026-03-19' }
+      { titulo: 'Streaming SSR y el renderizado progresivo de fragmentos sin bloquear la interaccion', resumen: 'El renderizado progresivo envia fragmentos de HTML al cliente a medida que estan listos. Mejora la percepcion de carga y muestra contenido interactivo temprano, mientras las secciones lentas aparecen progresivamente sin bloquear la interaccion.', tono_social: 'Positivo', fecha_narrativa: null, notas_de_trabajo: 'El streaming SSR puede mejorar el time to interactive. Probar en el dashboard de metricas donde tenemos problemas de carga lenta.' },
+      { titulo: 'Costo de servidor y estrategias de cache para mitigar el consumo de recursos', resumen: 'La arquitectura de server components y streaming SSR implica mayor consumo de recursos en el servidor que una SPA tradicional. Cada renderizado demanda procesamiento y multiplica costos de hosting con trafico alto, por lo que conviene cache y descarga estatica.', tono_social: 'Negativo', fecha_narrativa: '2026-03-19', notas_de_trabajo: 'Hacer un estimado de costos antes de la proxima revision trimestral. Si supera el presupuesto actual, posponer la migracion.' }
     ]
   },
   {
