@@ -27,6 +27,8 @@ const FACEBOOK_OTHER_REGEX =
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
+const ESTADO_FILTER_FIELDS: string[] = ['validado', 'analizado', 'descartado'];
+
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 
 export interface ItemTema {
@@ -49,6 +51,7 @@ export interface TimelineItem {
   es_oficial: boolean;
   validado: boolean | null;
   analizado: boolean; // Indica si el artículo ya fue analizado (si es false, solo se dispone de id y link_web)
+  descartado: boolean | null; // Indica si el artículo fue descartado (true = descartado, false = en uso, null = desconocido)
   thumbnail: string | null;
   link_web: string | null;
   actores_principales: string[];
@@ -84,7 +87,15 @@ interface LinkInfo {
 }
 
 interface FilterDef {
-  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'analizado';
+  field:
+    | 'tonos_sociales'
+    | 'tipo_fuente'
+    | 'validado'
+    | 'fecha_publicacion'
+    | 'contenido'
+    | 'es_oficial'
+    | 'analizado'
+    | 'descartado';
   label: string;
   options: HTMLElement;
   checkboxes: HTMLInputElement[];
@@ -185,6 +196,10 @@ export default class Timeline {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
               <div class="filter-menu" id="filter-menu">
+                <div class="filter-header filter-submenu-trigger filter-submenu-trigger-top" id="filter-submenu-trigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+                  <span>Estado interno</span>
+                  <span class="filter-submenu-arrow"></span>
+                </div>
                 <div class="filter-column">
                   <div class="filter-section">
                     <div class="filter-header">Tono social</div>
@@ -205,16 +220,15 @@ export default class Timeline {
                     <div class="filter-options" id="filter-options-source"></div>
                   </div>
                   <div class="filter-section">
-                    <div class="filter-header">Estado</div>
-                    <div class="filter-options" id="filter-options-validado"></div>
-                  </div>
-                  <div class="filter-section">
-                    <div class="filter-header">Análisis</div>
-                    <div class="filter-options" id="filter-options-analizado"></div>
-                  </div>
-                  <div class="filter-section">
                     <div class="filter-header">Fuente oficial</div>
                     <div class="filter-options" id="filter-options-oficial"></div>
+                  </div>
+                </div>
+                <div class="filter-menu-sub" id="filter-menu-sub">
+                  <div class="filter-section">
+                    <div class="filter-options" id="filter-options-validado"></div>
+                    <div class="filter-options" id="filter-options-analizado"></div>
+                    <div class="filter-options" id="filter-options-descartado"></div>
                   </div>
                 </div>
               </div>
@@ -292,6 +306,15 @@ export default class Timeline {
         extract: (item) => (item.analizado === false ? 'no-analizado' : 'analizado'),
         formatLabel: (val) => (val === 'analizado' ? 'Analizado' : 'Sin analizar'),
         defaultChecked: ['analizado']
+      },
+      {
+        field: 'descartado',
+        label: 'Descartado',
+        options: this.container.querySelector('#filter-options-descartado') as HTMLElement,
+        checkboxes: [],
+        extract: (item) => (item.descartado === true ? 'descartado' : 'no-descartado'),
+        formatLabel: (val) => (val === 'descartado' ? 'Descartado' : 'No descartado'),
+        defaultChecked: ['no-descartado']
       },
       {
         field: 'es_oficial',
@@ -476,9 +499,10 @@ export default class Timeline {
         <div class="timeline-hline"></div>
       </div>
       <div class="timeline-card no-image not-analyzed">
-        <span class="card-no-validado">Sin analizar</span>
+        <div class="card-status-badges">
+          <span class="card-no-validado">Sin analizar</span>
+        </div>
         <div class="card-body card-body-not-analyzed">
-          <span class="card-not-analyzed-label">Artículo sin analizar</span>
           <span class="card-not-analyzed-id"><span class="card-not-analyzed-strong">ID</span>${card.id}</span>
           ${
             card.link_web
@@ -586,7 +610,10 @@ export default class Timeline {
         <div class="timeline-hline"></div>
       </div>
       <div class="timeline-card${card.thumbnail ? '' : ' no-image'}">
-        ${card.validado !== true ? '<span class="card-no-validado">No validado</span>' : ''}
+        <div class="card-status-badges">
+          ${card.validado !== true ? '<span class="card-no-validado">No validado</span>' : ''}
+          ${card.descartado === true ? '<span class="card-no-validado">Descartado</span>' : ''}
+        </div>
         ${imgHtml}
         ${actionsHtml}
         <div class="card-body">
@@ -1054,9 +1081,8 @@ export default class Timeline {
 
   /** Build filter checkboxes from the available filter values */
   protected _buildFilterCheckboxes(): void {
-    let anyVisible = false;
+    let anyFilterVisible = false;
     this.filters.forEach((f) => {
-      const section = f.options.closest('.filter-section') as HTMLElement | null;
       const values = [
         ...new Set(
           this.items.flatMap((c) => {
@@ -1068,11 +1094,9 @@ export default class Timeline {
       ];
       if (values.length <= 1) {
         f.checkboxes = [];
-        if (section) section.hidden = true;
         return;
       }
-      if (section) section.hidden = false;
-      anyVisible = true;
+      anyFilterVisible = true;
       if (f.sortValues) values.sort(f.sortValues);
       const counts: Record<string, number> = {};
       values.forEach((val) => {
@@ -1107,7 +1131,25 @@ export default class Timeline {
         f.checkboxes.push(cb);
       });
     });
-    this.filterToggle.style.display = anyVisible ? '' : 'none';
+    this.container.querySelectorAll('.filter-section').forEach((sectionEl) => {
+      const section = sectionEl as HTMLElement;
+      const opts = Array.from(section.querySelectorAll<HTMLElement>('.filter-options'));
+      const hasOptions = opts.some((o) => this.filters.some((ef) => ef.options === o && ef.checkboxes.length > 0));
+      section.hidden = opts.length > 0 && !hasOptions;
+    });
+    const estadoHasDiversity = this.filters.some(
+      (f) => ESTADO_FILTER_FIELDS.includes(f.field) && f.checkboxes.length > 0
+    );
+    const submenuTrigger = this.container.querySelector('#filter-submenu-trigger') as HTMLElement;
+    const submenuPanel = this.container.querySelector('#filter-menu-sub') as HTMLElement;
+    submenuTrigger.style.display = estadoHasDiversity ? '' : 'none';
+    submenuPanel.style.display = estadoHasDiversity ? '' : 'none';
+    if (!estadoHasDiversity) {
+      submenuTrigger.classList.remove('open');
+      submenuPanel.classList.remove('open');
+      submenuTrigger.setAttribute('aria-expanded', 'false');
+    }
+    this.filterToggle.style.display = anyFilterVisible ? '' : 'none';
   }
 
   /** Normalize a string for accent- and case-insensitive search matching */
@@ -1135,6 +1177,10 @@ export default class Timeline {
   protected _applyFilters(): void {
     const anyActive = this.filters.some((f) => f.checkboxes.some((cb) => cb.checked));
     this.filterToggle.classList.toggle('active', anyActive);
+    const estadoActive = this.filters
+      .filter((f) => ESTADO_FILTER_FIELDS.includes(f.field))
+      .some((f) => f.checkboxes.some((cb) => cb.checked));
+    this.filterToggle.classList.toggle('estado-active', estadoActive);
     this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
     this.allCards = this._originalCards.filter(
       (c) =>
@@ -1244,10 +1290,48 @@ export default class Timeline {
       this._toggleExpand();
     });
     this.sortToggle.addEventListener('click', () => this._toggleSort());
+    const submenuTrigger = this.container.querySelector('#filter-submenu-trigger') as HTMLElement;
+    const submenu = this.container.querySelector('#filter-menu-sub') as HTMLElement;
+    let submenuCloseTimeout = 0;
+    const openSubmenu = () => {
+      window.clearTimeout(submenuCloseTimeout);
+      submenu.classList.add('open');
+      submenuTrigger.classList.add('open');
+      submenuTrigger.setAttribute('aria-expanded', 'true');
+    };
+    const closeSubmenu = () => {
+      window.clearTimeout(submenuCloseTimeout);
+      submenu.classList.remove('open');
+      submenuTrigger.classList.remove('open');
+      submenuTrigger.setAttribute('aria-expanded', 'false');
+    };
+    const scheduleSubmenuClose = () => {
+      window.clearTimeout(submenuCloseTimeout);
+      submenuCloseTimeout = window.setTimeout(() => {
+        if (!submenu.matches(':hover') && !submenuTrigger.matches(':hover')) closeSubmenu();
+      }, 150);
+    };
+    submenuTrigger.addEventListener('mouseenter', openSubmenu);
+    submenu.addEventListener('mouseenter', openSubmenu);
+    submenuTrigger.addEventListener('mouseleave', scheduleSubmenuClose);
+    submenu.addEventListener('mouseleave', scheduleSubmenuClose);
+    submenuTrigger.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      if (submenu.classList.contains('open')) closeSubmenu();
+      else openSubmenu();
+    });
+    submenuTrigger.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (submenu.classList.contains('open')) closeSubmenu();
+        else openSubmenu();
+      }
+    });
     this.filterToggle.addEventListener('click', (e: Event) => {
       e.stopPropagation();
       this.filterMenu.classList.toggle('open');
       this.filterToggle.classList.toggle('open');
+      if (!this.filterMenu.classList.contains('open')) closeSubmenu();
     });
     this.searchToggle.addEventListener('click', (e: Event) => {
       e.stopPropagation();
@@ -1281,6 +1365,7 @@ export default class Timeline {
       if (!(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
         this.filterToggle.classList.remove('open');
+        closeSubmenu();
       }
       if (!(e.target as HTMLElement).closest('.search-wrap')) {
         this.searchWrap.classList.remove('open');
