@@ -48,6 +48,7 @@ export interface TimelineItem {
   tipo_fuente: string;
   es_oficial: boolean;
   validado: boolean | null;
+  analizado: boolean; // Indica si el artículo ya fue analizado (si es false, solo se dispone de id y link_web)
   thumbnail: string | null;
   link_web: string | null;
   actores_principales: string[];
@@ -83,13 +84,14 @@ interface LinkInfo {
 }
 
 interface FilterDef {
-  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial';
+  field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'analizado';
   label: string;
   options: HTMLElement;
   checkboxes: HTMLInputElement[];
   extract?: (item: TimelineItem) => string | string[];
   formatLabel?: (val: string) => string;
   sortValues?: (a: string, b: string) => number;
+  defaultChecked?: string[];
 }
 
 export default class Timeline {
@@ -207,6 +209,10 @@ export default class Timeline {
                     <div class="filter-options" id="filter-options-validado"></div>
                   </div>
                   <div class="filter-section">
+                    <div class="filter-header">Análisis</div>
+                    <div class="filter-options" id="filter-options-analizado"></div>
+                  </div>
+                  <div class="filter-section">
                     <div class="filter-header">Fuente oficial</div>
                     <div class="filter-options" id="filter-options-oficial"></div>
                   </div>
@@ -277,6 +283,15 @@ export default class Timeline {
         checkboxes: [],
         extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
         formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
+      },
+      {
+        field: 'analizado',
+        label: 'Analizado',
+        options: this.container.querySelector('#filter-options-analizado') as HTMLElement,
+        checkboxes: [],
+        extract: (item) => (item.analizado === false ? 'no-analizado' : 'analizado'),
+        formatLabel: (val) => (val === 'analizado' ? 'Analizado' : 'Sin analizar'),
+        defaultChecked: ['analizado']
       },
       {
         field: 'es_oficial',
@@ -453,6 +468,28 @@ export default class Timeline {
     const el = document.createElement('div');
     el.className = 'timeline-item';
     el.style.transitionDelay = `${index * 0.08}s`;
+    if (card.analizado === false) {
+      el.innerHTML = `
+      <div class="timeline-date-col no-date">
+        <div class="timeline-date" title="Fecha de publicación">${card.fecha_publicacion ? this._formatDate(card.fecha_publicacion) : ''}</div>
+        <div class="timeline-dot"></div>
+        <div class="timeline-hline"></div>
+      </div>
+      <div class="timeline-card no-image not-analyzed">
+        <span class="card-no-validado">Sin analizar</span>
+        <div class="card-body card-body-not-analyzed">
+          <span class="card-not-analyzed-label">Artículo sin analizar</span>
+          <span class="card-not-analyzed-id"><span class="card-not-analyzed-strong">ID</span>${card.id}</span>
+          ${
+            card.link_web
+              ? `<a class="card-not-analyzed-link" href="${card.link_web}" target="_blank" rel="noopener">${card.link_web}</a>`
+              : '<span class="card-not-analyzed-link">Sin enlace</span>'
+          }
+        </div>
+      </div>
+    `;
+      return el;
+    }
     const imgHtml = card.thumbnail
       ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"><div class="card-title">${card.nombre_fuente}${card.es_oficial ? `<span class="card-img-oficial card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div></div>`
       : '';
@@ -1053,7 +1090,7 @@ export default class Timeline {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = val;
-        cb.checked = false;
+        cb.checked = f.defaultChecked ? f.defaultChecked.includes(val) : false;
         const span = document.createElement('span');
         span.className = 'filter-option-label';
         const display = f.formatLabel ? f.formatLabel(val) : val;
@@ -1117,7 +1154,7 @@ export default class Timeline {
 
   /** Render featured cards, timeline, and load-more button if needed */
   protected _renderAll(): void {
-    const featured = this.allCards.slice(0, this.featured_count);
+    const featured = this.allCards.filter((c) => c.analizado !== false).slice(0, this.featured_count);
     const n = this.allCards.length;
     this.remainingCount.textContent = String(this._originalCards.length);
     this.container.querySelector('#remaining-text')!.textContent =
@@ -1181,9 +1218,8 @@ export default class Timeline {
       if (!b.fecha_publicacion) return -1;
       return new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
     });
-    this.allCards = [...this._originalCards];
     if (this.itemsPerPage > 0) this._displayedCount = this.itemsPerPage;
-    this._renderAll();
+    this._applyFilters();
 
     if (this.allCards.length <= 3) {
       this.fabCollapse.style.display = 'none';

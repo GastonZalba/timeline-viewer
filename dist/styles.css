@@ -762,6 +762,48 @@
   letter-spacing: 0.3px;
   pointer-events: none;
 }
+.publicaciones-section .timeline-card.not-analyzed {
+  cursor: default;
+}
+.publicaciones-section .timeline-card.not-analyzed:hover {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--tv-border-card);
+}
+.publicaciones-section .timeline-card.not-analyzed .card-body-not-analyzed {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+.publicaciones-section .timeline-card.not-analyzed .card-body-not-analyzed .card-not-analyzed-label {
+  font-size: 0.7em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--tv-text-muted);
+}
+.publicaciones-section .timeline-card.not-analyzed .card-body-not-analyzed .card-not-analyzed-id {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--tv-text-on-primary);
+  word-break: break-all;
+}
+.publicaciones-section .timeline-card.not-analyzed .card-body-not-analyzed .card-not-analyzed-id .card-not-analyzed-strong {
+  font-size: 0.75em;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--tv-text-muted);
+  margin-right: 6px;
+}
+.publicaciones-section .timeline-card.not-analyzed .card-body-not-analyzed .card-not-analyzed-link {
+  font-size: 0.8em;
+  color: var(--tv-accent-light);
+  text-decoration: underline;
+  word-break: break-all;
+}
+.publicaciones-section .timeline-card.not-analyzed .card-body-not-analyzed .card-not-analyzed-link:hover {
+  color: var(--tv-accent);
+}
 .publicaciones-section .timeline-card.expanded {
   cursor: inherit;
   overflow: visible;
