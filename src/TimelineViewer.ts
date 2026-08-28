@@ -46,7 +46,7 @@ export interface TimelineItem {
   fecha_publicacion: string;
   fecha_scrapeo: string;
   tonos_sociales: TonoSocial[];
-  fuente_institucional: string;
+  fuente_institucional: string | null;
   tipo_fuente: string;
   es_oficial: boolean;
   validado: boolean | null;
@@ -54,7 +54,7 @@ export interface TimelineItem {
   descartado: boolean | null; // Indica si el artículo fue descartado (true = descartado, false = en uso, null = desconocido)
   thumbnail: string | null;
   link_web: string | null;
-  actores_principales: string[];
+  actores_principales: string[] | null;
   adjuntos: string[];
   contenido: string;
   screenshot: string | null;
@@ -651,7 +651,7 @@ export default class Timeline {
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
+          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional ?? '-'}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
           ${inlineImagesHtml}
           ${inlineAdjuntosHtml}
           ${iframeHtml}
@@ -1102,7 +1102,7 @@ export default class Timeline {
       values.forEach((val) => {
         counts[val] = this.items.filter((c) => {
           const v = f.extract ? f.extract(c) : c[f.field];
-          const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+          const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
           return arr.includes(val);
         }).length;
       });
@@ -1153,8 +1153,8 @@ export default class Timeline {
   }
 
   /** Normalize a string for accent- and case-insensitive search matching */
-  protected _normalizeSearch(value: string): string {
-    return value
+  protected _normalizeSearch(value: string | null | undefined): string {
+    return (value ?? '')
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase();
@@ -1168,7 +1168,7 @@ export default class Timeline {
       String(card.id),
       card.nombre_fuente,
       card.fuente_institucional,
-      (card.actores_principales || []).join(' ')
+      card.actores_principales?.join(' ') ?? ''
     ];
     return haystacks.some((v) => this._normalizeSearch(v).includes(q));
   }
@@ -1189,7 +1189,7 @@ export default class Timeline {
           const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
           if (active.length === 0) return true;
           const v = f.extract ? f.extract(c) : c[f.field];
-          const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+          const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
           return arr.some((x) => active.includes(x));
         })
     );

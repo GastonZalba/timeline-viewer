@@ -511,7 +511,7 @@ export default class Timeline {
             </div>
           </div>
           ${protHtml}
-          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
+          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional ?? '-'}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
           ${inlineImagesHtml}
           ${inlineAdjuntosHtml}
           ${iframeHtml}
@@ -949,7 +949,7 @@ export default class Timeline {
             values.forEach((val) => {
                 counts[val] = this.items.filter((c) => {
                     const v = f.extract ? f.extract(c) : c[f.field];
-                    const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+                    const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
                     return arr.includes(val);
                 }).length;
             });
@@ -998,7 +998,7 @@ export default class Timeline {
     }
     /** Normalize a string for accent- and case-insensitive search matching */
     _normalizeSearch(value) {
-        return value
+        return (value ?? '')
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
             .toLowerCase();
@@ -1012,7 +1012,7 @@ export default class Timeline {
             String(card.id),
             card.nombre_fuente,
             card.fuente_institucional,
-            (card.actores_principales || []).join(' ')
+            card.actores_principales?.join(' ') ?? ''
         ];
         return haystacks.some((v) => this._normalizeSearch(v).includes(q));
     }
@@ -1031,7 +1031,7 @@ export default class Timeline {
                 if (active.length === 0)
                     return true;
                 const v = f.extract ? f.extract(c) : c[f.field];
-                const arr = Array.isArray(v) ? v.map((x) => String(x)) : [String(v)];
+                const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
                 return arr.some((x) => active.includes(x));
             }));
         if (this.sortAscending)

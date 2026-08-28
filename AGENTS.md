@@ -104,7 +104,7 @@ interface TimelineItem {
   fecha_publicacion: string;    // YYYY-MM-DD
   fecha_scrapeo: string;        // ISO datetime
   tonos_sociales: string[];     // Tono(s) social(es) del artículo (valores únicos de temas)
-  fuente_institucional: string; // Nombre del medio
+  fuente_institucional: string | null; // Nombre del medio
   tipo_fuente: string;          // Tipo de fuente (ver valores en README)
   es_oficial: boolean;          // Indica si la fuente es oficial
   validado: boolean | null;     // Indica si el artículo fue validado (true/false/null = pendiente/desconocido)
@@ -112,7 +112,7 @@ interface TimelineItem {
   descartado: boolean | null;   // Indica si el artículo fue descartado (true = descartado, false = en uso, null = desconocido)
   thumbnail: string | null;     // URL de imagen principal
   link_web: string;             // URL del artículo original
-  actores_principales: string[];
+  actores_principales: string[] | null;
   adjuntos: string[];            // Archivos/links adjuntos (puede estar vacío)
   screenshot: string | null;    // URL de captura de pantalla
   imagenes: { thumb: string; full: string }[];

@@ -14,7 +14,7 @@ export interface TimelineItem {
     fecha_publicacion: string;
     fecha_scrapeo: string;
     tonos_sociales: TonoSocial[];
-    fuente_institucional: string;
+    fuente_institucional: string | null;
     tipo_fuente: string;
     es_oficial: boolean;
     validado: boolean | null;
@@ -22,7 +22,7 @@ export interface TimelineItem {
     descartado: boolean | null;
     thumbnail: string | null;
     link_web: string | null;
-    actores_principales: string[];
+    actores_principales: string[] | null;
     adjuntos: string[];
     contenido: string;
     screenshot: string | null;
@@ -137,7 +137,7 @@ export default class Timeline {
     /** Build filter checkboxes from the available filter values */
     protected _buildFilterCheckboxes(): void;
     /** Normalize a string for accent- and case-insensitive search matching */
-    protected _normalizeSearch(value: string): string;
+    protected _normalizeSearch(value: string | null | undefined): string;
     /** Check whether a card matches the current search term */
     protected _matchesSearch(card: TimelineItem): boolean;
     /** Apply active filters and re-render the full view */

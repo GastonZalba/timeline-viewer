@@ -78,14 +78,14 @@ Each object in `items` supports these fields:
 | `fecha_publicacion`    | `string` (YYYY-MM-DD)       | Publication date                         |
 | `fecha_scrapeo`        | `string` (ISO)              | When it was crawled                      |
 | `tonos_sociales`      | `string[]`                  | Overall sentiment(s) — unique tones present in the article's `temas` |
-| `fuente_institucional` | `string`                    | Source / publication name                |
+| `fuente_institucional` | `string` / `null`          | Source / publication name                |
 | `tipo_fuente`           | `string`                    | Source type. One of: `Decreto o norma`, `Libro o publicación`, `Sitio web o portal`, `Red Social`, `Gacetilla o comunicado de prensa`, `Video` |
 | `es_oficial`            | `boolean`                   | Whether the source is official (`true`) or not (`false`) |
 | `validado`              | `boolean` / `null`          | Whether the article has been validated (`true`), not validated (`false`), or pending/unknown (`null`) |
 | `analizado`             | `boolean`                   | Whether the article has been analyzed by the pipeline. When `false`, the entry is an unprocessed detection and only `id` and `link_web` are populated; all other fields are empty |
 | `descartado`            | `boolean` / `null`          | Whether the article has been discarded (`true`), kept (`false`), or unknown (`null`). By default the filter excludes discarded articles |
 | `adjuntos`              | `string[]`                  | Attached files/links — may be empty |
-| `actores_principales`  | `string[]`                  | Key people or entities                   |
+| `actores_principales`  | `string[]` / `null`        | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
 | `imagenes`             | `{ thumb: string; full: string }[]` | Image gallery with low-res `thumb` and full-res `full` URLs |
 | `links_videos`         | `string[]` (URL)          | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Only supported platforms (YouTube, etc.) are embedded; others are ignored |
