@@ -82,7 +82,7 @@ Each object in `items` supports these fields:
 | `tipo_fuente`           | `string`                    | Source type. One of: `Decreto o norma`, `Libro o publicación`, `Sitio web o portal`, `Red Social`, `Gacetilla o comunicado de prensa`, `Video` |
 | `es_oficial`            | `boolean`                   | Whether the source is official (`true`) or not (`false`) |
 | `validado`              | `boolean` / `null`          | Whether the article has been validated (`true`), not validated (`false`), or pending/unknown (`null`) |
-| `analizado`             | `boolean`                   | Whether the article has been analyzed by the pipeline. When `false`, the entry is an unprocessed detection and only `id` and `link_web` are populated; all other fields are empty |
+| `capturado`             | `boolean`                   | Whether the article has been captured by the pipeline. When `false`, the entry is an unprocessed detection and only `id` and `link_web` are populated; all other fields are empty |
 | `descartado`            | `boolean` / `null`          | Whether the article has been discarded (`true`), kept (`false`), or unknown (`null`). By default the filter excludes discarded articles |
 | `adjuntos`              | `string[]`                  | Attached files/links — may be empty |
 | `actores_principales`  | `string[]` / `null`        | Key people or entities                   |

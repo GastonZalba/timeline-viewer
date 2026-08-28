@@ -27,7 +27,7 @@ const FACEBOOK_OTHER_REGEX =
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
-const ESTADO_FILTER_FIELDS: string[] = ['validado', 'analizado', 'descartado'];
+const ESTADO_FILTER_FIELDS: string[] = ['validado', 'capturado', 'descartado'];
 
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 
@@ -50,7 +50,7 @@ export interface TimelineItem {
   tipo_fuente: string;
   es_oficial: boolean;
   validado: boolean | null;
-  analizado: boolean; // Indica si el artículo ya fue analizado (si es false, solo se dispone de id y link_web)
+  capturado: boolean; // Indica si el artículo ya fue capturado (si es false, solo se dispone de id y link_web)
   descartado: boolean | null; // Indica si el artículo fue descartado (true = descartado, false = en uso, null = desconocido)
   thumbnail: string | null;
   link_web: string | null;
@@ -94,7 +94,7 @@ interface FilterDef {
     | 'fecha_publicacion'
     | 'contenido'
     | 'es_oficial'
-    | 'analizado'
+    | 'capturado'
     | 'descartado';
   label: string;
   options: HTMLElement;
@@ -227,7 +227,7 @@ export default class Timeline {
                 <div class="filter-menu-sub" id="filter-menu-sub">
                   <div class="filter-section">
                     <div class="filter-options" id="filter-options-validado"></div>
-                    <div class="filter-options" id="filter-options-analizado"></div>
+                    <div class="filter-options" id="filter-options-capturado"></div>
                     <div class="filter-options" id="filter-options-descartado"></div>
                   </div>
                 </div>
@@ -299,13 +299,13 @@ export default class Timeline {
         formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
       },
       {
-        field: 'analizado',
+        field: 'capturado',
         label: 'Analizado',
-        options: this.container.querySelector('#filter-options-analizado') as HTMLElement,
+        options: this.container.querySelector('#filter-options-capturado') as HTMLElement,
         checkboxes: [],
-        extract: (item) => (item.analizado === false ? 'no-analizado' : 'analizado'),
-        formatLabel: (val) => (val === 'analizado' ? 'Analizado' : 'Sin analizar'),
-        defaultChecked: ['analizado']
+        extract: (item) => (item.capturado === false ? 'no-capturado' : 'capturado'),
+        formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
+        defaultChecked: ['capturado']
       },
       {
         field: 'descartado',
@@ -491,23 +491,23 @@ export default class Timeline {
     const el = document.createElement('div');
     el.className = 'timeline-item';
     el.style.transitionDelay = `${index * 0.08}s`;
-    if (card.analizado === false) {
+    if (card.capturado === false) {
       el.innerHTML = `
       <div class="timeline-date-col no-date">
         <div class="timeline-date" title="Fecha de publicación">${card.fecha_publicacion ? this._formatDate(card.fecha_publicacion) : ''}</div>
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
-      <div class="timeline-card no-image not-analyzed">
+      <div class="timeline-card no-image not-captured">
         <div class="card-status-badges">
-          <span class="card-no-validado">Sin analizar</span>
+          <span class="card-no-validado">Sin capturar</span>
         </div>
-        <div class="card-body card-body-not-analyzed">
-          <span class="card-not-analyzed-id"><span class="card-not-analyzed-strong">ID</span>${card.id}</span>
+        <div class="card-body card-body-not-captured">
+          <span class="card-not-captured-id"><span class="card-not-captured-strong">ID</span>${card.id}</span>
           ${
             card.link_web
-              ? `<a class="card-not-analyzed-link" href="${card.link_web}" target="_blank" rel="noopener">${card.link_web}</a>`
-              : '<span class="card-not-analyzed-link">Sin enlace</span>'
+              ? `<a class="card-not-captured-link" href="${card.link_web}" target="_blank" rel="noopener">${card.link_web}</a>`
+              : '<span class="card-not-captured-link">Sin enlace</span>'
           }
         </div>
       </div>
@@ -1200,7 +1200,7 @@ export default class Timeline {
 
   /** Render featured cards, timeline, and load-more button if needed */
   protected _renderAll(): void {
-    const featured = this.allCards.filter((c) => c.analizado !== false).slice(0, this.featured_count);
+    const featured = this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
     const n = this.allCards.length;
     this.remainingCount.textContent = String(this._originalCards.length);
     this.container.querySelector('#remaining-text')!.textContent =

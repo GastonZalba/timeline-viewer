@@ -923,7 +923,7 @@
       pointer-events: none;
     }
 
-    &.not-analyzed {
+    &.not-captured {
       cursor: default;
 
       &:hover {
@@ -931,19 +931,19 @@
         border: 1px solid var(--tv-border-card);
       }
 
-      .card-body-not-analyzed {
+      .card-body-not-captured {
         display: flex;
         flex-direction: column;
         gap: 10px;
         padding: 16px;
 
-        .card-not-analyzed-id {
+        .card-not-captured-id {
           font-size: 0.9em;
           font-weight: 600;
           color: var(--tv-text-on-primary);
           word-break: break-all;
 
-          .card-not-analyzed-strong {
+          .card-not-captured-strong {
             font-size: 0.75em;
             font-weight: 600;
             text-transform: uppercase;
@@ -952,7 +952,7 @@
           }
         }
 
-        .card-not-analyzed-link {
+        .card-not-captured-link {
           font-size: 0.8em;
           color: var(--tv-accent-light);
           text-decoration: underline;

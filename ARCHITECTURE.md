@@ -126,7 +126,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │   │       └── .filter-menu-sub (#filter-menu-sub)
   │   │   │           └── .filter-section
   │   │   │               ├── .filter-options#filter-options-validado
-  │   │   │               ├── .filter-options#filter-options-analizado
+  │   │   │               ├── .filter-options#filter-options-capturado
   │   │   │               └── .filter-options#filter-options-descartado
   │   │   └── button.sort-toggle (#sort-toggle)
   │   └── .featured-cards (#featured-cards)
@@ -247,7 +247,7 @@ Cinco filtros disponibles, generados dinámicamente desde los datos, distribuido
 | Tono social | `tonos_sociales` | Array: Positivo / Negativo / Neutro |
 | Año publicación | `fecha_publicacion` | Año extraído de `YYYY-MM-DD` (ordena descendente) |
 | Tipo de fuente | `tipo_fuente` | Valores únicos presentes en los datos |
-| Estado interno | `validado`, `analizado`, `descartado` | Validado / No validado · Analizado / Sin analizar · no descartado (por defecto) / Descartado. Se despliega en un submenu flyout a la derecha del menú (fondo con tinte rojizo). El submenu y su trigger se ocultan automáticamente si ninguno de los tres filtros tiene valores diversos entre los items |
+| Estado interno | `validado`, `capturado`, `descartado` | Validado / No validado · Capturado / Sin capturar · no descartado (por defecto) / Descartado. Se despliega en un submenu flyout a la derecha del menú (fondo con tinte rojizo). El submenu y su trigger se ocultan automáticamente si ninguno de los tres filtros tiene valores diversos entre los items |
 | Contenido | `adjuntos`, `links_videos`, `imagenes` | Con adjuntos / Con video / Con imágenes |
 
 Flujo:
