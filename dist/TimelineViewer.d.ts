@@ -18,7 +18,7 @@ export interface TimelineItem {
     tipo_fuente: string;
     es_oficial: boolean;
     validado: boolean | null;
-    analizado: boolean;
+    capturado: boolean;
     descartado: boolean | null;
     thumbnail: string | null;
     link_web: string | null;
@@ -54,7 +54,7 @@ interface LinkInfo {
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 interface FilterDef {
-    field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'analizado' | 'descartado';
+    field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'capturado' | 'descartado';
     label: string;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];

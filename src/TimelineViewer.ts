@@ -300,7 +300,7 @@ export default class Timeline {
       },
       {
         field: 'capturado',
-        label: 'Analizado',
+        label: 'Capturado',
         options: this.container.querySelector('#filter-options-capturado') as HTMLElement,
         checkboxes: [],
         extract: (item) => (item.capturado === false ? 'no-capturado' : 'capturado'),
@@ -1094,8 +1094,10 @@ export default class Timeline {
       ];
       if (values.length <= 1) {
         f.checkboxes = [];
+        f.options.hidden = true;
         return;
       }
+      f.options.hidden = false;
       anyFilterVisible = true;
       if (f.sortValues) values.sort(f.sortValues);
       const counts: Record<string, number> = {};

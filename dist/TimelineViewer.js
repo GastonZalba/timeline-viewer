@@ -13,7 +13,7 @@ const FACEBOOK_POST_REGEX = /(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+
 const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
-const ESTADO_FILTER_FIELDS = ['validado', 'analizado', 'descartado'];
+const ESTADO_FILTER_FIELDS = ['validado', 'capturado', 'descartado'];
 export default class Timeline {
     constructor(config) {
         this.sortAscending = false;
@@ -105,7 +105,7 @@ export default class Timeline {
                 <div class="filter-menu-sub" id="filter-menu-sub">
                   <div class="filter-section">
                     <div class="filter-options" id="filter-options-validado"></div>
-                    <div class="filter-options" id="filter-options-analizado"></div>
+                    <div class="filter-options" id="filter-options-capturado"></div>
                     <div class="filter-options" id="filter-options-descartado"></div>
                   </div>
                 </div>
@@ -177,13 +177,13 @@ export default class Timeline {
                 formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
             },
             {
-                field: 'analizado',
-                label: 'Analizado',
-                options: this.container.querySelector('#filter-options-analizado'),
+                field: 'capturado',
+                label: 'Capturado',
+                options: this.container.querySelector('#filter-options-capturado'),
                 checkboxes: [],
-                extract: (item) => (item.analizado === false ? 'no-analizado' : 'analizado'),
-                formatLabel: (val) => (val === 'analizado' ? 'Analizado' : 'Sin analizar'),
-                defaultChecked: ['analizado']
+                extract: (item) => (item.capturado === false ? 'no-capturado' : 'capturado'),
+                formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
+                defaultChecked: ['capturado']
             },
             {
                 field: 'descartado',
@@ -368,22 +368,22 @@ export default class Timeline {
         const el = document.createElement('div');
         el.className = 'timeline-item';
         el.style.transitionDelay = `${index * 0.08}s`;
-        if (card.analizado === false) {
+        if (card.capturado === false) {
             el.innerHTML = `
       <div class="timeline-date-col no-date">
         <div class="timeline-date" title="Fecha de publicación">${card.fecha_publicacion ? this._formatDate(card.fecha_publicacion) : ''}</div>
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
-      <div class="timeline-card no-image not-analyzed">
+      <div class="timeline-card no-image not-captured">
         <div class="card-status-badges">
-          <span class="card-no-validado">Sin analizar</span>
+          <span class="card-no-validado">Sin capturar</span>
         </div>
-        <div class="card-body card-body-not-analyzed">
-          <span class="card-not-analyzed-id"><span class="card-not-analyzed-strong">ID</span>${card.id}</span>
+        <div class="card-body card-body-not-captured">
+          <span class="card-not-captured-id"><span class="card-not-captured-strong">ID</span>${card.id}</span>
           ${card.link_web
-                ? `<a class="card-not-analyzed-link" href="${card.link_web}" target="_blank" rel="noopener">${card.link_web}</a>`
-                : '<span class="card-not-analyzed-link">Sin enlace</span>'}
+                ? `<a class="card-not-captured-link" href="${card.link_web}" target="_blank" rel="noopener">${card.link_web}</a>`
+                : '<span class="card-not-captured-link">Sin enlace</span>'}
         </div>
       </div>
     `;
@@ -940,8 +940,10 @@ export default class Timeline {
             ];
             if (values.length <= 1) {
                 f.checkboxes = [];
+                f.options.hidden = true;
                 return;
             }
+            f.options.hidden = false;
             anyFilterVisible = true;
             if (f.sortValues)
                 values.sort(f.sortValues);
@@ -1042,7 +1044,7 @@ export default class Timeline {
     }
     /** Render featured cards, timeline, and load-more button if needed */
     _renderAll() {
-        const featured = this.allCards.filter((c) => c.analizado !== false).slice(0, this.featured_count);
+        const featured = this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
         const n = this.allCards.length;
         this.remainingCount.textContent = String(this._originalCards.length);
         this.container.querySelector('#remaining-text').textContent =
