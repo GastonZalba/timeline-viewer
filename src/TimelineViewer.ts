@@ -305,7 +305,7 @@ export default class Timeline {
         label: 'Capturado',
         options: this.container.querySelector('#filter-options-capturado') as HTMLElement,
         checkboxes: [],
-        extract: (item) => (item.capturado === true ? 'capturado' : 'no-capturado'),
+        extract: (item) => (item.capturado !== true ? 'no-capturado' : 'capturado'),
         formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
         defaultChecked: ['capturado']
       },
@@ -493,7 +493,7 @@ export default class Timeline {
     const el = document.createElement('div');
     el.className = 'timeline-item';
     el.style.transitionDelay = `${index * 0.08}s`;
-    if (card.capturado === false) {
+    if (card.capturado !== true) {
       el.innerHTML = `
       <div class="timeline-date-col no-date">
         <div class="timeline-date" title="Fecha de publicación">${card.fecha_publicacion ? this._formatDate(card.fecha_publicacion) : ''}</div>
