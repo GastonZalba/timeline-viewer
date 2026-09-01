@@ -288,7 +288,9 @@ export default class Timeline {
         field: 'tipo_fuente',
         label: 'Tipo de fuente',
         options: this.container.querySelector('#filter-options-source') as HTMLElement,
-        checkboxes: []
+        checkboxes: [],
+        extract: (item) => (item.tipo_fuente ? item.tipo_fuente : 'sin-tipo'),
+        formatLabel: (val) => (val === 'sin-tipo' ? 'Sin tipo' : val)
       },
       {
         field: 'validado',
@@ -303,7 +305,7 @@ export default class Timeline {
         label: 'Capturado',
         options: this.container.querySelector('#filter-options-capturado') as HTMLElement,
         checkboxes: [],
-        extract: (item) => (item.capturado === false ? 'no-capturado' : 'capturado'),
+        extract: (item) => (item.capturado === true ? 'capturado' : 'no-capturado'),
         formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
         defaultChecked: ['capturado']
       },
