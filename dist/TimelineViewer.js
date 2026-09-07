@@ -38,7 +38,6 @@ export default class Timeline {
         this.expandToggle = null;
         this.remainingCount = null;
         this.expandIcon = null;
-        this.fabCollapse = null;
         this.sortToggle = null;
         this.filterToggle = null;
         this.filterMenu = null;
@@ -121,16 +120,7 @@ export default class Timeline {
           <div class="timeline-collapse-wrap">
             <div class="timeline-line"></div>
             <div class="timeline-content">
-              <div class="timeline-cards" id="timeline-cards"></div>
-              <div class="fab-sticky-wrap">
-                <button class="fab-collapse" id="fab-collapse" title="Colapsar publicaciones">
-                  <span class="fab-icon-stack">
-                    <svg class="fab-chevron-right" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,4 17,12 9,20"/></svg>
-                    <svg class="fab-chevron-left" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,4 7,12 15,20"/></svg>
-                  </span>
-                  <span class="fab-label">Colapsar</span>
-                </button>
-              </div>
+              <div class="timeline-cards" id="timeline-cards"></div>             
             </div>
           </div>
           <div class="ai-disclaimer">
@@ -148,7 +138,6 @@ export default class Timeline {
         this.expandToggle = this.container.querySelector('#expand-toggle');
         this.remainingCount = this.container.querySelector('#remaining-count');
         this.expandIcon = this.container.querySelector('#expand-icon');
-        this.fabCollapse = this.container.querySelector('#fab-collapse');
         this.sortToggle = this.container.querySelector('#sort-toggle');
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
@@ -1108,15 +1097,11 @@ export default class Timeline {
         if (this.itemsPerPage > 0)
             this._displayedCount = this.itemsPerPage;
         this._applyFilters();
-        if (this.allCards.length <= 3) {
-            this.fabCollapse.style.display = 'none';
-        }
         requestAnimationFrame(() => {
             const cards = this.featuredContainer.querySelectorAll('.featured-card');
             cards.forEach((c) => c.classList.add('visible'));
         });
         this.expandToggle.addEventListener('click', () => this._toggleExpand());
-        this.fabCollapse.addEventListener('click', () => this._toggleExpand(true));
         this.featuredContainer.addEventListener('click', () => this._toggleExpand());
         this.featuredRow.addEventListener('click', (e) => {
             if (this.isExpanded)

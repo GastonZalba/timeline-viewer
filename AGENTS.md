@@ -36,7 +36,7 @@ npm run build:ts     # Solo TypeScript
 npm run build:css    # Solo SCSS
 npm run format       # Formatea código con Prettier
 npm run format:check # Verifica formato sin modificar
-npm run dev          # Copia el plugin zoom + Watch mode + dev server en :3010
+npm run watch          # Copia el plugin zoom + Watch mode + dev server en :3010
 npm start            # Solo dev server en :3010
 ```
 

@@ -1,6 +1,6 @@
 {
   "name": "timeline-viewer",
-  "version": "1.21.1",
+  "version": "1.22.0",
   "description": "A frontend timeline card viewer for news articles with expandable details",
   "type": "module",
   "main": "dist/TimelineViewer.js",
@@ -17,7 +17,7 @@
     "build:css": "sass src/styles.scss dist/styles.css",
     "build:ts": "tsc",
     "build": "npm run format && npm run build:ts && npm run build:css",
-    "dev": "concurrently --kill-others \"npm run build:ts -- --watch\" \"npm run build:css -- --watch\" \"nodemon example/server.js\""
+    "watch": "concurrently --kill-others \"npm run build:ts -- --watch\" \"npm run build:css -- --watch\" \"nodemon example/server.js\""
   },
   "keywords": [
     "timeline",

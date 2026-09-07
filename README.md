@@ -129,7 +129,7 @@ npm run build:ts
 ## Development
 
 ```bash
-npm run dev
+npm run watch
 ```
 
 Starts the dev server at `http://localhost:3010` with a demo page, and automatically recompiles TypeScript and SCSS on every change. No need to manually build.

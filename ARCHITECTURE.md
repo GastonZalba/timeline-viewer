@@ -35,12 +35,10 @@ new Timeline({ container, items, ... })
      │        └── Bind event listeners                │ │
      │                │                               │ │
      │                ├── expandToggle → _toggleExpand()│
-     │                ├── fabCollapse → _toggleExpand()│ │
      │                ├── featuredContainer → _toggleExpand()│
      │                ├── sortToggle → _toggleSort()  │ │
      │                ├── filterToggle → toggle menu  │ │
-     │                ├── document click → close menus│ │
-     │                └── scroll → scrolled state     │ │
+     │                └── document click → close menus│ │
      │                                                │ │
      └────────────────────────────────────────────────┘ │
               _toggleSort() y _applyFilters() ──────────┘
@@ -171,8 +169,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
               │   ├── .timeline-item.timeline-footer-item (si lastUpdated)
               │   ├── .timeline-item.timeline-load-more-item (si hay más páginas)
               │   └── .timeline-item.timeline-empty-item (si no hay resultados)
-              └── .fab-sticky-wrap
-                  └── button.fab-collapse (#fab-collapse)
+
 ```
 
 ## Sistema de theming CSS
@@ -289,7 +286,6 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `expandToggle` | `HTMLElement` | `#expand-toggle` |
 | `remainingCount` | `HTMLElement` | `#remaining-count` |
 | `expandIcon` | `HTMLElement` | `#expand-icon` |
-| `fabCollapse` | `HTMLElement` | `#fab-collapse` |
 | `sortToggle` | `HTMLElement` | `#sort-toggle` |
 | `filterToggle` | `HTMLElement` | `#filter-toggle` |
 | `filterMenu` | `HTMLElement` | `#filter-menu` |
@@ -301,7 +297,6 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | Clase | Elemento | Descripción |
 |-------|----------|-------------|
 | `.expanded` | `.publicaciones-section` | Timeline visible, featured oculto |
-| `.scrolled` | `.publicaciones-section` | Timeline scrolled más allá del top |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
 | `.visible` | `.featured-card` | Tarjeta featured animada (entró en viewport) |
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |

@@ -82,7 +82,6 @@ export default class Timeline {
     remainingCount: HTMLElement;
     expandIcon: HTMLElement;
     section: HTMLElement;
-    fabCollapse: HTMLElement;
     sortToggle: HTMLElement;
     sortAscending: boolean;
     filterToggle: HTMLElement;
