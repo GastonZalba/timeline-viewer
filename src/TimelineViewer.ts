@@ -13,7 +13,7 @@ const YOUTUBE_REGEX =
   /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
 const YOUTUBE_EMBED_URL = 'https://www.youtube.com/embed/';
 
-const INSTAGRAM_REGEX = /(?:instagram\.com)\/(p|reel|tv)\/([a-zA-Z0-9_-]+)/;
+const INSTAGRAM_REGEX = /(?:instagram\.com)\/(p|reels?|tv)\/([a-zA-Z0-9_-]+)/;
 const INSTAGRAM_EMBED_BASE = 'https://www.instagram.com/';
 const INSTAGRAM_EMBED_SCRIPT = 'https://www.instagram.com/embed.js';
 
@@ -370,7 +370,11 @@ export default class Timeline {
     let m = url.match(YOUTUBE_REGEX);
     if (m) return { url: `${YOUTUBE_EMBED_URL}${m[1]}`, type: 'youtube' };
     m = url.match(INSTAGRAM_REGEX);
-    if (m) return { url: `${INSTAGRAM_EMBED_BASE}${m[1]}/${m[2]}/`, type: 'instagram' };
+    if (m)
+      return {
+        url: `${INSTAGRAM_EMBED_BASE}${m[1] === 'reels' ? 'reel' : m[1]}/${m[2]}/`,
+        type: 'instagram'
+      };
     m = url.match(TWITTER_REGEX);
     if (m) return { url: `${TWITTER_EMBED_BASE}${m[1]}/status/${m[2]}`, type: 'twitter' };
     m = url.match(FACEBOOK_POST_REGEX);
