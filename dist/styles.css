@@ -879,6 +879,17 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   border: 1px solid var(--tv-border-card);
 }
+.publicaciones-section .timeline-card.not-captured .card-actions {
+  display: block;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+.publicaciones-section .timeline-card.not-captured .card-actions .card-actions-row {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
 .publicaciones-section .timeline-card.not-captured .card-body-not-captured {
   display: flex;
   flex-direction: column;
