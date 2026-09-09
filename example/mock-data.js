@@ -520,6 +520,7 @@ export default {
   },
   {
     id: 'FUE-00019',
+    link_edit_entry: 'https://ejemplo.com/admin/editar/FUE-00019',
     capturado: false,
     descartado: null,
     nombre_fuente: '',

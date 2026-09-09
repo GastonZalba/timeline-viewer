@@ -954,6 +954,19 @@
         border: 1px solid var(--tv-border-card);
       }
 
+      .card-actions {
+        display: block;
+        padding: 0;
+        background: transparent;
+        border: 0;
+
+        .card-actions-row {
+          margin-top: 12px;
+          display: flex;
+          gap: 8px;
+        }
+      }
+
       .card-body-not-captured {
         display: flex;
         flex-direction: column;
