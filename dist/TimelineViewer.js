@@ -18,6 +18,8 @@ const RESIZE_MIN_HEIGHT = 180;
 const RESIZE_MAX_HEIGHT = 1200;
 const RESIZE_STEP = 24;
 const RESIZE_STORAGE_KEY = 'tv-timeline-cards-height';
+const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
+const ESTADO_FILTER_STORAGE_KEY = 'tv-estado-filters';
 export default class Timeline {
     constructor(config) {
         this.sortAscending = false;
@@ -32,6 +34,7 @@ export default class Timeline {
         this.itemsPerPage = config.itemsPerPage || 10;
         this.inlineImages = config.inlineImages || false;
         this.inlineAdjuntos = config.inlineAdjuntos || false;
+        this.internalButtons = config.internalButtons || false;
         this._displayedCount = 0;
         this.allCards = [];
         this.isExpanded = false;
@@ -44,8 +47,12 @@ export default class Timeline {
         this.remainingCount = null;
         this.expandIcon = null;
         this.sortToggle = null;
+        this.workNotesToggle = null;
         this.filterToggle = null;
         this.filterMenu = null;
+        this.estadoWrap = null;
+        this.estadoToggle = null;
+        this.estadoMenu = null;
         this.section = null;
         this.filters = [];
         this.searchWrap = null;
@@ -59,6 +66,21 @@ export default class Timeline {
     }
     /** Build the main DOM layout and cache element references */
     _buildLayout() {
+        const internalButtonsHtml = this.internalButtons
+            ? `<button class="work-notes-toggle" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
+            </button>
+            <div class="estado-wrap" id="estado-wrap">
+              <button class="estado-toggle" id="estado-toggle" title="Estado interno">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+              <div class="estado-menu" id="estado-menu">
+                <div class="filter-options" id="filter-options-validado"></div>
+                <div class="filter-options" id="filter-options-capturado"></div>
+                <div class="filter-options" id="filter-options-descartado"></div>
+              </div>
+            </div>`
+            : '';
         this.container.innerHTML = `
       <section class="publicaciones-section" id="publicaciones-section">
         <div class="featured-row">
@@ -78,10 +100,6 @@ export default class Timeline {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
               <div class="filter-menu" id="filter-menu">
-                <div class="filter-header filter-submenu-trigger filter-submenu-trigger-top" id="filter-submenu-trigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
-                  <span>Estado interno</span>
-                  <span class="filter-submenu-arrow"></span>
-                </div>
                 <div class="filter-column">
                   <div class="filter-section">
                     <div class="filter-header">Tono social</div>
@@ -106,18 +124,12 @@ export default class Timeline {
                     <div class="filter-options" id="filter-options-oficial"></div>
                   </div>
                 </div>
-                <div class="filter-menu-sub" id="filter-menu-sub">
-                  <div class="filter-section">
-                    <div class="filter-options" id="filter-options-validado"></div>
-                    <div class="filter-options" id="filter-options-capturado"></div>
-                    <div class="filter-options" id="filter-options-descartado"></div>
-                  </div>
-                </div>
               </div>
             </div>
             <button class="sort-toggle" id="sort-toggle" title="Invertir orden">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="17,9 12,4 7,9" fill="currentColor"/><polygon points="17,15 12,20 7,15" fill="none" stroke-width="1.5"/></svg>
             </button>
+            ${internalButtonsHtml}
           </div>
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
         </div>
@@ -147,8 +159,12 @@ export default class Timeline {
         this.remainingCount = this.container.querySelector('#remaining-count');
         this.expandIcon = this.container.querySelector('#expand-icon');
         this.sortToggle = this.container.querySelector('#sort-toggle');
+        this.workNotesToggle = this.container.querySelector('#work-notes-toggle');
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
+        this.estadoWrap = this.container.querySelector('#estado-wrap');
+        this.estadoToggle = this.container.querySelector('#estado-toggle');
+        this.estadoMenu = this.container.querySelector('#estado-menu');
         this.searchWrap = this.container.querySelector('#search-wrap');
         this.searchToggle = this.container.querySelector('#search-toggle');
         this.searchInput = this.container.querySelector('#search-input');
@@ -173,7 +189,8 @@ export default class Timeline {
                 options: this.container.querySelector('#filter-options-validado'),
                 checkboxes: [],
                 extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
-                formatLabel: (val) => (val === 'validado' ? 'Validado' : 'No validado')
+                formatLabel: (val) => (val === 'validado' ? 'Validado' : 'Sin validar'),
+                defaultChecked: ['validado', 'no-validado']
             },
             {
                 field: 'capturado',
@@ -190,7 +207,8 @@ export default class Timeline {
                 options: this.container.querySelector('#filter-options-descartado'),
                 checkboxes: [],
                 extract: (item) => (item.descartado === true ? 'descartado' : 'no-descartado'),
-                formatLabel: (val) => (val === 'descartado' ? 'Descartado' : 'No descartado'),
+                formatLabel: (val) => (val === 'descartado' ? 'Descartado' : 'Sin descartar'),
+                sortValues: (a, b) => (a === 'descartado' ? -1 : b === 'descartado' ? 1 : 0),
                 defaultChecked: ['no-descartado']
             },
             {
@@ -497,7 +515,7 @@ export default class Timeline {
       </div>
       <div class="timeline-card${card.thumbnail ? '' : ' no-image'}">
         <div class="card-status-badges">
-          ${card.validado !== true ? '<span class="card-no-validado">No validado</span>' : ''}
+          ${card.validado !== true ? '<span class="card-no-validado">Sin validar</span>' : ''}
           ${card.descartado === true ? '<span class="card-no-validado">Descartado</span>' : ''}
         </div>
         ${imgHtml}
@@ -951,10 +969,45 @@ export default class Timeline {
         this.sortToggle.classList.toggle('asc', this.sortAscending);
         this._applyFilters();
     }
+    /** Apply the persisted work-notes visibility state to the section and toggle button */
+    _applyWorkNotesState() {
+        if (!this.workNotesToggle)
+            return;
+        let hidden = false;
+        try {
+            hidden = window.localStorage.getItem(WORK_NOTES_STORAGE_KEY) === '1';
+        }
+        catch {
+            /* localStorage unavailable */
+        }
+        this.section.classList.toggle('work-notes-hidden', hidden);
+        this.workNotesToggle.classList.toggle('active', hidden);
+        this.workNotesToggle.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        this.workNotesToggle.title = hidden ? 'Mostrar notas de trabajo' : 'Ocultar notas de trabajo';
+    }
+    /** Toggle work-notes visibility and persist the state to localStorage */
+    _toggleWorkNotes() {
+        if (!this.workNotesToggle)
+            return;
+        const hidden = !this.section.classList.contains('work-notes-hidden');
+        this.section.classList.toggle('work-notes-hidden', hidden);
+        this.workNotesToggle.classList.toggle('active', hidden);
+        this.workNotesToggle.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+        this.workNotesToggle.title = hidden ? 'Mostrar notas de trabajo' : 'Ocultar notas de trabajo';
+        try {
+            window.localStorage.setItem(WORK_NOTES_STORAGE_KEY, hidden ? '1' : '0');
+        }
+        catch {
+            /* localStorage unavailable */
+        }
+    }
     /** Build filter checkboxes from the available filter values */
     _buildFilterCheckboxes() {
+        const savedEstado = this._loadEstadoFilterState();
         let anyFilterVisible = false;
         this.filters.forEach((f) => {
+            if (!f.options)
+                return;
             const values = [
                 ...new Set(this.items.flatMap((c) => {
                     const v = f.extract ? f.extract(c) : c[f.field];
@@ -987,7 +1040,12 @@ export default class Timeline {
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.value = val;
-                cb.checked = f.defaultChecked ? f.defaultChecked.includes(val) : false;
+                const savedValues = ESTADO_FILTER_FIELDS.includes(f.field) ? savedEstado[f.field] : undefined;
+                cb.checked = savedValues
+                    ? savedValues.includes(val)
+                    : f.defaultChecked
+                        ? f.defaultChecked.includes(val)
+                        : false;
                 const span = document.createElement('span');
                 span.className = 'filter-option-label';
                 const display = f.formatLabel ? f.formatLabel(val) : val;
@@ -999,7 +1057,11 @@ export default class Timeline {
                 label.appendChild(cb);
                 label.appendChild(span);
                 label.appendChild(countSpan);
-                cb.addEventListener('change', () => this._applyFilters());
+                cb.addEventListener('change', () => {
+                    if (ESTADO_FILTER_FIELDS.includes(f.field))
+                        this._saveEstadoFilterState();
+                    this._applyFilters();
+                });
                 f.options.appendChild(label);
                 f.checkboxes.push(cb);
             });
@@ -1011,16 +1073,42 @@ export default class Timeline {
             section.hidden = opts.length > 0 && !hasOptions;
         });
         const estadoHasDiversity = this.filters.some((f) => ESTADO_FILTER_FIELDS.includes(f.field) && f.checkboxes.length > 0);
-        const submenuTrigger = this.container.querySelector('#filter-submenu-trigger');
-        const submenuPanel = this.container.querySelector('#filter-menu-sub');
-        submenuTrigger.style.display = estadoHasDiversity ? '' : 'none';
-        submenuPanel.style.display = estadoHasDiversity ? '' : 'none';
-        if (!estadoHasDiversity) {
-            submenuTrigger.classList.remove('open');
-            submenuPanel.classList.remove('open');
-            submenuTrigger.setAttribute('aria-expanded', 'false');
+        if (this.estadoWrap) {
+            this.estadoWrap.style.display = estadoHasDiversity ? '' : 'none';
+            if (!estadoHasDiversity) {
+                this.estadoMenu.classList.remove('open');
+                this.estadoToggle.classList.remove('open');
+            }
         }
         this.filterToggle.style.display = anyFilterVisible ? '' : 'none';
+    }
+    /** Load the persisted estado-interno filter state from localStorage */
+    _loadEstadoFilterState() {
+        try {
+            const raw = window.localStorage.getItem(ESTADO_FILTER_STORAGE_KEY);
+            if (!raw)
+                return {};
+            const parsed = JSON.parse(raw);
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        }
+        catch {
+            return {};
+        }
+    }
+    /** Persist the current estado-interno filter state to localStorage */
+    _saveEstadoFilterState() {
+        const state = {};
+        ESTADO_FILTER_FIELDS.forEach((field) => {
+            const f = this.filters.find((x) => x.field === field);
+            if (f)
+                state[field] = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+        });
+        try {
+            window.localStorage.setItem(ESTADO_FILTER_STORAGE_KEY, JSON.stringify(state));
+        }
+        catch {
+            /* localStorage unavailable */
+        }
     }
     /** Normalize a string for accent- and case-insensitive search matching */
     _normalizeSearch(value) {
@@ -1044,12 +1132,15 @@ export default class Timeline {
     }
     /** Apply active filters and re-render the full view */
     _applyFilters() {
-        const anyActive = this.filters.some((f) => f.checkboxes.some((cb) => cb.checked));
+        const anyActive = this.filters
+            .filter((f) => !ESTADO_FILTER_FIELDS.includes(f.field))
+            .some((f) => f.checkboxes.some((cb) => cb.checked));
         this.filterToggle.classList.toggle('active', anyActive);
         const estadoActive = this.filters
             .filter((f) => ESTADO_FILTER_FIELDS.includes(f.field))
             .some((f) => f.checkboxes.some((cb) => cb.checked));
-        this.filterToggle.classList.toggle('estado-active', estadoActive);
+        if (this.estadoToggle)
+            this.estadoToggle.classList.toggle('active', estadoActive);
         this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
         this.allCards = this._originalCards.filter((c) => this._matchesSearch(c) &&
             this.filters.every((f) => {
@@ -1226,60 +1317,26 @@ export default class Timeline {
         this.featuredRow.addEventListener('click', (e) => {
             if (this.isExpanded)
                 return;
-            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap'))
+            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .estado-toggle, .estado-wrap'))
                 return;
             this._toggleExpand();
         });
         this.sortToggle.addEventListener('click', () => this._toggleSort());
-        const submenuTrigger = this.container.querySelector('#filter-submenu-trigger');
-        const submenu = this.container.querySelector('#filter-menu-sub');
-        let submenuCloseTimeout = 0;
-        const openSubmenu = () => {
-            window.clearTimeout(submenuCloseTimeout);
-            submenu.classList.add('open');
-            submenuTrigger.classList.add('open');
-            submenuTrigger.setAttribute('aria-expanded', 'true');
-        };
-        const closeSubmenu = () => {
-            window.clearTimeout(submenuCloseTimeout);
-            submenu.classList.remove('open');
-            submenuTrigger.classList.remove('open');
-            submenuTrigger.setAttribute('aria-expanded', 'false');
-        };
-        const scheduleSubmenuClose = () => {
-            window.clearTimeout(submenuCloseTimeout);
-            submenuCloseTimeout = window.setTimeout(() => {
-                if (!submenu.matches(':hover') && !submenuTrigger.matches(':hover'))
-                    closeSubmenu();
-            }, 150);
-        };
-        submenuTrigger.addEventListener('mouseenter', openSubmenu);
-        submenu.addEventListener('mouseenter', openSubmenu);
-        submenuTrigger.addEventListener('mouseleave', scheduleSubmenuClose);
-        submenu.addEventListener('mouseleave', scheduleSubmenuClose);
-        submenuTrigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (submenu.classList.contains('open'))
-                closeSubmenu();
-            else
-                openSubmenu();
-        });
-        submenuTrigger.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                if (submenu.classList.contains('open'))
-                    closeSubmenu();
-                else
-                    openSubmenu();
-            }
-        });
+        this._applyWorkNotesState();
+        if (this.workNotesToggle)
+            this.workNotesToggle.addEventListener('click', () => this._toggleWorkNotes());
         this.filterToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             this.filterMenu.classList.toggle('open');
             this.filterToggle.classList.toggle('open');
-            if (!this.filterMenu.classList.contains('open'))
-                closeSubmenu();
         });
+        if (this.estadoToggle) {
+            this.estadoToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.estadoMenu.classList.toggle('open');
+                this.estadoToggle.classList.toggle('open');
+            });
+        }
         this.searchToggle.addEventListener('click', (e) => {
             e.stopPropagation();
             this.searchWrap.classList.toggle('open');
@@ -1311,7 +1368,10 @@ export default class Timeline {
             if (!e.target.closest('.filter-wrap')) {
                 this.filterMenu.classList.remove('open');
                 this.filterToggle.classList.remove('open');
-                closeSubmenu();
+            }
+            if (!e.target.closest('.estado-wrap') && this.estadoMenu) {
+                this.estadoMenu.classList.remove('open');
+                this.estadoToggle.classList.remove('open');
             }
             if (!e.target.closest('.search-wrap')) {
                 this.searchWrap.classList.remove('open');

@@ -44,6 +44,7 @@ export interface TimelineOptions {
     itemsPerPage?: number;
     inlineImages?: boolean;
     inlineAdjuntos?: boolean;
+    internalButtons?: boolean;
 }
 interface ImageInfo {
     thumb: string;
@@ -71,6 +72,7 @@ export default class Timeline {
     itemsPerPage: number;
     inlineImages: boolean;
     inlineAdjuntos: boolean;
+    internalButtons: boolean;
     _displayedCount: number;
     allCards: TimelineItem[];
     isExpanded: boolean;
@@ -85,8 +87,12 @@ export default class Timeline {
     section: HTMLElement;
     sortToggle: HTMLElement;
     sortAscending: boolean;
+    workNotesToggle: HTMLElement;
     filterToggle: HTMLElement;
     filterMenu: HTMLElement;
+    estadoWrap: HTMLElement;
+    estadoToggle: HTMLElement;
+    estadoMenu: HTMLElement;
     filters: FilterDef[];
     searchWrap: HTMLElement;
     searchToggle: HTMLElement;
@@ -136,8 +142,16 @@ export default class Timeline {
     protected _scrollToSection(): void;
     /** Toggle timeline sort order between ascending and descending */
     protected _toggleSort(): void;
+    /** Apply the persisted work-notes visibility state to the section and toggle button */
+    protected _applyWorkNotesState(): void;
+    /** Toggle work-notes visibility and persist the state to localStorage */
+    protected _toggleWorkNotes(): void;
     /** Build filter checkboxes from the available filter values */
     protected _buildFilterCheckboxes(): void;
+    /** Load the persisted estado-interno filter state from localStorage */
+    protected _loadEstadoFilterState(): Record<string, string[]>;
+    /** Persist the current estado-interno filter state to localStorage */
+    protected _saveEstadoFilterState(): void;
     /** Normalize a string for accent- and case-insensitive search matching */
     protected _normalizeSearch(value: string | null | undefined): string;
     /** Check whether a card matches the current search term */
