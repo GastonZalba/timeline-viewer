@@ -119,7 +119,7 @@ export default {
     adjuntos: ['https://archivos.ejemplo.com/specs/spec-css-2026.pdf', 'https://archivos.ejemplo.com/specs/anexo-ejemplos-layout.html'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
     imagenes: [
-      { thumb: 'https://picsum.photos/seed/noticia4a/300/200', full: 'https://picsum.photos/seed/noticia4a/600/400' }
+      { thumb: 'https://picsum.photos/seed/noticia4a/300/200?4564646', full: 'https://picsum.photos/seed/noticia4a/600/400' }
     ],
     has_video: true,
     links_videos: ['https://www.youtube.com/watch?v=YQHsXMglC9A', 'https://www.instagram.com/reel/DFwJRp9sp1i/','https://www.instagram.com/tv/CD1ra-YgcBe/'],

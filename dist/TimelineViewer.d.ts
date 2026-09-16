@@ -63,6 +63,7 @@ interface FilterDef {
     formatLabel?: (val: string) => string;
     sortValues?: (a: string, b: string) => number;
     defaultChecked?: string[];
+    fixedValues?: string[];
 }
 export default class Timeline {
     container: HTMLElement;

@@ -231,6 +231,7 @@
   border-radius: 42px;
   height: 34px;
   width: 34px;
+  min-width: 34px;
   cursor: pointer;
   transition: none;
   display: none;
@@ -256,6 +257,7 @@
   border-radius: 34px;
   height: 34px;
   width: 34px;
+  min-width: 34px;
   cursor: pointer;
   transition: all 0.3s ease;
   display: none;
@@ -762,7 +764,7 @@
   position: absolute;
   left: 110px;
   top: 0px;
-  bottom: 25px;
+  bottom: 40px;
   width: 1px;
   background: var(--tv-accent);
   border-radius: 2px;

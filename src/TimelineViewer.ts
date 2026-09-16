@@ -111,6 +111,7 @@ interface FilterDef {
   formatLabel?: (val: string) => string;
   sortValues?: (a: string, b: string) => number;
   defaultChecked?: string[];
+  fixedValues?: string[];
 }
 
 export default class Timeline {
@@ -319,7 +320,8 @@ export default class Timeline {
         checkboxes: [],
         extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
         formatLabel: (val) => (val === 'validado' ? 'Validado' : 'Sin validar'),
-        defaultChecked: ['validado', 'no-validado']
+        defaultChecked: ['validado', 'no-validado'],
+        fixedValues: ['validado', 'no-validado']
       },
       {
         field: 'capturado',
@@ -328,7 +330,8 @@ export default class Timeline {
         checkboxes: [],
         extract: (item) => (item.capturado !== true ? 'no-capturado' : 'capturado'),
         formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
-        defaultChecked: ['capturado']
+        defaultChecked: ['capturado'],
+        fixedValues: ['capturado', 'no-capturado']
       },
       {
         field: 'descartado',
@@ -338,7 +341,8 @@ export default class Timeline {
         extract: (item) => (item.descartado === true ? 'descartado' : 'no-descartado'),
         formatLabel: (val) => (val === 'descartado' ? 'Descartado' : 'Sin descartar'),
         sortValues: (a, b) => (a === 'descartado' ? -1 : b === 'descartado' ? 1 : 0),
-        defaultChecked: ['no-descartado']
+        defaultChecked: ['no-descartado'],
+        fixedValues: ['descartado', 'no-descartado']
       },
       {
         field: 'es_oficial',
@@ -487,9 +491,12 @@ export default class Timeline {
 
   /** Codificar con encodeURIComponent el nombre de archivo de una URL, preservando el resto */
   protected _encodeFileName(url: string): string {
-    const idx = url.lastIndexOf('/');
-    if (idx === -1) return encodeURIComponent(url);
-    return url.substring(0, idx + 1) + encodeURIComponent(url.substring(idx + 1));
+    const qIdx = url.indexOf('?');
+    const base = qIdx === -1 ? url : url.substring(0, qIdx);
+    const tail = qIdx === -1 ? '' : url.substring(qIdx);
+    const idx = base.lastIndexOf('/');
+    if (idx === -1) return encodeURIComponent(base) + tail;
+    return base.substring(0, idx + 1) + encodeURIComponent(base.substring(idx + 1)) + tail;
   }
 
   /** SVG del icono de archivo según su extensión (pdf vs genérico) */
@@ -556,14 +563,6 @@ export default class Timeline {
                   ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 Ir
-              </a>`
-                  : ''
-              }
-              ${
-                card.link_edit_entry
-                  ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                Editar
               </a>`
                   : ''
               }
@@ -654,7 +653,7 @@ export default class Timeline {
             : ''
         }
         ${
-          card.link_edit_entry
+          this.internalButtons && card.link_edit_entry
             ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
           Editar
@@ -1175,22 +1174,25 @@ export default class Timeline {
     let anyFilterVisible = false;
     this.filters.forEach((f) => {
       if (!f.options) return;
-      const values = [
-        ...new Set(
-          this.items.flatMap((c) => {
-            const v = f.extract ? f.extract(c) : c[f.field];
-            const arr = v == null ? [] : Array.isArray(v) ? v : [v];
-            return arr.map((x) => String(x)).filter(Boolean);
-          })
-        )
-      ];
-      if (values.length <= 1) {
+      const isEstado = ESTADO_FILTER_FIELDS.includes(f.field);
+      const values = f.fixedValues
+        ? [...f.fixedValues]
+        : [
+            ...new Set(
+              this.items.flatMap((c) => {
+                const v = f.extract ? f.extract(c) : c[f.field];
+                const arr = v == null ? [] : Array.isArray(v) ? v : [v];
+                return arr.map((x) => String(x)).filter(Boolean);
+              })
+            )
+          ];
+      if (!f.fixedValues && values.length <= 1) {
         f.checkboxes = [];
         f.options.hidden = true;
         return;
       }
       f.options.hidden = false;
-      anyFilterVisible = true;
+      if (!isEstado) anyFilterVisible = true;
       if (f.sortValues) values.sort(f.sortValues);
       const counts: Record<string, number> = {};
       values.forEach((val) => {
@@ -1239,15 +1241,8 @@ export default class Timeline {
       const hasOptions = opts.some((o) => this.filters.some((ef) => ef.options === o && ef.checkboxes.length > 0));
       section.hidden = opts.length > 0 && !hasOptions;
     });
-    const estadoHasDiversity = this.filters.some(
-      (f) => ESTADO_FILTER_FIELDS.includes(f.field) && f.checkboxes.length > 0
-    );
     if (this.estadoWrap) {
-      this.estadoWrap.style.display = estadoHasDiversity ? '' : 'none';
-      if (!estadoHasDiversity) {
-        this.estadoMenu.classList.remove('open');
-        this.estadoToggle.classList.remove('open');
-      }
+      this.estadoWrap.style.display = '';
     }
     this.filterToggle.style.display = anyFilterVisible ? '' : 'none';
   }
