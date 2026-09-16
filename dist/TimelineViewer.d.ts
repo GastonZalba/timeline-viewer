@@ -113,7 +113,7 @@ export default class Timeline {
     /** Build the embed markup for a parsed link */
     protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
-    protected _openLightGallery(images: ImageInfo[], title: string, showFileName: boolean, startIndex?: number): void;
+    protected _openLightGallery(images: ImageInfo[] | null | undefined, title: string, showFileName: boolean, startIndex?: number): void;
     /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
     protected _oficialIconSvg(): string;
     /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */

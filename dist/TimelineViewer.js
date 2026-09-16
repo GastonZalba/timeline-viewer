@@ -241,11 +241,11 @@ export default class Timeline {
                 checkboxes: [],
                 extract: (item) => {
                     const types = [];
-                    if (item.adjuntos.length > 0)
+                    if ((item.adjuntos || []).length > 0)
                         types.push('adjuntos');
                     if (item.has_video)
                         types.push('video');
-                    if (item.imagenes.length > 0)
+                    if ((item.imagenes || []).length > 0)
                         types.push('imagenes');
                     return types;
                 },
@@ -312,6 +312,8 @@ export default class Timeline {
     }
     /** Open a lightGallery modal with the provided images */
     _openLightGallery(images, title, showFileName, startIndex = 0) {
+        if (!images || !images.length)
+            return;
         if (this._lgInstance) {
             this._lgInstance.destroy();
             this._lgInstance = null;
@@ -1011,7 +1013,7 @@ export default class Timeline {
             const values = [
                 ...new Set(this.items.flatMap((c) => {
                     const v = f.extract ? f.extract(c) : c[f.field];
-                    const arr = Array.isArray(v) ? v : [v];
+                    const arr = v == null ? [] : Array.isArray(v) ? v : [v];
                     return arr.map((x) => String(x)).filter(Boolean);
                 }))
             ];
