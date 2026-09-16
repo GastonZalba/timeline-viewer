@@ -8,5 +8,6 @@ new Timeline({
   featuredCount: 10,
   itemsPerPage: 10,
   inlineImages: true,
-  inlineAdjuntos: true
+  inlineAdjuntos: true,
+  internalButtons: true
 });
