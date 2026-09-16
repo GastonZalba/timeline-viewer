@@ -78,6 +78,7 @@ export default class Timeline {
     featuredRow: HTMLElement;
     timelineContainer: HTMLElement;
     timelineCards: HTMLElement;
+    resizeHandle: HTMLElement;
     expandToggle: HTMLElement;
     remainingCount: HTMLElement;
     expandIcon: HTMLElement;
@@ -111,6 +112,8 @@ export default class Timeline {
     protected _oficialIconSvg(): string;
     /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */
     protected _getFileExt(url: string): string;
+    /** Codificar con encodeURIComponent el nombre de archivo de una URL, preservando el resto */
+    protected _encodeFileName(url: string): string;
     /** SVG del icono de archivo según su extensión (pdf vs genérico) */
     protected _fileIconSvg(ext: string): string;
     /** Render the featured (overlapping) cards row */
@@ -145,6 +148,16 @@ export default class Timeline {
     protected _renderAll(): void;
     /** Render the "load more" button and wire its click handler */
     protected _renderLoadMoreButton(): void;
+    /** Read the current effective max-height of the timeline-cards in px */
+    protected _getCardsHeightPx(): number;
+    /** Clamp and apply a max-height (px) to the timeline-cards */
+    protected _applyCardsHeight(value: number): void;
+    /** Persist the current height to localStorage */
+    protected _persistCardsHeight(): void;
+    /** Keep the resize handle aria attributes in sync with the current height */
+    protected _syncResizeHandleA11y(): void;
+    /** Set up the timeline-cards resize handle: drag, keyboard and localStorage persistence */
+    protected _initResizeHandle(): void;
     /** Initialize the component: build layout, sort data, render, bind events */
     protected _init(): void;
 }

@@ -14,6 +14,10 @@ const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.ph
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 const ESTADO_FILTER_FIELDS = ['validado', 'capturado', 'descartado'];
+const RESIZE_MIN_HEIGHT = 180;
+const RESIZE_MAX_HEIGHT = 1200;
+const RESIZE_STEP = 24;
+const RESIZE_STORAGE_KEY = 'tv-timeline-cards-height';
 export default class Timeline {
     constructor(config) {
         this.sortAscending = false;
@@ -35,6 +39,7 @@ export default class Timeline {
         this.featuredRow = null;
         this.timelineContainer = null;
         this.timelineCards = null;
+        this.resizeHandle = null;
         this.expandToggle = null;
         this.remainingCount = null;
         this.expandIcon = null;
@@ -120,7 +125,10 @@ export default class Timeline {
           <div class="timeline-collapse-wrap">
             <div class="timeline-line"></div>
             <div class="timeline-content">
-              <div class="timeline-cards" id="timeline-cards"></div>             
+              <div class="timeline-cards-col">
+                <div class="timeline-cards" id="timeline-cards"></div>
+                <div class="timeline-resize-handle" id="timeline-resize-handle" role="slider" tabindex="0" aria-orientation="vertical" title="Ajustar la altura de la lista."></div>
+              </div>
             </div>
           </div>
           <div class="ai-disclaimer">
@@ -297,8 +305,8 @@ export default class Timeline {
             addClass: 'timeline-gallery',
             dynamic: true,
             dynamicEl: images.map((imgInfo) => ({
-                src: imgInfo.full,
-                thumb: imgInfo.thumb,
+                src: this._encodeFileName(imgInfo.full),
+                thumb: this._encodeFileName(imgInfo.thumb),
                 subHtml: title
                     ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>`
                     : ''
@@ -323,6 +331,13 @@ export default class Timeline {
     _getFileExt(url) {
         const clean = url.split('?')[0].split('#')[0];
         return clean.includes('.') ? clean.substring(clean.lastIndexOf('.') + 1).toLowerCase() : '';
+    }
+    /** Codificar con encodeURIComponent el nombre de archivo de una URL, preservando el resto */
+    _encodeFileName(url) {
+        const idx = url.lastIndexOf('/');
+        if (idx === -1)
+            return encodeURIComponent(url);
+        return url.substring(0, idx + 1) + encodeURIComponent(url.substring(idx + 1));
     }
     /** SVG del icono de archivo según su extensión (pdf vs genérico) */
     _fileIconSvg(ext) {
@@ -361,7 +376,6 @@ export default class Timeline {
     _createTimelineItem(card, index) {
         const el = document.createElement('div');
         el.className = 'timeline-item';
-        el.style.transitionDelay = `${index * 0.08}s`;
         if (card.capturado !== true) {
             el.innerHTML = `
       <div class="timeline-date-col no-date">
@@ -444,7 +458,7 @@ export default class Timeline {
             : '';
         const inlineImagesHtml = this.inlineImages && card.imagenes && card.imagenes.length
             ? `<div class="card-inline-images"><div class="card-subtitle">Imágenes</div><div class="card-inline-images-list">${card.imagenes
-                .map((img, i) => `<button class="card-inline-thumb" data-index="${i}"><img src="${img.thumb}" alt="" loading="lazy"></button>`)
+                .map((img, i) => `<button class="card-inline-thumb" data-index="${i}"><img src="${this._encodeFileName(img.thumb)}" alt="" loading="lazy"></button>`)
                 .join('')}</div></div>`
             : '';
         const inlineAdjuntosHtml = this.inlineAdjuntos && card.adjuntos && card.adjuntos.length
@@ -452,7 +466,7 @@ export default class Timeline {
                 .map((a) => {
                 const ext = this._getFileExt(a);
                 const name = a.substring(a.lastIndexOf('/') + 1);
-                return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${a}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
+                return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
             })
                 .join('')}</div></div>`
             : '';
@@ -460,7 +474,7 @@ export default class Timeline {
       <div class="card-actions-row">
         ${card.screenshot ? '<button class="card-actions-btn card-screenshot-btn" title="Captura de pantallla de la fuente"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144.12 144" width="14" height="14"><path d="M78.64,116.38q-18.12,0-36.22,0c-6.27,0-10.66-4.39-10.66-10.68q0-22.31,0-44.61A10.44,10.44,0,0,1,36.23,52a1.13,1.13,0,0,0,.49-1.11c0-1.36,0-2.72,0-4.08,0-1.92.39-2.51,2.29-2.89a15.06,15.06,0,0,1,6.41,0c1.54.36,2.06,1.14,2.09,2.74,0,1.15-.5,2.67.23,3.32s2.13.17,3.24.18c1.68,0,3.36-.06,5,0,1,.05,1.27-.26,1.36-1.22a12.06,12.06,0,0,1,7.79-10.66,13.4,13.4,0,0,1,5.22-1.08c5.56,0,11.12-.11,16.67,0,6.25.14,11.68,3.88,12.91,10.5A2,2,0,0,1,100,48c.1.71-.16,1.74.35,2.05s1.55.15,2.34.15h12.48a10.13,10.13,0,0,1,10.48,10.25q.1,22.85,0,45.69a10.13,10.13,0,0,1-10.46,10.27Q96.93,116.4,78.64,116.38Zm0-61.24A26.93,26.93,0,1,0,79.23,109c14.27-.16,26.3-12.34,26.31-26.91A26.91,26.91,0,0,0,78.68,55.14Z" transform="translate(-6.66 -4.82)"/><path d="M31.12,4.82H49.24a6.16,6.16,0,0,1,6.17,6.37,6.24,6.24,0,0,1-6.16,6.55q-14.22,0-28.43,0c-.92,0-1.18.2-1.18,1.15,0,9.48,0,19,0,28.43,0,3.33-2.34,5.73-5.93,6.16a6.46,6.46,0,0,1-6.86-4.59,5.16,5.16,0,0,1-.12-1.3q0-18.48,0-36.95a5.88,5.88,0,0,1,5.78-5.8C18.72,4.81,24.92,4.82,31.12,4.82Z" transform="translate(-6.66 -4.82)"/><path d="M126.32,148.77c-6,0-12.08-.13-18.11,0a6.31,6.31,0,0,1-6.08-7.35c.62-3.77,2.86-5.62,6.65-5.62,9.27,0,18.55,0,27.83,0,1.07,0,1.19-.35,1.18-1.27q0-14.16,0-28.31c0-3.34,2.3-5.71,5.93-6.17a6.51,6.51,0,0,1,6.83,4.46,4.94,4.94,0,0,1,.15,1.42q0,18.42,0,36.83a5.9,5.9,0,0,1-5.89,5.93H126.32Z" transform="translate(-6.66 -4.82)"/><path d="M150.7,29.18c0,5.92-.24,11.85.07,17.75.26,4.79-5.22,8.24-9.85,5.68a5.75,5.75,0,0,1-3.15-5.37c0-9.44,0-18.87,0-28.31,0-1-.29-1.21-1.25-1.21q-14.16.06-28.31,0c-3.35,0-5.73-2.24-6.14-5.91A6.39,6.39,0,0,1,106.51,5a5.34,5.34,0,0,1,1.42-.16h36.94a5.92,5.92,0,0,1,5.82,5.88Q150.7,20,150.7,29.18Z" transform="translate(-6.66 -4.82)"/><path d="M6.74,124.42c0-5.92.25-11.85-.07-17.75-.26-4.78,5.22-8.25,9.85-5.68a5.75,5.75,0,0,1,3.15,5.37c0,9.44,0,18.87,0,28.31,0,1,.28,1.21,1.25,1.21q14.14-.06,28.3,0c3.36,0,5.73,2.23,6.15,5.91a6.39,6.39,0,0,1-4.41,6.85,4.94,4.94,0,0,1-1.42.15H12.57a5.93,5.93,0,0,1-5.82-5.88Q6.74,133.65,6.74,124.42Z" transform="translate(-6.66 -4.82)"/><path d="M94.38,82.05A15.66,15.66,0,1,1,78.72,66.26,15.72,15.72,0,0,1,94.38,82.05Z" transform="translate(-6.66 -4.82)"/></svg> Captura</button>' : ''}
         ${card.imagenes && card.imagenes.length && !this.inlineImages ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + card.imagenes.length + '</span></button>' : ''}
-        ${card.adjuntos && card.adjuntos.length && !this.inlineAdjuntos ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${a}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
+        ${card.adjuntos && card.adjuntos.length && !this.inlineAdjuntos ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
         ${card.link_web
             ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -1102,9 +1116,96 @@ export default class Timeline {
         });
         this._insertBeforeFooter(el);
     }
+    /** Read the current effective max-height of the timeline-cards in px */
+    _getCardsHeightPx() {
+        const inline = this.timelineCards.style.maxHeight;
+        const px = inline && inline.endsWith('px') ? parseFloat(inline) : NaN;
+        if (Number.isFinite(px))
+            return px;
+        const computed = getComputedStyle(this.timelineCards).maxHeight;
+        const match = computed ? parseFloat(computed) : NaN;
+        return Number.isFinite(match) ? match : RESIZE_MIN_HEIGHT;
+    }
+    /** Clamp and apply a max-height (px) to the timeline-cards */
+    _applyCardsHeight(value) {
+        const clamped = Math.min(RESIZE_MAX_HEIGHT, Math.max(RESIZE_MIN_HEIGHT, Math.round(value)));
+        this.timelineCards.style.maxHeight = clamped + 'px';
+        this._syncResizeHandleA11y();
+    }
+    /** Persist the current height to localStorage */
+    _persistCardsHeight() {
+        try {
+            window.localStorage.setItem(RESIZE_STORAGE_KEY, String(this._getCardsHeightPx()));
+        }
+        catch {
+            /* localStorage unavailable */
+        }
+    }
+    /** Keep the resize handle aria attributes in sync with the current height */
+    _syncResizeHandleA11y() {
+        this.resizeHandle.setAttribute('aria-valuemin', String(RESIZE_MIN_HEIGHT));
+        this.resizeHandle.setAttribute('aria-valuemax', String(RESIZE_MAX_HEIGHT));
+        this.resizeHandle.setAttribute('aria-valuenow', String(this._getCardsHeightPx()));
+    }
+    /** Set up the timeline-cards resize handle: drag, keyboard and localStorage persistence */
+    _initResizeHandle() {
+        this.resizeHandle = this.container.querySelector('#timeline-resize-handle');
+        if (!this.resizeHandle)
+            return;
+        const onPointerDown = (e) => {
+            e.preventDefault();
+            const startY = e.clientY;
+            const startHeight = this._getCardsHeightPx();
+            const onPointerMove = (ev) => {
+                this._applyCardsHeight(startHeight + (ev.clientY - startY));
+            };
+            const onPointerUp = () => {
+                window.removeEventListener('pointermove', onPointerMove);
+                window.removeEventListener('pointerup', onPointerUp);
+                window.removeEventListener('pointercancel', onPointerUp);
+                this.section.classList.remove('resizing');
+                this._persistCardsHeight();
+            };
+            window.addEventListener('pointermove', onPointerMove);
+            window.addEventListener('pointerup', onPointerUp);
+            window.addEventListener('pointercancel', onPointerUp);
+            this.section.classList.add('resizing');
+        };
+        const onKeyDown = (e) => {
+            let delta = 0;
+            if (e.key === 'ArrowUp')
+                delta = -RESIZE_STEP;
+            else if (e.key === 'ArrowDown')
+                delta = RESIZE_STEP;
+            else if (e.key === 'Home')
+                delta = -RESIZE_MAX_HEIGHT;
+            else if (e.key === 'End')
+                delta = RESIZE_MAX_HEIGHT;
+            else
+                return;
+            e.preventDefault();
+            this._applyCardsHeight(this._getCardsHeightPx() + delta);
+            this._persistCardsHeight();
+        };
+        try {
+            const raw = window.localStorage.getItem(RESIZE_STORAGE_KEY);
+            if (raw !== null) {
+                const value = Number(raw);
+                if (Number.isFinite(value))
+                    this._applyCardsHeight(value);
+            }
+        }
+        catch {
+            /* localStorage unavailable */
+        }
+        this._syncResizeHandleA11y();
+        this.resizeHandle.addEventListener('pointerdown', onPointerDown);
+        this.resizeHandle.addEventListener('keydown', onKeyDown);
+    }
     /** Initialize the component: build layout, sort data, render, bind events */
     _init() {
         this._buildLayout();
+        this._initResizeHandle();
         this._buildFilterCheckboxes();
         this._originalCards = [...this.items].sort((a, b) => {
             if (!a.fecha_publicacion)
