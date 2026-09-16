@@ -182,7 +182,7 @@
     }
 
     .sort-toggle {
-      display: block;
+      display: inline-flex;
       opacity: 1;
       transition: opacity 0.3s ease;
     }
@@ -272,6 +272,8 @@
     pointer-events: auto;
     color: var(--tv-text-on-primary);
     background: rgba(59, 130, 246, 0.25);
+    align-items: center;
+    justify-content: center;
 
     &:hover {
       background: var(--tv-accent);
