@@ -29,6 +29,11 @@ const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&vers
 
 const ESTADO_FILTER_FIELDS: string[] = ['validado', 'capturado', 'descartado'];
 
+const RESIZE_MIN_HEIGHT = 180;
+const RESIZE_MAX_HEIGHT = 1200;
+const RESIZE_STEP = 24;
+const RESIZE_STORAGE_KEY = 'tv-timeline-cards-height';
+
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 
 export interface ItemTema {
@@ -120,6 +125,7 @@ export default class Timeline {
   featuredRow: HTMLElement;
   timelineContainer: HTMLElement;
   timelineCards: HTMLElement;
+  resizeHandle: HTMLElement;
   expandToggle: HTMLElement;
   remainingCount: HTMLElement;
   expandIcon: HTMLElement;
@@ -155,6 +161,7 @@ export default class Timeline {
     this.featuredRow = null as unknown as HTMLElement;
     this.timelineContainer = null as unknown as HTMLElement;
     this.timelineCards = null as unknown as HTMLElement;
+    this.resizeHandle = null as unknown as HTMLElement;
     this.expandToggle = null as unknown as HTMLElement;
     this.remainingCount = null as unknown as HTMLElement;
     this.expandIcon = null as unknown as HTMLElement;
@@ -241,7 +248,10 @@ export default class Timeline {
           <div class="timeline-collapse-wrap">
             <div class="timeline-line"></div>
             <div class="timeline-content">
-              <div class="timeline-cards" id="timeline-cards"></div>             
+              <div class="timeline-cards-col">
+                <div class="timeline-cards" id="timeline-cards"></div>
+                <div class="timeline-resize-handle" id="timeline-resize-handle" role="slider" tabindex="0" aria-orientation="vertical" title="Ajustar la altura de la lista."></div>
+              </div>
             </div>
           </div>
           <div class="ai-disclaimer">
@@ -491,7 +501,6 @@ export default class Timeline {
   protected _createTimelineItem(card: TimelineItem, index: number): HTMLElement {
     const el = document.createElement('div');
     el.className = 'timeline-item';
-    el.style.transitionDelay = `${index * 0.08}s`;
     if (card.capturado !== true) {
       el.innerHTML = `
       <div class="timeline-date-col no-date">
@@ -1278,9 +1287,94 @@ export default class Timeline {
     this._insertBeforeFooter(el);
   }
 
+  /** Read the current effective max-height of the timeline-cards in px */
+  protected _getCardsHeightPx(): number {
+    const inline = this.timelineCards.style.maxHeight;
+    const px = inline && inline.endsWith('px') ? parseFloat(inline) : NaN;
+    if (Number.isFinite(px)) return px;
+    const computed = getComputedStyle(this.timelineCards).maxHeight;
+    const match = computed ? parseFloat(computed) : NaN;
+    return Number.isFinite(match) ? match : RESIZE_MIN_HEIGHT;
+  }
+
+  /** Clamp and apply a max-height (px) to the timeline-cards */
+  protected _applyCardsHeight(value: number): void {
+    const clamped = Math.min(RESIZE_MAX_HEIGHT, Math.max(RESIZE_MIN_HEIGHT, Math.round(value)));
+    this.timelineCards.style.maxHeight = clamped + 'px';
+    this._syncResizeHandleA11y();
+  }
+
+  /** Persist the current height to localStorage */
+  protected _persistCardsHeight(): void {
+    try {
+      window.localStorage.setItem(RESIZE_STORAGE_KEY, String(this._getCardsHeightPx()));
+    } catch {
+      /* localStorage unavailable */
+    }
+  }
+
+  /** Keep the resize handle aria attributes in sync with the current height */
+  protected _syncResizeHandleA11y(): void {
+    this.resizeHandle.setAttribute('aria-valuemin', String(RESIZE_MIN_HEIGHT));
+    this.resizeHandle.setAttribute('aria-valuemax', String(RESIZE_MAX_HEIGHT));
+    this.resizeHandle.setAttribute('aria-valuenow', String(this._getCardsHeightPx()));
+  }
+
+  /** Set up the timeline-cards resize handle: drag, keyboard and localStorage persistence */
+  protected _initResizeHandle(): void {
+    this.resizeHandle = this.container.querySelector('#timeline-resize-handle') as HTMLElement;
+    if (!this.resizeHandle) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startHeight = this._getCardsHeightPx();
+      const onPointerMove = (ev: PointerEvent) => {
+        this._applyCardsHeight(startHeight + (ev.clientY - startY));
+      };
+      const onPointerUp = () => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', onPointerUp);
+        this.section.classList.remove('resizing');
+        this._persistCardsHeight();
+      };
+      window.addEventListener('pointermove', onPointerMove);
+      window.addEventListener('pointerup', onPointerUp);
+      window.addEventListener('pointercancel', onPointerUp);
+      this.section.classList.add('resizing');
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      let delta = 0;
+      if (e.key === 'ArrowUp') delta = -RESIZE_STEP;
+      else if (e.key === 'ArrowDown') delta = RESIZE_STEP;
+      else if (e.key === 'Home') delta = -RESIZE_MAX_HEIGHT;
+      else if (e.key === 'End') delta = RESIZE_MAX_HEIGHT;
+      else return;
+      e.preventDefault();
+      this._applyCardsHeight(this._getCardsHeightPx() + delta);
+      this._persistCardsHeight();
+    };
+
+    try {
+      const raw = window.localStorage.getItem(RESIZE_STORAGE_KEY);
+      if (raw !== null) {
+        const value = Number(raw);
+        if (Number.isFinite(value)) this._applyCardsHeight(value);
+      }
+    } catch {
+      /* localStorage unavailable */
+    }
+    this._syncResizeHandleA11y();
+    this.resizeHandle.addEventListener('pointerdown', onPointerDown);
+    this.resizeHandle.addEventListener('keydown', onKeyDown);
+  }
+
   /** Initialize the component: build layout, sort data, render, bind events */
   protected _init(): void {
     this._buildLayout();
+    this._initResizeHandle();
     this._buildFilterCheckboxes();
     this._originalCards = [...this.items].sort((a, b) => {
       if (!a.fecha_publicacion) return 1;
