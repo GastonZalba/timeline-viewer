@@ -942,7 +942,7 @@
   right: 8px;
   z-index: 2;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
   gap: 4px;
   pointer-events: none;

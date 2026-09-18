@@ -412,6 +412,8 @@ export default class Timeline {
       <div class="timeline-card no-image not-captured">
         <div class="card-status-badges">
           <span class="card-no-validado">Sin capturar</span>
+          ${card.validado !== true ? '<span class="card-no-validado">Sin validar</span>' : ''}
+          ${card.descartado === true ? '<span class="card-no-validado">Descartado</span>' : ''}
         </div>
         <div class="card-body card-body-not-captured">
           <span class="card-not-captured-id"><span class="card-not-captured-strong">ID</span>${card.id}</span>
@@ -424,6 +426,12 @@ export default class Timeline {
                 ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 Ir
+              </a>`
+                : ''}
+              ${this.internalButtons && card.link_edit_entry
+                ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                Editar
               </a>`
                 : ''}
             </div>
