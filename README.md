@@ -73,7 +73,7 @@ Each object in `items` supports these fields:
 |------------------------|-----------------------------|------------------------------------------|
 | `id`                   | `string`                    | Unique identifier (e.g. `FUE-00001`)    |
 | `nombre_fuente`        | `string`                    | Article headline                         |
-| `resumen_ia`           | `string`                    | AI-generated short summary               |
+| `resumen_ia`           | `string` / `null`          | AI-generated short summary. Hidden (not rendered) when `null` |
 | `thumbnail`         | `string` (URL) / `null`     | Main card image                          |
 | `link_web`             | `string` (URL)              | External article link                    |
 | `fecha_publicacion`    | `string` (YYYY-MM-DD)       | Publication date                         |

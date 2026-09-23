@@ -10,7 +10,7 @@ export interface ItemTema {
 export interface TimelineItem {
     id: number | string;
     nombre_fuente: string;
-    resumen_ia: string;
+    resumen_ia: string | null;
     fecha_publicacion: string;
     fecha_scrapeo: string;
     tonos_sociales: TonoSocial[];

@@ -536,7 +536,7 @@ export default class Timeline {
             : `<div class="card-title">${card.nombre_fuente}${card.es_oficial ? `<span class="card-img-oficial card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>`}
           <div class="card-fecha-pub" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
           ${card.notas_de_trabajo ? `<div class="card-notas-trabajo">${card.notas_de_trabajo}</div>` : ''}
-          <div class="card-desc">${card.resumen_ia}</div>
+          ${card.resumen_ia ? `<div class="card-desc">${card.resumen_ia}</div>` : ''}
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
           ${temasHtml}
           <div class="card-hint"><span class="card-hint-arrow"></span></div>

@@ -100,7 +100,7 @@ El componente consume un array de `TimelineItem`. La estructura es plana (no jer
 interface TimelineItem {
   id: number | string;
   nombre_fuente: string;        // Titular del artículo
-  resumen_ia: string;           // Resumen generado por IA
+  resumen_ia: string | null;    // Resumen generado por IA (null = no se muestra)
   fecha_publicacion: string;    // YYYY-MM-DD
   fecha_scrapeo: string;        // ISO datetime
   tonos_sociales: string[];     // Tono(s) social(es) del artículo (valores únicos de temas)

@@ -402,7 +402,7 @@ export default {
   {
     id: 'FUE-00014',
     nombre_fuente: 'Demostracion de animaciones CSS en YouTube',
-    resumen_ia: 'Un video tutorial que muestra como crear animaciones complejas con solo CSS, sin necesidad de JavaScript.',
+    resumen_ia: null,
     thumbnail: 'https://picsum.photos/seed/youtube1/600/400',
     link_web: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
     fecha_publicacion: '2025-06-28',
