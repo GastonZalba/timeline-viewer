@@ -232,6 +232,7 @@
     border-radius: 42px;
     cursor: pointer;
     font-size: 0.7rem;
+    line-height: 0.8rem;
     text-transform: uppercase;
     font-weight: 100;
     transition: all 0.3s ease;
@@ -239,6 +240,19 @@
     align-items: center;
     gap: 14px;
     white-space: nowrap;
+
+    .expand-text {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #remaining-text {
+      max-width: 250px;
+      display: inline-block;
+      text-wrap: auto;
+      text-align: left;
+    }
   }
 
   #remaining-count {
@@ -254,7 +268,6 @@
     border-radius: 20px;
     border: 1px solid var(--tv-accent);
     color: var(--tv-accent);
-    margin-right: 3px;
   }
 
   .expand-icon {

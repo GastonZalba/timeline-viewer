@@ -80,6 +80,12 @@ export interface TimelineOptions {
     inlineImages?: boolean;
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
+    /**
+     * Label of the expand toggle for the given remaining count.
+     * The returned string is injected as HTML (it is not escaped), so it can contain markup
+     * (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`).
+     * Escape any untrusted value before returning it.
+     */
     relatedLabel?: (count: number) => string;
     singleId?: string;
     singleUrl?: string;
@@ -320,6 +326,8 @@ export default class Timeline {
     protected _applyFilters(): void;
     /** Label of the expand toggle; uses the custom function when provided, otherwise the Spanish singular/plural default */
     protected _relatedLabel(n: number): string;
+    /** Write the expand toggle label into `#remaining-text`; the label is injected as HTML, so it may contain markup */
+    protected _setRelatedLabel(n: number): void;
     /** Render featured cards, timeline, and load-more button if needed */
     protected _renderAll(): void;
     /** Render the "load more" button and wire its click handler */

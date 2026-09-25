@@ -21,7 +21,8 @@ const baseOptions = {
   inlineImages: true,
   inlineAdjuntos: true,
   internalButtons: true,
-  relatedLabel: (count) => (count === 1 ? 'artículo relacionado' : 'artículos relacionados'),
+  relatedLabel: (count) =>
+    count === 1 ? 'publicación relacionada' : 'publicaciones relacionadas',
   singleId,
   singleUrl: '?id={id}',
   singleTaxonomies: [

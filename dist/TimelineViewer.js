@@ -1665,12 +1665,18 @@ export default class Timeline {
             return this.relatedLabel(n);
         return n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
     }
+    /** Write the expand toggle label into `#remaining-text`; the label is injected as HTML, so it may contain markup */
+    _setRelatedLabel(n) {
+        const el = this.container.querySelector('#remaining-text');
+        if (el)
+            el.innerHTML = this._relatedLabel(n);
+    }
     /** Render featured cards, timeline, and load-more button if needed */
     _renderAll() {
         if (this.api) {
             const n = this._apiTotal;
             this.remainingCount.textContent = String(n);
-            this.container.querySelector('#remaining-text').textContent = this._relatedLabel(n);
+            this._setRelatedLabel(n);
             this._renderFeatured(this._apiFeatured);
             this._renderTimeline(this.allCards);
             if (this._hasMorePages()) {
@@ -1688,7 +1694,7 @@ export default class Timeline {
         const featured = this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
         const n = this.allCards.length;
         this.remainingCount.textContent = String(this._originalCards.length);
-        this.container.querySelector('#remaining-text').textContent = this._relatedLabel(n);
+        this._setRelatedLabel(n);
         this._renderFeatured(featured);
         const displayCards = this.itemsPerPage > 0 ? this.allCards.slice(0, this._displayedCount) : this.allCards;
         this._renderTimeline(displayCards);
