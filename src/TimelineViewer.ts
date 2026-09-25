@@ -36,6 +36,8 @@ const RESIZE_STORAGE_KEY = 'tv-timeline-cards-height';
 const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
 const ESTADO_FILTER_STORAGE_KEY = 'tv-estado-filters';
 
+const TONE_LABEL: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 
 export interface ItemTema {
@@ -73,9 +75,47 @@ export interface TimelineItem {
   temas: ItemTema[];
 }
 
+export interface TimelineItemSummary {
+  id: number | string;
+  nombre_fuente: string;
+  thumbnail: string | null;
+  fecha_publicacion: string;
+  fecha_scrapeo: string;
+  tonos_sociales: TonoSocial[];
+  tipo_fuente: string;
+  es_oficial: boolean;
+  validado: boolean | null;
+  capturado: boolean;
+  descartado: boolean | null;
+  link_web: string | null;
+  link_edit_entry?: string;
+  notas_de_trabajo?: string | null;
+  has_video: boolean;
+  actores_principales: string[] | null;
+  fuente_institucional: string | null;
+  screenshot: string | null;
+  imagenes_count: number;
+  adjuntos_count: number;
+}
+
+export interface TimelineApiConfig {
+  url: string;
+  fetchImpl?: typeof fetch;
+}
+
+export interface TimelineApiPageResponse {
+  items: TimelineItemSummary[];
+  total: number;
+  totalAll: number;
+  featured: TimelineItemSummary[];
+  lastUpdated?: string;
+  facets: Record<string, Record<string, number>>;
+}
+
 export interface TimelineOptions {
   container: string | HTMLElement;
   items?: TimelineItem[];
+  api?: TimelineApiConfig;
   featuredCount?: number;
   lastUpdated?: string;
   itemsPerPage?: number;
@@ -151,6 +191,18 @@ export default class Timeline {
   _lgInstance: LightGallery | null;
   _lgContainer: HTMLElement | null;
   _originalCards: TimelineItem[];
+  api: TimelineApiConfig | null;
+  _apiPage: number;
+  _apiTotal: number;
+  _apiTotalAll: number;
+  _apiFacets: Record<string, Record<string, number>>;
+  _apiFeatured: TimelineItemSummary[];
+  _apiLoading: boolean;
+  _apiSeq: number;
+  _apiReloadTimer: number;
+  _apiFacetsBuilt: boolean;
+  _apiError: string;
+  _apiDetails: Map<string, TimelineItem | null>;
 
   constructor(config: TimelineOptions) {
     this.container =
@@ -191,6 +243,18 @@ export default class Timeline {
     this._lgInstance = null;
     this._lgContainer = null;
     this._originalCards = [];
+    this.api = config.api || null;
+    this._apiPage = 1;
+    this._apiTotal = 0;
+    this._apiTotalAll = 0;
+    this._apiFacets = {};
+    this._apiFeatured = [];
+    this._apiLoading = false;
+    this._apiSeq = 0;
+    this._apiReloadTimer = 0;
+    this._apiFacetsBuilt = false;
+    this._apiError = '';
+    this._apiDetails = new Map();
     this._init();
   }
 
@@ -586,74 +650,20 @@ export default class Timeline {
     const imgHtml = card.thumbnail
       ? `<div class="card-image-wrap"><img class="card-image" src="${card.thumbnail}" alt="${card.nombre_fuente}" loading="lazy"><div class="card-title">${card.nombre_fuente}${card.es_oficial ? `<span class="card-img-oficial card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div></div>`
       : '';
-    const toneLabel: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
-    const toneLabelTema: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
-    const actors = card.actores_principales || [];
-    const MAX_ACTORS = 3;
-    const hasMore = actors.length > MAX_ACTORS;
-    const protHtml = actors.length
-      ? `<div class="card-protagonista${hasMore ? ' has-more' : ''}" data-full="${actors.join(', ')}">
-          <span class="protagonista-label">Actores principales:</span>
-          <span class="protagonista-list">${actors.slice(0, MAX_ACTORS).join(', ')}${hasMore ? '...' : ''}</span>
-         </div>`
-      : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
+    const summary = card as unknown as TimelineItemSummary;
+    const hasDetail = this._hasDetail(card);
+    const imgCount = hasDetail ? (card.imagenes || []).length : summary.imagenes_count || 0;
+    const adjCount = hasDetail ? (card.adjuntos || []).length : summary.adjuntos_count || 0;
     const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
     const embedHtml = embedUrl ? this._buildEmbed(embedUrl) : '';
     const iframeHtml = embedUrl
       ? `<div class="card-embed"><div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}</div>`
       : '';
-    const videosHtml =
-      card.links_videos && card.links_videos.length
-        ? `<div class="card-videos"><div class="card-subtitle card-iframe-subtitle">Videos vinculados</div><div class="card-videos-list">${card.links_videos
-            .map((link) => this._parseLinkWeb(link))
-            .filter((parsed): parsed is LinkInfo => parsed !== null)
-            .map((parsed) => this._buildEmbed(parsed))
-            .join('')}</div></div>`
-        : '';
-    const temasHtml =
-      card.temas && card.temas.length
-        ? `<div class="card-temas">
-        <div class="card-subtitle">Temas destacados</div>
-        <div class="card-temas-list">
-        ${card.temas
-          .map(
-            (t) => `
-          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
-            <div class="tema-content">
-              <span class="tema-title"><span class="tema-tone">${toneLabelTema[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
-              <span class="tema-desc">${t.resumen}</span>
-              ${t.notas_de_trabajo ? `<div class="tema-notas-trabajo">${t.notas_de_trabajo}</div>` : ''}
-            </div>
-          </div>`
-          )
-          .join('')}
-        </div>
-        </div>`
-        : '';
-    const inlineImagesHtml =
-      this.inlineImages && card.imagenes && card.imagenes.length
-        ? `<div class="card-inline-images"><div class="card-subtitle">Imágenes</div><div class="card-inline-images-list">${card.imagenes
-            .map(
-              (img, i) =>
-                `<button class="card-inline-thumb" data-index="${i}"><img src="${this._encodeFileName(img.thumb)}" alt="" loading="lazy"></button>`
-            )
-            .join('')}</div></div>`
-        : '';
-    const inlineAdjuntosHtml =
-      this.inlineAdjuntos && card.adjuntos && card.adjuntos.length
-        ? `<div class="card-inline-adjuntos"><div class="card-subtitle">Adjuntos</div><div class="card-inline-adjuntos-list">${card.adjuntos
-            .map((a) => {
-              const ext = this._getFileExt(a);
-              const name = a.substring(a.lastIndexOf('/') + 1);
-              return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
-            })
-            .join('')}</div></div>`
-        : '';
     const actionsHtml = `<div class="card-actions">
       <div class="card-actions-row">
         ${card.screenshot ? '<button class="card-actions-btn card-screenshot-btn" title="Captura de pantallla de la fuente"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144.12 144" width="14" height="14"><path d="M78.64,116.38q-18.12,0-36.22,0c-6.27,0-10.66-4.39-10.66-10.68q0-22.31,0-44.61A10.44,10.44,0,0,1,36.23,52a1.13,1.13,0,0,0,.49-1.11c0-1.36,0-2.72,0-4.08,0-1.92.39-2.51,2.29-2.89a15.06,15.06,0,0,1,6.41,0c1.54.36,2.06,1.14,2.09,2.74,0,1.15-.5,2.67.23,3.32s2.13.17,3.24.18c1.68,0,3.36-.06,5,0,1,.05,1.27-.26,1.36-1.22a12.06,12.06,0,0,1,7.79-10.66,13.4,13.4,0,0,1,5.22-1.08c5.56,0,11.12-.11,16.67,0,6.25.14,11.68,3.88,12.91,10.5A2,2,0,0,1,100,48c.1.71-.16,1.74.35,2.05s1.55.15,2.34.15h12.48a10.13,10.13,0,0,1,10.48,10.25q.1,22.85,0,45.69a10.13,10.13,0,0,1-10.46,10.27Q96.93,116.4,78.64,116.38Zm0-61.24A26.93,26.93,0,1,0,79.23,109c14.27-.16,26.3-12.34,26.31-26.91A26.91,26.91,0,0,0,78.68,55.14Z" transform="translate(-6.66 -4.82)"/><path d="M31.12,4.82H49.24a6.16,6.16,0,0,1,6.17,6.37,6.24,6.24,0,0,1-6.16,6.55q-14.22,0-28.43,0c-.92,0-1.18.2-1.18,1.15,0,9.48,0,19,0,28.43,0,3.33-2.34,5.73-5.93,6.16a6.46,6.46,0,0,1-6.86-4.59,5.16,5.16,0,0,1-.12-1.3q0-18.48,0-36.95a5.88,5.88,0,0,1,5.78-5.8C18.72,4.81,24.92,4.82,31.12,4.82Z" transform="translate(-6.66 -4.82)"/><path d="M126.32,148.77c-6,0-12.08-.13-18.11,0a6.31,6.31,0,0,1-6.08-7.35c.62-3.77,2.86-5.62,6.65-5.62,9.27,0,18.55,0,27.83,0,1.07,0,1.19-.35,1.18-1.27q0-14.16,0-28.31c0-3.34,2.3-5.71,5.93-6.17a6.51,6.51,0,0,1,6.83,4.46,4.94,4.94,0,0,1,.15,1.42q0,18.42,0,36.83a5.9,5.9,0,0,1-5.89,5.93H126.32Z" transform="translate(-6.66 -4.82)"/><path d="M150.7,29.18c0,5.92-.24,11.85.07,17.75.26,4.79-5.22,8.24-9.85,5.68a5.75,5.75,0,0,1-3.15-5.37c0-9.44,0-18.87,0-28.31,0-1-.29-1.21-1.25-1.21q-14.16.06-28.31,0c-3.35,0-5.73-2.24-6.14-5.91A6.39,6.39,0,0,1,106.51,5a5.34,5.34,0,0,1,1.42-.16h36.94a5.92,5.92,0,0,1,5.82,5.88Q150.7,20,150.7,29.18Z" transform="translate(-6.66 -4.82)"/><path d="M6.74,124.42c0-5.92.25-11.85-.07-17.75-.26-4.78,5.22-8.25,9.85-5.68a5.75,5.75,0,0,1,3.15,5.37c0,9.44,0,18.87,0,28.31,0,1,.28,1.21,1.25,1.21q14.14-.06,28.3,0c3.36,0,5.73,2.23,6.15,5.91a6.39,6.39,0,0,1-4.41,6.85,4.94,4.94,0,0,1-1.42.15H12.57a5.93,5.93,0,0,1-5.82-5.88Q6.74,133.65,6.74,124.42Z" transform="translate(-6.66 -4.82)"/><path d="M94.38,82.05A15.66,15.66,0,1,1,78.72,66.26,15.72,15.72,0,0,1,94.38,82.05Z" transform="translate(-6.66 -4.82)"/></svg> Captura</button>' : ''}
-        ${card.imagenes && card.imagenes.length && !this.inlineImages ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + card.imagenes.length + '</span></button>' : ''}
-        ${card.adjuntos && card.adjuntos.length && !this.inlineAdjuntos ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${card.adjuntos.length}</span></button><div class="card-adjuntos-menu">${card.adjuntos.map((a) => `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
+        ${imgCount > 0 && !this.inlineImages ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + imgCount + '</span></button>' : ''}
+        ${adjCount > 0 && !this.inlineAdjuntos ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${adjCount}</span></button><div class="card-adjuntos-menu">${(card.adjuntos || []).map((a) => `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
         ${
           card.link_web
             ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
@@ -693,9 +703,9 @@ export default class Timeline {
           }
           <div class="card-fecha-pub" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
           ${card.notas_de_trabajo ? `<div class="card-notas-trabajo">${card.notas_de_trabajo}</div>` : ''}
-          ${card.resumen_ia ? `<div class="card-desc">${card.resumen_ia}</div>` : ''}
-          ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${toneLabel[t] || t}</span>`).join('')}</div>` : ''}
-          ${temasHtml}
+          <div class="card-desc-slot">${hasDetail ? '' : '<div class="card-desc card-desc-placeholder"></div>'}</div>
+          ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${TONE_LABEL[t] || t}</span>`).join('')}</div>` : ''}
+          <div class="card-temas-slot"></div>
           <div class="card-hint"><span class="card-hint-arrow"></span></div>
           <button class="card-collapse" title="Colapsar"></button>
           <button class="card-info-btn" title="Información">
@@ -719,12 +729,10 @@ export default class Timeline {
               <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
             </div>
           </div>
-          ${protHtml}
-          <div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional ?? '-'}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>
-          ${inlineImagesHtml}
-          ${inlineAdjuntosHtml}
+          <div class="card-protag-fuente-slot"></div>
+          <div class="card-media-slot"></div>
           ${iframeHtml}
-          ${videosHtml}
+          <div class="card-videos-slot"></div>
         </div>
       </div>
     `;
@@ -733,13 +741,6 @@ export default class Timeline {
       timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
       if (timelineImg.complete) timelineImg.classList.add('loaded');
     }
-    el.querySelectorAll('.card-inline-thumb').forEach((thumb) => {
-      const img = thumb.querySelector('img') as HTMLImageElement | null;
-      if (img) {
-        img.addEventListener('load', () => thumb.classList.add('loaded'));
-        if (img.complete) thumb.classList.add('loaded');
-      }
-    });
     el.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
       const iframe = wrap.querySelector('iframe') as HTMLIFrameElement | null;
       if (iframe) {
@@ -757,112 +758,9 @@ export default class Timeline {
       )
         return;
       cardEl.classList.add('expanded');
-      const igWraps = cardEl.querySelectorAll('.card-iframe-instagram');
-      if (igWraps.length) {
-        setTimeout(() => {
-          igWraps.forEach((igWrap) => {
-            if (!igWrap.querySelector('.instagram-media')) {
-              const embedUrl = igWrap.getAttribute('data-embed-url');
-              if (embedUrl) {
-                const blockquote = document.createElement('blockquote');
-                blockquote.className = 'instagram-media';
-                blockquote.setAttribute('data-instgrm-permalink', embedUrl);
-                blockquote.setAttribute('data-instgrm-version', '14');
-                blockquote.style.cssText =
-                  'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
-                igWrap.insertAdjacentElement('afterbegin', blockquote);
-              }
-            }
-          });
-          if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
-            instgrm.Embeds.process();
-          } else if (!cardEl.querySelector('.card-iframe-instagram iframe')) {
-            const waitForInstgrm = setInterval(() => {
-              if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
-                instgrm.Embeds.process();
-                clearInterval(waitForInstgrm);
-              }
-            }, 200);
-            setTimeout(() => clearInterval(waitForInstgrm), 15000);
-          }
-          igWraps.forEach((igWrap) => {
-            if (!igWrap.classList.contains('loaded')) {
-              const check = setInterval(() => {
-                const iframe = igWrap.querySelector('iframe');
-                if (!iframe) return;
-                clearInterval(check);
-                iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
-                setTimeout(() => igWrap.classList.add('loaded'), 3000);
-              }, 100);
-              setTimeout(() => igWrap.classList.add('loaded'), 10000);
-            }
-          });
-        }, 150);
-      }
-      const twWraps = cardEl.querySelectorAll('.card-iframe-twitter') as NodeListOf<HTMLElement>;
-      if (twWraps.length) {
-        setTimeout(() => {
-          twWraps.forEach((twWrap) => {
-            if (!twWrap.querySelector('iframe')) {
-              if (typeof twttr !== 'undefined' && twttr.widgets) {
-                twttr.widgets.load(twWrap);
-              } else {
-                const waitForTwttr = setInterval(() => {
-                  if (typeof twttr !== 'undefined' && twttr.widgets) {
-                    twttr.widgets.load(twWrap);
-                    clearInterval(waitForTwttr);
-                  }
-                }, 200);
-                setTimeout(() => clearInterval(waitForTwttr), 15000);
-              }
-            }
-          });
-          twWraps.forEach((twWrap) => {
-            if (!twWrap.classList.contains('loaded')) {
-              const check = setInterval(() => {
-                const iframe = twWrap.querySelector('iframe');
-                if (!iframe) return;
-                clearInterval(check);
-                iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
-                setTimeout(() => twWrap.classList.add('loaded'), 3000);
-              }, 100);
-              setTimeout(() => twWrap.classList.add('loaded'), 10000);
-            }
-          });
-        }, 150);
-      }
-      const fbWraps = cardEl.querySelectorAll('.card-iframe-facebook') as NodeListOf<HTMLElement>;
-      if (fbWraps.length) {
-        setTimeout(() => {
-          fbWraps.forEach((fbWrap) => {
-            if (!fbWrap.querySelector('iframe')) {
-              if (typeof FB !== 'undefined' && FB.XFBML) {
-                FB.XFBML.parse(fbWrap);
-              } else {
-                const waitForFB = setInterval(() => {
-                  if (typeof FB !== 'undefined' && FB.XFBML) {
-                    FB.XFBML.parse(fbWrap);
-                    clearInterval(waitForFB);
-                  }
-                }, 200);
-                setTimeout(() => clearInterval(waitForFB), 15000);
-              }
-            }
-          });
-          fbWraps.forEach((fbWrap) => {
-            if (!fbWrap.classList.contains('loaded')) {
-              const check = setInterval(() => {
-                const iframe = fbWrap.querySelector('iframe');
-                if (!iframe) return;
-                clearInterval(check);
-                iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
-                setTimeout(() => fbWrap.classList.add('loaded'), 3000);
-              }, 100);
-              setTimeout(() => fbWrap.classList.add('loaded'), 10000);
-            }
-          });
-        }, 150);
-      }
+      void this._ensureCardDetail(cardEl).then(() => {
+        this._processCardEmbeds(cardEl);
+      });
     });
     (cardEl.querySelector('.card-collapse') as HTMLElement).addEventListener('click', (e: Event) => {
       e.stopPropagation();
@@ -885,17 +783,12 @@ export default class Timeline {
     if (imagesBtn) {
       imagesBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
-        this._openLightGallery(card.imagenes, card.nombre_fuente, true);
-      });
-    }
-    const inlineImages = el.querySelector('.card-inline-images') as HTMLElement | null;
-    if (inlineImages) {
-      inlineImages.addEventListener('click', (e: Event) => {
-        const thumb = (e.target as HTMLElement).closest('.card-inline-thumb') as HTMLElement | null;
-        if (!thumb) return;
-        e.stopPropagation();
-        const index = Number(thumb.dataset.index) || 0;
-        this._openLightGallery(card.imagenes, card.nombre_fuente, true, index);
+        void this._ensureCardDetail(cardEl).then(() => {
+          const full = this._resolveDetail(cardEl, card);
+          if (full && full.imagenes && full.imagenes.length) {
+            this._openLightGallery(full.imagenes, full.nombre_fuente, true);
+          }
+        });
       });
     }
     const adjuntosWrap = el.querySelector('.card-adjuntos') as HTMLElement | null;
@@ -904,25 +797,298 @@ export default class Timeline {
       const adjuntosMenu = adjuntosWrap.querySelector('.card-adjuntos-menu') as HTMLElement;
       adjuntosBtn.addEventListener('click', (e: Event) => {
         e.stopPropagation();
-        adjuntosMenu.classList.toggle('open');
-        const infoMenu = el.querySelector('.card-info-menu') as HTMLElement | null;
-        if (infoMenu) infoMenu.classList.remove('open');
+        void this._ensureCardDetail(cardEl).then(() => {
+          adjuntosMenu.classList.toggle('open');
+          const infoMenu = cardEl.querySelector('.card-info-menu') as HTMLElement | null;
+          if (infoMenu) infoMenu.classList.remove('open');
+        });
       });
     }
-    const prot = el.querySelector('.card-protagonista.has-more') as HTMLElement | null;
-    if (prot) {
-      prot.addEventListener('click', (e: Event) => {
-        e.stopPropagation();
-        prot.classList.toggle('expanded');
-        const list = prot.querySelector('.protagonista-list') as HTMLElement;
-        if (prot.classList.contains('expanded')) {
-          list.textContent = prot.dataset.full || '';
-        } else {
-          list.textContent = actors.slice(0, MAX_ACTORS).join(', ') + '...';
+    cardEl.dataset.cardId = String(card.id);
+    if (hasDetail) {
+      this._injectCardDetail(cardEl, card as TimelineItem);
+    }
+    return el;
+  }
+
+  /** True if the card already carries its full detail payload (local mode) */
+  protected _hasDetail(card: TimelineItem | TimelineItemSummary): boolean {
+    return Array.isArray((card as TimelineItem).imagenes);
+  }
+
+  /** Resolve the full detail of a card from its DOM reference, falling back to the passed object */
+  protected _resolveDetail(cardEl: HTMLElement, fallback: TimelineItem | TimelineItemSummary): TimelineItem | null {
+    if (this._hasDetail(fallback)) return fallback as TimelineItem;
+    const id = cardEl.dataset.cardId;
+    if (!id) return null;
+    return this._apiDetails.get(id) || null;
+  }
+
+  /** Build the "Actores principales" HTML block */
+  protected _buildProtagonistaHtml(card: TimelineItem): string {
+    const actors = card.actores_principales || [];
+    const max = 3;
+    const hasMore = actors.length > max;
+    return actors.length
+      ? `<div class="card-protagonista${hasMore ? ' has-more' : ''}" data-full="${actors.join(', ')}">
+          <span class="protagonista-label">Actores principales:</span>
+          <span class="protagonista-list">${actors.slice(0, max).join(', ')}${hasMore ? '...' : ''}</span>
+         </div>`
+      : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
+  }
+
+  /** Build the "Fuente" HTML block */
+  protected _buildFuenteHtml(card: TimelineItem): string {
+    return `<div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional ?? '-'}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>`;
+  }
+
+  /** Build the "Temas destacados" HTML block */
+  protected _buildTemasHtml(card: TimelineItem): string {
+    if (!card.temas || !card.temas.length) return '';
+    return `<div class="card-temas">
+        <div class="card-subtitle">Temas destacados</div>
+        <div class="card-temas-list">
+        ${card.temas
+          .map(
+            (t) => `
+          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
+            <div class="tema-content">
+              <span class="tema-title"><span class="tema-tone">${TONE_LABEL[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
+              <span class="tema-desc">${t.resumen}</span>
+              ${t.notas_de_trabajo ? `<div class="tema-notas-trabajo">${t.notas_de_trabajo}</div>` : ''}
+            </div>
+          </div>`
+          )
+          .join('')}
+        </div>
+        </div>`;
+  }
+
+  /** Build the "Videos vinculados" HTML block */
+  protected _buildVideosHtml(card: TimelineItem): string {
+    if (!card.links_videos || !card.links_videos.length) return '';
+    return `<div class="card-videos"><div class="card-subtitle card-iframe-subtitle">Videos vinculados</div><div class="card-videos-list">${card.links_videos
+      .map((link) => this._parseLinkWeb(link))
+      .filter((parsed): parsed is LinkInfo => parsed !== null)
+      .map((parsed) => this._buildEmbed(parsed))
+      .join('')}</div></div>`;
+  }
+
+  /** Build the inline "Imágenes" HTML block */
+  protected _buildInlineImagesHtml(card: TimelineItem): string {
+    if (!this.inlineImages || !card.imagenes || !card.imagenes.length) return '';
+    return `<div class="card-inline-images"><div class="card-subtitle">Imágenes</div><div class="card-inline-images-list">${card.imagenes
+      .map(
+        (img, i) =>
+          `<button class="card-inline-thumb" data-index="${i}"><img src="${this._encodeFileName(img.thumb)}" alt="" loading="lazy"></button>`
+      )
+      .join('')}</div></div>`;
+  }
+
+  /** Build the inline "Adjuntos" HTML block */
+  protected _buildInlineAdjuntosHtml(card: TimelineItem): string {
+    if (!this.inlineAdjuntos || !card.adjuntos || !card.adjuntos.length) return '';
+    return `<div class="card-inline-adjuntos"><div class="card-subtitle">Adjuntos</div><div class="card-inline-adjuntos-list">${card.adjuntos
+      .map((a) => {
+        const ext = this._getFileExt(a);
+        const name = a.substring(a.lastIndexOf('/') + 1);
+        return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
+      })
+      .join('')}</div></div>`;
+  }
+
+  /** Fill the card detail slots and bind their interactions */
+  protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void {
+    const descSlot = cardEl.querySelector('.card-desc-slot') as HTMLElement | null;
+    const temasSlot = cardEl.querySelector('.card-temas-slot') as HTMLElement | null;
+    const protagFuenteSlot = cardEl.querySelector('.card-protag-fuente-slot') as HTMLElement | null;
+    const mediaSlot = cardEl.querySelector('.card-media-slot') as HTMLElement | null;
+    const videosSlot = cardEl.querySelector('.card-videos-slot') as HTMLElement | null;
+
+    if (descSlot) {
+      descSlot.innerHTML = card.resumen_ia ? `<div class="card-desc">${card.resumen_ia}</div>` : '';
+    }
+    if (temasSlot) temasSlot.innerHTML = this._buildTemasHtml(card);
+    if (protagFuenteSlot) {
+      protagFuenteSlot.innerHTML = this._buildProtagonistaHtml(card) + this._buildFuenteHtml(card);
+      const prot = protagFuenteSlot.querySelector('.card-protagonista.has-more') as HTMLElement | null;
+      if (prot) {
+        prot.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          prot.classList.toggle('expanded');
+          const list = prot.querySelector('.protagonista-list') as HTMLElement;
+          if (prot.classList.contains('expanded')) {
+            list.textContent = prot.dataset.full || '';
+          } else {
+            list.textContent = (card.actores_principales || []).slice(0, 3).join(', ') + '...';
+          }
+        });
+      }
+    }
+    if (mediaSlot) {
+      mediaSlot.innerHTML = this._buildInlineImagesHtml(card) + this._buildInlineAdjuntosHtml(card);
+      mediaSlot.querySelectorAll('.card-inline-thumb').forEach((thumb) => {
+        const img = thumb.querySelector('img') as HTMLImageElement | null;
+        if (img) {
+          img.addEventListener('load', () => thumb.classList.add('loaded'));
+          if (img.complete) thumb.classList.add('loaded');
+        }
+      });
+      const inlineImages = mediaSlot.querySelector('.card-inline-images') as HTMLElement | null;
+      if (inlineImages) {
+        inlineImages.addEventListener('click', (e: Event) => {
+          const thumb = (e.target as HTMLElement).closest('.card-inline-thumb') as HTMLElement | null;
+          if (!thumb) return;
+          e.stopPropagation();
+          const index = Number(thumb.dataset.index) || 0;
+          this._openLightGallery(card.imagenes, card.nombre_fuente, true, index);
+        });
+      }
+    }
+    if (videosSlot) {
+      videosSlot.innerHTML = this._buildVideosHtml(card);
+      videosSlot.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
+        const iframe = wrap.querySelector('iframe') as HTMLIFrameElement | null;
+        if (iframe) {
+          iframe.addEventListener('load', () => wrap.classList.add('loaded'));
+          if (iframe.contentDocument?.readyState === 'complete') wrap.classList.add('loaded');
         }
       });
     }
-    return el;
+    const adjuntosMenuEl = cardEl.querySelector('.card-adjuntos-menu') as HTMLElement | null;
+    if (adjuntosMenuEl && card.adjuntos && card.adjuntos.length) {
+      adjuntosMenuEl.innerHTML = card.adjuntos
+        .map(
+          (a) =>
+            `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`
+        )
+        .join('');
+    }
+    cardEl.dataset.detailLoaded = '1';
+  }
+
+  /** Ensure the full detail of the card is present (fetches it when missing) */
+  protected async _ensureCardDetail(cardEl: HTMLElement): Promise<void> {
+    if (cardEl.dataset.detailLoaded) return;
+    const id = cardEl.dataset.cardId;
+    if (!id) return;
+    const cached = this._apiDetails.get(id);
+    if (cached) {
+      this._injectCardDetail(cardEl, cached);
+      return;
+    }
+    const detail = await this._fetchDetail(id);
+    if (detail) this._injectCardDetail(cardEl, detail);
+  }
+
+  /** Process the lazy social embeds (Instagram, Twitter, Facebook) once the card is expanded */
+  protected _processCardEmbeds(cardEl: HTMLElement): void {
+    const igWraps = cardEl.querySelectorAll('.card-iframe-instagram');
+    if (igWraps.length) {
+      setTimeout(() => {
+        igWraps.forEach((igWrap) => {
+          if (!igWrap.querySelector('.instagram-media')) {
+            const embedUrl = igWrap.getAttribute('data-embed-url');
+            if (embedUrl) {
+              const blockquote = document.createElement('blockquote');
+              blockquote.className = 'instagram-media';
+              blockquote.setAttribute('data-instgrm-permalink', embedUrl);
+              blockquote.setAttribute('data-instgrm-version', '14');
+              blockquote.style.cssText =
+                'background:#FFF;border:0;border-radius:3px;margin:1px;max-width:100%;min-width:326px;padding:0;width:calc(100% - 2px)';
+              igWrap.insertAdjacentElement('afterbegin', blockquote);
+            }
+          }
+        });
+        if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
+          instgrm.Embeds.process();
+        } else if (!cardEl.querySelector('.card-iframe-instagram iframe')) {
+          const waitForInstgrm = setInterval(() => {
+            if (typeof instgrm !== 'undefined' && instgrm.Embeds) {
+              instgrm.Embeds.process();
+              clearInterval(waitForInstgrm);
+            }
+          }, 200);
+          setTimeout(() => clearInterval(waitForInstgrm), 15000);
+        }
+        igWraps.forEach((igWrap) => {
+          if (!igWrap.classList.contains('loaded')) {
+            const check = setInterval(() => {
+              const iframe = igWrap.querySelector('iframe');
+              if (!iframe) return;
+              clearInterval(check);
+              iframe.addEventListener('load', () => igWrap.classList.add('loaded'), { once: true });
+              setTimeout(() => igWrap.classList.add('loaded'), 3000);
+            }, 100);
+            setTimeout(() => igWrap.classList.add('loaded'), 10000);
+          }
+        });
+      }, 150);
+    }
+    const twWraps = cardEl.querySelectorAll('.card-iframe-twitter') as NodeListOf<HTMLElement>;
+    if (twWraps.length) {
+      setTimeout(() => {
+        twWraps.forEach((twWrap) => {
+          if (!twWrap.querySelector('iframe')) {
+            if (typeof twttr !== 'undefined' && twttr.widgets) {
+              twttr.widgets.load(twWrap);
+            } else {
+              const waitForTwttr = setInterval(() => {
+                if (typeof twttr !== 'undefined' && twttr.widgets) {
+                  twttr.widgets.load(twWrap);
+                  clearInterval(waitForTwttr);
+                }
+              }, 200);
+              setTimeout(() => clearInterval(waitForTwttr), 15000);
+            }
+          }
+        });
+        twWraps.forEach((twWrap) => {
+          if (!twWrap.classList.contains('loaded')) {
+            const check = setInterval(() => {
+              const iframe = twWrap.querySelector('iframe');
+              if (!iframe) return;
+              clearInterval(check);
+              iframe.addEventListener('load', () => twWrap.classList.add('loaded'), { once: true });
+              setTimeout(() => twWrap.classList.add('loaded'), 3000);
+            }, 100);
+            setTimeout(() => twWrap.classList.add('loaded'), 10000);
+          }
+        });
+      }, 150);
+    }
+    const fbWraps = cardEl.querySelectorAll('.card-iframe-facebook') as NodeListOf<HTMLElement>;
+    if (fbWraps.length) {
+      setTimeout(() => {
+        fbWraps.forEach((fbWrap) => {
+          if (!fbWrap.querySelector('iframe')) {
+            if (typeof FB !== 'undefined' && FB.XFBML) {
+              FB.XFBML.parse(fbWrap);
+            } else {
+              const waitForFB = setInterval(() => {
+                if (typeof FB !== 'undefined' && FB.XFBML) {
+                  FB.XFBML.parse(fbWrap);
+                  clearInterval(waitForFB);
+                }
+              }, 200);
+              setTimeout(() => clearInterval(waitForFB), 15000);
+            }
+          }
+        });
+        fbWraps.forEach((fbWrap) => {
+          if (!fbWrap.classList.contains('loaded')) {
+            const check = setInterval(() => {
+              const iframe = fbWrap.querySelector('iframe');
+              if (!iframe) return;
+              clearInterval(check);
+              iframe.addEventListener('load', () => fbWrap.classList.add('loaded'), { once: true });
+              setTimeout(() => fbWrap.classList.add('loaded'), 3000);
+            }, 100);
+            setTimeout(() => fbWrap.classList.add('loaded'), 10000);
+          }
+        });
+      }, 150);
+    }
   }
 
   /** Insert an element before the timeline footer, or append if no footer */
@@ -1178,24 +1344,40 @@ export default class Timeline {
     }
   }
 
-  /** Build filter checkboxes from the available filter values */
+  /** Build filter checkboxes from the available filter values (local data or API facets) */
   protected _buildFilterCheckboxes(): void {
     const savedEstado = this._loadEstadoFilterState();
     let anyFilterVisible = false;
     this.filters.forEach((f) => {
       if (!f.options) return;
       const isEstado = ESTADO_FILTER_FIELDS.includes(f.field);
-      const values = f.fixedValues
-        ? [...f.fixedValues]
-        : [
-            ...new Set(
-              this.items.flatMap((c) => {
-                const v = f.extract ? f.extract(c) : c[f.field];
-                const arr = v == null ? [] : Array.isArray(v) ? v : [v];
-                return arr.map((x) => String(x)).filter(Boolean);
-              })
-            )
-          ];
+      let values: string[];
+      let counts: Record<string, number>;
+      if (this.api) {
+        const facetCounts = this._apiFacets[f.field] || {};
+        values = f.fixedValues ? [...f.fixedValues] : Object.keys(facetCounts).filter((v) => (facetCounts[v] || 0) > 0);
+        counts = facetCounts;
+      } else {
+        values = f.fixedValues
+          ? [...f.fixedValues]
+          : [
+              ...new Set(
+                this.items.flatMap((c) => {
+                  const v = f.extract ? f.extract(c) : c[f.field];
+                  const arr = v == null ? [] : Array.isArray(v) ? v : [v];
+                  return arr.map((x) => String(x)).filter(Boolean);
+                })
+              )
+            ];
+        counts = {};
+        values.forEach((val) => {
+          counts[val] = this.items.filter((c) => {
+            const v = f.extract ? f.extract(c) : c[f.field];
+            const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
+            return arr.includes(val);
+          }).length;
+        });
+      }
       if (!f.fixedValues && values.length <= 1) {
         f.checkboxes = [];
         f.options.hidden = true;
@@ -1204,14 +1386,6 @@ export default class Timeline {
       f.options.hidden = false;
       if (!isEstado) anyFilterVisible = true;
       if (f.sortValues) values.sort(f.sortValues);
-      const counts: Record<string, number> = {};
-      values.forEach((val) => {
-        counts[val] = this.items.filter((c) => {
-          const v = f.extract ? f.extract(c) : c[f.field];
-          const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
-          return arr.includes(val);
-        }).length;
-      });
       f.options.innerHTML = '';
       f.checkboxes = [];
       values.forEach((val) => {
@@ -1232,7 +1406,7 @@ export default class Timeline {
         span.textContent = display;
         const countSpan = document.createElement('span');
         countSpan.className = 'filter-option-count';
-        countSpan.textContent = `(${counts[val]})`;
+        countSpan.textContent = `(${counts[val] || 0})`;
         label.title = display;
         label.appendChild(cb);
         label.appendChild(span);
@@ -1304,8 +1478,153 @@ export default class Timeline {
     return haystacks.some((v) => this._normalizeSearch(v).includes(q));
   }
 
-  /** Apply active filters and re-render the full view */
-  protected _applyFilters(): void {
+  /** Page size used by the API mode (falls back to 6 when itemsPerPage is 0/unset) */
+  protected _apiPageSize(): number {
+    return this.itemsPerPage > 0 ? this.itemsPerPage : 6;
+  }
+
+  /** True when there are more pages to load */
+  protected _hasMorePages(): boolean {
+    if (this.api) return this.allCards.length < this._apiTotal;
+    return this.itemsPerPage > 0 && this._displayedCount < this.allCards.length;
+  }
+
+  /** Fetch a JSON resource from the API with the configured fetch implementation */
+  protected async _apiFetch<T>(path: string, params: Record<string, string>): Promise<T> {
+    const cfg = this.api!;
+    const base = cfg.url.replace(/\/+$/, '');
+    const qs = new URLSearchParams(params).toString();
+    const fetchImpl = cfg.fetchImpl || window.fetch.bind(window);
+    const response = await fetchImpl(`${base}${path}${qs ? '?' + qs : ''}`, {
+      headers: { Accept: 'application/json' }
+    });
+    if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+    return (await response.json()) as T;
+  }
+
+  /** Build the query string params for the items list endpoint from the current UI state */
+  protected _buildQueryParams(page: number): Record<string, string> {
+    const params: Record<string, string> = {
+      page: String(page),
+      pageSize: String(this._apiPageSize()),
+      sort: this.sortAscending ? 'asc' : 'desc'
+    };
+    if (this.searchTerm.trim()) params.q = this.searchTerm.trim();
+    this.filters.forEach((f) => {
+      const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+      if (active.length === 0) return;
+      params[f.field] = active.join(',');
+    });
+    if (this.featured_count > 0) params.featured = String(this.featured_count);
+    return params;
+  }
+
+  /** Fetch a page of items from the API and (re)build the whole view */
+  protected async _fetchPage(page: number): Promise<void> {
+    const seq = ++this._apiSeq;
+    this._apiPage = page;
+    this._apiLoading = true;
+    this._apiError = '';
+    this._renderStatus();
+    try {
+      const data = await this._apiFetch<TimelineApiPageResponse>('/items', this._buildQueryParams(page));
+      if (seq !== this._apiSeq) return;
+      this._apiTotal = typeof data.total === 'number' ? data.total : this.allCards.length;
+      this._apiTotalAll = typeof data.totalAll === 'number' ? data.totalAll : this._apiTotal;
+      this._apiFacets = data.facets || {};
+      this._apiFeatured = Array.isArray(data.featured) ? data.featured : [];
+      if (data.lastUpdated) this.lastUpdated = data.lastUpdated;
+      this._apiLoading = false;
+      this.allCards = Array.isArray(data.items) ? (data.items as unknown as TimelineItem[]) : [];
+      this._displayedCount = this.allCards.length;
+      this._apiDetails.clear();
+      this._buildFilterCheckboxes();
+      this._syncFilterToggleState();
+      this._renderAll();
+    } catch {
+      if (seq !== this._apiSeq) return;
+      this._apiLoading = false;
+      this._apiError = 'No se pudieron cargar los datos. Intente nuevamente.';
+      this._renderStatus();
+    }
+  }
+
+  /** Fetch the next page of items and append them to the timeline */
+  protected async _appendPageItems(): Promise<void> {
+    const seq = this._apiSeq;
+    const nextPage = this._apiPage + 1;
+    this._apiLoading = true;
+    this._apiError = '';
+    this._renderStatus();
+    try {
+      const data = await this._apiFetch<TimelineApiPageResponse>('/items', this._buildQueryParams(nextPage));
+      if (seq !== this._apiSeq) return;
+      this._apiTotal = typeof data.total === 'number' ? data.total : this._apiTotal;
+      if (data.lastUpdated) this.lastUpdated = data.lastUpdated;
+      this._apiPage = nextPage;
+      this._apiLoading = false;
+      this.allCards.push(...((data.items || []) as unknown as TimelineItem[]));
+      this._displayedCount = this.allCards.length;
+      this._renderAll();
+    } catch {
+      if (seq !== this._apiSeq) return;
+      this._apiLoading = false;
+      this._apiError = 'No se pudieron cargar más datos. Intente nuevamente.';
+      this._renderStatus();
+    }
+  }
+
+  /** Fetch the full detail of a single item by id */
+  protected async _fetchDetail(id: string): Promise<TimelineItem | null> {
+    const seq = ++this._apiSeq;
+    try {
+      const data = await this._apiFetch<{ item: TimelineItem }>(`/items/${encodeURIComponent(id)}`, {});
+      if (seq !== this._apiSeq) return null;
+      if (!data.item) {
+        this._apiDetails.set(id, null);
+        return null;
+      }
+      this._apiDetails.set(id, data.item);
+      return data.item;
+    } catch {
+      if (seq !== this._apiSeq) return null;
+      this._apiDetails.set(id, null);
+      return null;
+    }
+  }
+
+  /** Debounce a full page reload triggered by filter/search/sort changes */
+  protected _schedulePageReload(): void {
+    if (this._apiReloadTimer) window.clearTimeout(this._apiReloadTimer);
+    this._apiReloadTimer = window.setTimeout(() => {
+      this._apiReloadTimer = 0;
+      void this._fetchPage(1);
+    }, 300);
+  }
+
+  /** Render the API status row (loading / error / count) at the end of the timeline */
+  protected _renderStatus(): void {
+    const prev = this.timelineCards.querySelector('.timeline-status-item');
+    if (prev) prev.remove();
+    let text = '';
+    if (this._apiError) text = this._apiError;
+    else if (this._apiLoading && this.allCards.length === 0) text = 'Cargando publicaciones...';
+    else if (this._apiLoading && this.allCards.length > 0) text = 'Cargando más publicaciones...';
+    else if (this._apiTotal > 0) text = `Mostrando ${this.allCards.length} de ${this._apiTotal} publicaciones`;
+    if (!text) return;
+    const el = document.createElement('div');
+    el.className = 'timeline-item timeline-status-item';
+    el.innerHTML = `
+      <div class="timeline-date-col">
+        <div class="timeline-dot timeline-footer-dot"></div>
+      </div>
+      <div class="timeline-status-text">${text}</div>
+    `;
+    this._insertBeforeFooter(el);
+  }
+
+  /** Sync the active class on the search/filter/estado toggle buttons */
+  protected _syncFilterToggleState(): void {
     const anyActive = this.filters
       .filter((f) => !ESTADO_FILTER_FIELDS.includes(f.field))
       .some((f) => f.checkboxes.some((cb) => cb.checked));
@@ -1315,6 +1634,15 @@ export default class Timeline {
       .some((f) => f.checkboxes.some((cb) => cb.checked));
     if (this.estadoToggle) this.estadoToggle.classList.toggle('active', estadoActive);
     this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
+  }
+
+  /** Apply active filters and re-render the full view (or reload from the API) */
+  protected _applyFilters(): void {
+    this._syncFilterToggleState();
+    if (this.api) {
+      this._schedulePageReload();
+      return;
+    }
     this.allCards = this._originalCards.filter(
       (c) =>
         this._matchesSearch(c) &&
@@ -1333,6 +1661,25 @@ export default class Timeline {
 
   /** Render featured cards, timeline, and load-more button if needed */
   protected _renderAll(): void {
+    if (this.api) {
+      const n = this._apiTotal;
+      this.remainingCount.textContent = String(n);
+      this.container.querySelector('#remaining-text')!.textContent =
+        n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+      this._renderFeatured(this._apiFeatured as unknown as TimelineItem[]);
+      this._renderTimeline(this.allCards);
+      if (this._hasMorePages()) {
+        this._renderLoadMoreButton();
+      }
+      this._renderStatus();
+      requestAnimationFrame(() => {
+        this.featuredContainer.querySelectorAll('.featured-card').forEach((c) => c.classList.add('visible'));
+      });
+      if (this.isExpanded) {
+        requestAnimationFrame(() => this._setupTimelineObserver());
+      }
+      return;
+    }
     const featured = this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
     const n = this.allCards.length;
     this.remainingCount.textContent = String(this._originalCards.length);
@@ -1365,6 +1712,10 @@ export default class Timeline {
       </div>
     `;
     (el.querySelector('.timeline-load-more-btn') as HTMLElement).addEventListener('click', () => {
+      if (this.api) {
+        if (!this._apiLoading) void this._appendPageItems();
+        return;
+      }
       const start = this._displayedCount;
       const end = Math.min(start + this.itemsPerPage, this.allCards.length);
       const more = this.allCards.slice(start, end);
@@ -1476,6 +1827,12 @@ export default class Timeline {
   protected _init(): void {
     this._buildLayout();
     this._initResizeHandle();
+    if (this.api) {
+      this._bindBaseEvents();
+      this._renderStatus();
+      void this._fetchPage(1);
+      return;
+    }
     this._buildFilterCheckboxes();
     this._originalCards = [...this.items].sort((a, b) => {
       if (!a.fecha_publicacion) return 1;
@@ -1490,6 +1847,11 @@ export default class Timeline {
       cards.forEach((c) => c.classList.add('visible'));
     });
 
+    this._bindBaseEvents();
+  }
+
+  /** Bind the header/global event listeners shared by both local and API modes */
+  protected _bindBaseEvents(): void {
     this.expandToggle.addEventListener('click', () => this._toggleExpand());
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
     this.featuredRow.addEventListener('click', (e: Event) => {

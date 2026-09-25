@@ -58,6 +58,7 @@ The `Timeline` constructor accepts a single config object:
 |-----------------|--------------------------------|------------|--------------------------------------|
 | `container`     | `string` (CSS selector/Element)| **required** | DOM element to mount into          |
 | `items`         | `Array`                        | `[]`       | Array of article card objects        |
+| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `${url}/items` and the lazy detail of each card from `${url}/items/:id`. When set, `items` is ignored and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
@@ -96,6 +97,99 @@ Each object in `items` supports these fields:
 | `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa?, notas_de_trabajo? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null`. `notas_de_trabajo` is an optional working note displayed as a red badge below the theme description |
 
 > **Importante:** `example/mock-data.js` es la fuente de verdad para probar el componente. Cualquier campo que se agregue, renombre o elimine en el mock **debe** actualizarse en el mismo cambio en la interfaz `TimelineItem` (`src/TimelineViewer.ts`), en la declaración de tipos generada (`dist/TimelineViewer.d.ts` vía `npm run build`) y en esta tabla de campos. Los valores de `tipo_fuente` y los `tonos_sociales` se documentan según los que existen en el mock.
+
+### Modo API (servidor)
+
+Para volúmenes grandes se puede delegar el filtrado, la búsqueda, el orden y la paginación al servidor. En vez de `items`, se pasa una configuración `api`:
+
+```js
+new Timeline({
+  container: '#my-container',
+  api: { url: '/api' },
+  itemsPerPage: 10,
+  featuredCount: 6
+});
+```
+
+En este modo el detalle pesado (resumen, temas, notas, imágenes, adjuntos, videos) **no viaja en la lista**: cada tarjeta muestra un esqueleto con shimmer y se obtiene completo al expandirla. `GET ${url}/items/:id` devuelve el artículo completo con el contrato de `TimelineItem`.
+
+#### Endpoints
+
+| Endpoint               | Uso                                                                 |
+|------------------------|---------------------------------------------------------------------|
+| `GET {url}/items`      | Lista paginada con búsqueda, filtros, orden, facets y destacadas    |
+| `GET {url}/items/:id`  | Detalle completo de un artículo (cargado lazy al expandir la tarjeta) |
+
+#### Parámetros de `GET {url}/items`
+
+| Parámetro          | Tipo      | Descripción                                                              |
+|--------------------|-----------|--------------------------------------------------------------------------|
+| `page`             | `number`  | Página solicitada, 1-indexed (default `1`)                               |
+| `pageSize`         | `number`  | Ítems por página (default `10`)                                          |
+| `sort`             | `asc`/`desc` | Orden por `fecha_publicacion`. `desc` (reciente primero) es el default |
+| `q`                | `string`  | Texto libre. Coincide con `id`, `nombre_fuente`, `fuente_institucional` y `actores_principales`, sin distinguir acentos ni mayúsculas |
+| `featured`         | `number`  | Cantidad de tarjetas destacadas a devolver (las primeras con `capturado !== false`) |
+| `tonos_sociales`   | `string`  | CSV de tonos (`Positivo`, `Negativo`, `Neutro`) — OR dentro del campo    |
+| `tipo_fuente`      | `string`  | CSV de tipos (`sin-tipo` para los que no declaran tipo)                  |
+| `validado`         | `string`  | `validado`, `no-validado`                                                |
+| `capturado`        | `string`  | `capturado`, `no-capturado`                                              |
+| `descartado`       | `string`  | `descartado`, `no-descartado`                                            |
+| `es_oficial`       | `string`  | `oficial`, `no-oficial`                                                  |
+| `fecha_publicacion`| `string`  | CSV de años (`2026`) o `sin-fecha`                                       |
+| `contenido`        | `string`  | CSV de `adjuntos`, `video`, `imagenes`                                   |
+
+#### Respuesta de `GET {url}/items`
+
+```jsonc
+{
+  "items": [ /* TimelineItemSummary[] */ ],
+  "total": 123,            // total tras búsqueda + filtros + orden
+  "totalAll": 1000,        // total de la colección completa (sin filtros)
+  "featured": [ /* TimelineItemSummary[] */ ],
+  "lastUpdated": "2026-06-25T14:30:00",  // opcional
+  "facets": {
+    "tonos_sociales": { "Positivo": 15, "Negativo": 5, "Neutro": 8 },
+    "tipo_fuente": { "Sitio web o portal": 9 },
+    "validado": { "validado": 12, "no-validado": 7 },
+    "capturado": { "capturado": 17, "no-capturado": 2 },
+    "descartado": { "descartado": 3, "no-descartado": 16 },
+    "es_oficial": { "oficial": 10, "no-oficial": 9 },
+    "fecha_publicacion": { "2026": 15 },
+    "contenido": { "adjuntos": 4, "video": 6, "imagenes": 8 }
+  }
+}
+```
+
+Los `facets` se calculan sobre el conjunto búsqueda + filtros, ignorando el filtro del propio campo. Las claves canónicas (`validado`, `no-validado`, `oficial`, `sin-tipo`, etc.) deben coincidir con las que devuelve cada campo.
+
+#### `TimelineItemSummary`
+
+Los ítems de la lista usan una proyección liviana (los campos que la tarjeta colapsada muestra de inmediato). No incluyen `imagenes`, `adjuntos`, `temas`, `resumen_ia`, `links_videos`, ni `contenido`:
+
+| Field                  | Type                        |
+|------------------------|-----------------------------|
+| `id`                   | `number` / `string`        |
+| `nombre_fuente`        | `string`                    |
+| `thumbnail`            | `string` (URL) / `null`     |
+| `fecha_publicacion`    | `string` (YYYY-MM-DD)       |
+| `fecha_scrapeo`        | `string` (ISO)              |
+| `tonos_sociales`       | `string[]`                  |
+| `tipo_fuente`          | `string`                    |
+| `es_oficial`           | `boolean`                   |
+| `validado`             | `boolean` / `null`          |
+| `capturado`            | `boolean`                   |
+| `descartado`           | `boolean` / `null`          |
+| `link_web`             | `string` (URL) / `null`     |
+| `link_edit_entry`      | `string` (URL) / `null` (opcional) |
+| `notas_de_trabajo`     | `string` / `null` (opcional) |
+| `has_video`            | `boolean`                   |
+| `actores_principales`  | `string[]` / `null`        |
+| `fuente_institucional` | `string` / `null`          |
+| `screenshot`           | `string` (URL) / `null`     |
+| `imagenes_count`       | `number`                    |
+| `adjuntos_count`       | `number`                    |
+
+> Los campos `imagenes_count` y `adjuntos_count` permiten mostrar los contadores de los botones de acción sin descargar el detalle completo.
 
 ### Embedded content
 
