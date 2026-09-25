@@ -65,6 +65,7 @@ The `Timeline` constructor accepts a single config object:
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
 | `inlineAdjuntos`| `boolean`                      | `false`    | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button |
 | `internalButtons`| `boolean`                     | `false`    | When `true`, shows the internal work controls in the timeline toolbar: the red "work notes" toggle (hide/show `notas_de_trabajo` on cards and topics) and the red "Estado interno" filter button (validado / capturado / descartado). When `false` (default) those buttons are not rendered |
+| `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given remaining count. When unset, the default Spanish label is used with singular/plural logic |
 
 ### Item fields
 
@@ -111,7 +112,7 @@ new Timeline({
 });
 ```
 
-En este modo el detalle pesado (resumen, temas, notas, imágenes, adjuntos, videos) **no viaja en la lista**: cada tarjeta muestra un esqueleto con shimmer y se obtiene completo al expandirla. `GET ${url}/items/:id` devuelve el artículo completo con el contrato de `TimelineItem`.
+En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediato (título, resumen, thumbnail, badges, tonos y fecha). El resto — barra de acciones (captura, imágenes, adjuntos, abrir, editar), embed de la publicación original, menú de información, actores, fuente, temas, media y videos — se obtiene al expandir la tarjeta con `GET {url}/items/:id`, que devuelve el contrato completo de `TimelineItem`.
 
 #### Endpoints
 
@@ -164,32 +165,23 @@ Los `facets` se calculan sobre el conjunto búsqueda + filtros, ignorando el fil
 
 #### `TimelineItemSummary`
 
-Los ítems de la lista usan una proyección liviana (los campos que la tarjeta colapsada muestra de inmediato). No incluyen `imagenes`, `adjuntos`, `temas`, `resumen_ia`, `links_videos`, ni `contenido`:
+Los ítems de la lista llevan solo los campos que la tarjeta colapsada muestra de inmediato. Todo lo que aparece al expandir (barra de acciones, embed de `link_web`, menú de información, actores, fuente, temas, imágenes, adjuntos y videos) se carga con `GET {url}/items/:id`.
 
 | Field                  | Type                        |
 |------------------------|-----------------------------|
 | `id`                   | `number` / `string`        |
 | `nombre_fuente`        | `string`                    |
+| `resumen_ia`           | `string` / `null` (opcional) |
 | `thumbnail`            | `string` (URL) / `null`     |
 | `fecha_publicacion`    | `string` (YYYY-MM-DD)       |
-| `fecha_scrapeo`        | `string` (ISO)              |
 | `tonos_sociales`       | `string[]`                  |
-| `tipo_fuente`          | `string`                    |
 | `es_oficial`           | `boolean`                   |
 | `validado`             | `boolean` / `null`          |
 | `capturado`            | `boolean`                   |
 | `descartado`           | `boolean` / `null`          |
-| `link_web`             | `string` (URL) / `null`     |
-| `link_edit_entry`      | `string` (URL) / `null` (opcional) |
 | `notas_de_trabajo`     | `string` / `null` (opcional) |
-| `has_video`            | `boolean`                   |
-| `actores_principales`  | `string[]` / `null`        |
-| `fuente_institucional` | `string` / `null`          |
-| `screenshot`           | `string` (URL) / `null`     |
-| `imagenes_count`       | `number`                    |
-| `adjuntos_count`       | `number`                    |
 
-> Los campos `imagenes_count` y `adjuntos_count` permiten mostrar los contadores de los botones de acción sin descargar el detalle completo.
+`link_web` solo se incluye cuando `capturado === false` (esos ítems no son expandibles y muestran únicamente su `id` y enlace).
 
 ### Embedded content
 

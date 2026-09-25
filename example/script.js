@@ -10,7 +10,8 @@ const baseOptions = {
   itemsPerPage: 10,
   inlineImages: true,
   inlineAdjuntos: true,
-  internalButtons: true
+  internalButtons: true,
+  relatedLabel: (count) => (count === 1 ? 'artículo relacionado' : 'artículos relacionados')
 };
 
 if (useApi) {

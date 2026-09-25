@@ -78,24 +78,16 @@ export interface TimelineItem {
 export interface TimelineItemSummary {
   id: number | string;
   nombre_fuente: string;
+  resumen_ia?: string | null;
   thumbnail: string | null;
   fecha_publicacion: string;
-  fecha_scrapeo: string;
   tonos_sociales: TonoSocial[];
-  tipo_fuente: string;
   es_oficial: boolean;
   validado: boolean | null;
   capturado: boolean;
   descartado: boolean | null;
-  link_web: string | null;
-  link_edit_entry?: string;
   notas_de_trabajo?: string | null;
-  has_video: boolean;
-  actores_principales: string[] | null;
-  fuente_institucional: string | null;
-  screenshot: string | null;
-  imagenes_count: number;
-  adjuntos_count: number;
+  link_web?: string | null;
 }
 
 export interface TimelineApiConfig {
@@ -122,6 +114,7 @@ export interface TimelineOptions {
   inlineImages?: boolean;
   inlineAdjuntos?: boolean;
   internalButtons?: boolean;
+  relatedLabel?: (count: number) => string;
 }
 
 interface ImageInfo {
@@ -163,6 +156,7 @@ export default class Timeline {
   inlineImages: boolean;
   inlineAdjuntos: boolean;
   internalButtons: boolean;
+  relatedLabel: ((count: number) => string) | null;
   _displayedCount: number;
   allCards: TimelineItem[];
   isExpanded: boolean;
@@ -216,6 +210,7 @@ export default class Timeline {
     this.inlineImages = config.inlineImages || false;
     this.inlineAdjuntos = config.inlineAdjuntos || false;
     this.internalButtons = config.internalButtons || false;
+    this.relatedLabel = config.relatedLabel || null;
     this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
@@ -280,7 +275,7 @@ export default class Timeline {
         <div class="featured-row">
           <div class="noticias-top">
             <button class="expand-toggle" id="expand-toggle">
-              <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">publicaciones relacionadas</span></span>
+              <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">${this._relatedLabel(0)}</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
             <div class="search-wrap" id="search-wrap">
@@ -652,36 +647,6 @@ export default class Timeline {
       : '';
     const summary = card as unknown as TimelineItemSummary;
     const hasDetail = this._hasDetail(card);
-    const imgCount = hasDetail ? (card.imagenes || []).length : summary.imagenes_count || 0;
-    const adjCount = hasDetail ? (card.adjuntos || []).length : summary.adjuntos_count || 0;
-    const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
-    const embedHtml = embedUrl ? this._buildEmbed(embedUrl) : '';
-    const iframeHtml = embedUrl
-      ? `<div class="card-embed"><div class="card-subtitle card-iframe-subtitle">Publicación original</div>${embedHtml}</div>`
-      : '';
-    const actionsHtml = `<div class="card-actions">
-      <div class="card-actions-row">
-        ${card.screenshot ? '<button class="card-actions-btn card-screenshot-btn" title="Captura de pantallla de la fuente"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144.12 144" width="14" height="14"><path d="M78.64,116.38q-18.12,0-36.22,0c-6.27,0-10.66-4.39-10.66-10.68q0-22.31,0-44.61A10.44,10.44,0,0,1,36.23,52a1.13,1.13,0,0,0,.49-1.11c0-1.36,0-2.72,0-4.08,0-1.92.39-2.51,2.29-2.89a15.06,15.06,0,0,1,6.41,0c1.54.36,2.06,1.14,2.09,2.74,0,1.15-.5,2.67.23,3.32s2.13.17,3.24.18c1.68,0,3.36-.06,5,0,1,.05,1.27-.26,1.36-1.22a12.06,12.06,0,0,1,7.79-10.66,13.4,13.4,0,0,1,5.22-1.08c5.56,0,11.12-.11,16.67,0,6.25.14,11.68,3.88,12.91,10.5A2,2,0,0,1,100,48c.1.71-.16,1.74.35,2.05s1.55.15,2.34.15h12.48a10.13,10.13,0,0,1,10.48,10.25q.1,22.85,0,45.69a10.13,10.13,0,0,1-10.46,10.27Q96.93,116.4,78.64,116.38Zm0-61.24A26.93,26.93,0,1,0,79.23,109c14.27-.16,26.3-12.34,26.31-26.91A26.91,26.91,0,0,0,78.68,55.14Z" transform="translate(-6.66 -4.82)"/><path d="M31.12,4.82H49.24a6.16,6.16,0,0,1,6.17,6.37,6.24,6.24,0,0,1-6.16,6.55q-14.22,0-28.43,0c-.92,0-1.18.2-1.18,1.15,0,9.48,0,19,0,28.43,0,3.33-2.34,5.73-5.93,6.16a6.46,6.46,0,0,1-6.86-4.59,5.16,5.16,0,0,1-.12-1.3q0-18.48,0-36.95a5.88,5.88,0,0,1,5.78-5.8C18.72,4.81,24.92,4.82,31.12,4.82Z" transform="translate(-6.66 -4.82)"/><path d="M126.32,148.77c-6,0-12.08-.13-18.11,0a6.31,6.31,0,0,1-6.08-7.35c.62-3.77,2.86-5.62,6.65-5.62,9.27,0,18.55,0,27.83,0,1.07,0,1.19-.35,1.18-1.27q0-14.16,0-28.31c0-3.34,2.3-5.71,5.93-6.17a6.51,6.51,0,0,1,6.83,4.46,4.94,4.94,0,0,1,.15,1.42q0,18.42,0,36.83a5.9,5.9,0,0,1-5.89,5.93H126.32Z" transform="translate(-6.66 -4.82)"/><path d="M150.7,29.18c0,5.92-.24,11.85.07,17.75.26,4.79-5.22,8.24-9.85,5.68a5.75,5.75,0,0,1-3.15-5.37c0-9.44,0-18.87,0-28.31,0-1-.29-1.21-1.25-1.21q-14.16.06-28.31,0c-3.35,0-5.73-2.24-6.14-5.91A6.39,6.39,0,0,1,106.51,5a5.34,5.34,0,0,1,1.42-.16h36.94a5.92,5.92,0,0,1,5.82,5.88Q150.7,20,150.7,29.18Z" transform="translate(-6.66 -4.82)"/><path d="M6.74,124.42c0-5.92.25-11.85-.07-17.75-.26-4.78,5.22-8.25,9.85-5.68a5.75,5.75,0,0,1,3.15,5.37c0,9.44,0,18.87,0,28.31,0,1,.28,1.21,1.25,1.21q14.14-.06,28.3,0c3.36,0,5.73,2.23,6.15,5.91a6.39,6.39,0,0,1-4.41,6.85,4.94,4.94,0,0,1-1.42.15H12.57a5.93,5.93,0,0,1-5.82-5.88Q6.74,133.65,6.74,124.42Z" transform="translate(-6.66 -4.82)"/><path d="M94.38,82.05A15.66,15.66,0,1,1,78.72,66.26,15.72,15.72,0,0,1,94.38,82.05Z" transform="translate(-6.66 -4.82)"/></svg> Captura</button>' : ''}
-        ${imgCount > 0 && !this.inlineImages ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' + imgCount + '</span></button>' : ''}
-        ${adjCount > 0 && !this.inlineAdjuntos ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${adjCount}</span></button><div class="card-adjuntos-menu">${(card.adjuntos || []).map((a) => `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`).join('')}</div></div>` : ''}
-        ${
-          card.link_web
-            ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Ir
-        </a>`
-            : ''
-        }
-        ${
-          this.internalButtons && card.link_edit_entry
-            ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-          Editar
-        </a>`
-            : ''
-        }
-      </div>
-    </div>`;
     el.innerHTML = `
       <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
         <div class="timeline-date" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
@@ -694,7 +659,7 @@ export default class Timeline {
           ${card.descartado === true ? '<span class="card-no-validado">Descartado</span>' : ''}
         </div>
         ${imgHtml}
-        ${actionsHtml}
+        <div class="card-actions"></div>
         <div class="card-body">
           ${
             card.thumbnail
@@ -703,7 +668,9 @@ export default class Timeline {
           }
           <div class="card-fecha-pub" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
           ${card.notas_de_trabajo ? `<div class="card-notas-trabajo">${card.notas_de_trabajo}</div>` : ''}
-          <div class="card-desc-slot">${hasDetail ? '' : '<div class="card-desc card-desc-placeholder"></div>'}</div>
+          <div class="card-desc-slot">${
+            summary.resumen_ia ? `<div class="card-desc">${summary.resumen_ia}</div>` : ''
+          }</div>
           ${card.tonos_sociales && card.tonos_sociales.length ? `<div class="card-tone-wrap">${card.tonos_sociales.map((t) => `<span class="card-tone tone-${t.toLowerCase()}">${TONE_LABEL[t] || t}</span>`).join('')}</div>` : ''}
           <div class="card-temas-slot"></div>
           <div class="card-hint"><span class="card-hint-arrow"></span></div>
@@ -711,27 +678,10 @@ export default class Timeline {
           <button class="card-info-btn" title="Información">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           </button>
-          <div class="card-info-menu">
-            <div class="card-info-row">
-              <span class="card-info-label">ID</span>
-              <span class="card-info-value">${card.id}</span>
-            </div>
-            <div class="card-info-row">
-              <span class="card-info-label">Tipo</span>
-              <span class="card-info-value">${card.tipo_fuente}</span>
-            </div>
-            <div class="card-info-row">
-              <span class="card-info-label">Oficial</span>
-              <span class="card-info-value">${card.es_oficial ? 'Sí' : 'No'}</span>
-            </div>
-            <div class="card-info-row">
-              <span class="card-info-label">Captura</span>
-              <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
-            </div>
-          </div>
+          <div class="card-info-menu"></div>
           <div class="card-protag-fuente-slot"></div>
           <div class="card-media-slot"></div>
-          ${iframeHtml}
+          <div class="card-embed-slot"></div>
           <div class="card-videos-slot"></div>
         </div>
       </div>
@@ -741,13 +691,6 @@ export default class Timeline {
       timelineImg.addEventListener('load', () => timelineImg.classList.add('loaded'));
       if (timelineImg.complete) timelineImg.classList.add('loaded');
     }
-    el.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
-      const iframe = wrap.querySelector('iframe') as HTMLIFrameElement | null;
-      if (iframe) {
-        iframe.addEventListener('load', () => wrap.classList.add('loaded'));
-        if (iframe.contentDocument?.readyState === 'complete') wrap.classList.add('loaded');
-      }
-    });
     const cardEl = el.querySelector('.timeline-card') as HTMLElement;
     cardEl.addEventListener('click', (e: Event) => {
       if (
@@ -772,41 +715,9 @@ export default class Timeline {
       const adjuntosMenu = cardEl.querySelector('.card-adjuntos-menu') as HTMLElement | null;
       if (adjuntosMenu) adjuntosMenu.classList.remove('open');
     });
-    const screenshotBtn = el.querySelector('.card-screenshot-btn') as HTMLElement | null;
-    if (screenshotBtn) {
-      screenshotBtn.addEventListener('click', (e: Event) => {
-        e.stopPropagation();
-        this._openLightGallery([{ thumb: card.screenshot!, full: card.screenshot! }], card.nombre_fuente, false);
-      });
-    }
-    const imagesBtn = el.querySelector('.card-images-btn') as HTMLElement | null;
-    if (imagesBtn) {
-      imagesBtn.addEventListener('click', (e: Event) => {
-        e.stopPropagation();
-        void this._ensureCardDetail(cardEl).then(() => {
-          const full = this._resolveDetail(cardEl, card);
-          if (full && full.imagenes && full.imagenes.length) {
-            this._openLightGallery(full.imagenes, full.nombre_fuente, true);
-          }
-        });
-      });
-    }
-    const adjuntosWrap = el.querySelector('.card-adjuntos') as HTMLElement | null;
-    if (adjuntosWrap) {
-      const adjuntosBtn = adjuntosWrap.querySelector('.card-adjuntos-btn') as HTMLElement;
-      const adjuntosMenu = adjuntosWrap.querySelector('.card-adjuntos-menu') as HTMLElement;
-      adjuntosBtn.addEventListener('click', (e: Event) => {
-        e.stopPropagation();
-        void this._ensureCardDetail(cardEl).then(() => {
-          adjuntosMenu.classList.toggle('open');
-          const infoMenu = cardEl.querySelector('.card-info-menu') as HTMLElement | null;
-          if (infoMenu) infoMenu.classList.remove('open');
-        });
-      });
-    }
     cardEl.dataset.cardId = String(card.id);
     if (hasDetail) {
-      this._injectCardDetail(cardEl, card as TimelineItem);
+      this._injectCardDetail(cardEl, card);
     }
     return el;
   }
@@ -814,14 +725,6 @@ export default class Timeline {
   /** True if the card already carries its full detail payload (local mode) */
   protected _hasDetail(card: TimelineItem | TimelineItemSummary): boolean {
     return Array.isArray((card as TimelineItem).imagenes);
-  }
-
-  /** Resolve the full detail of a card from its DOM reference, falling back to the passed object */
-  protected _resolveDetail(cardEl: HTMLElement, fallback: TimelineItem | TimelineItemSummary): TimelineItem | null {
-    if (this._hasDetail(fallback)) return fallback as TimelineItem;
-    const id = cardEl.dataset.cardId;
-    if (!id) return null;
-    return this._apiDetails.get(id) || null;
   }
 
   /** Build the "Actores principales" HTML block */
@@ -897,16 +800,116 @@ export default class Timeline {
       .join('')}</div></div>`;
   }
 
+  /** Build the card actions bar (screenshot, imágenes, adjuntos, abrir, editar) */
+  protected _buildActionsHtml(card: TimelineItem): string {
+    const imgCount = (card.imagenes || []).length;
+    const adjCount = (card.adjuntos || []).length;
+    return `<div class="card-actions-row">
+        ${
+          card.screenshot
+            ? '<button class="card-actions-btn card-screenshot-btn" title="Captura de pantallla de la fuente"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 144.12 144" width="14" height="14"><path d="M78.64,116.38q-18.12,0-36.22,0c-6.27,0-10.66-4.39-10.66-10.68q0-22.31,0-44.61A10.44,10.44,0,0,1,36.23,52a1.13,1.13,0,0,0,.49-1.11c0-1.36,0-2.72,0-4.08,0-1.92.39-2.51,2.29-2.89a15.06,15.06,0,0,1,6.41,0c1.54.36,2.06,1.14,2.09,2.74,0,1.15-.5,2.67.23,3.32s2.13.17,3.24.18c1.68,0,3.36-.06,5,0,1,.05,1.27-.26,1.36-1.22a12.06,12.06,0,0,1,7.79-10.66,13.4,13.4,0,0,1,5.22-1.08c5.56,0,11.12-.11,16.67,0,6.25.14,11.68,3.88,12.91,10.5A2,2,0,0,1,100,48c.1.71-.16,1.74.35,2.05s1.55.15,2.34.15h12.48a10.13,10.13,0,0,1,10.48,10.25q.1,22.85,0,45.69a10.13,10.13,0,0,1-10.46,10.27Q96.93,116.4,78.64,116.38Zm0-61.24A26.93,26.93,0,1,0,79.23,109c14.27-.16,26.3-12.34,26.31-26.91A26.91,26.91,0,0,0,78.68,55.14Z" transform="translate(-6.66 -4.82)"/><path d="M31.12,4.82H49.24a6.16,6.16,0,0,1,6.17,6.37,6.24,6.24,0,0,1-6.16,6.55q-14.22,0-28.43,0c-.92,0-1.18.2-1.18,1.15,0,9.48,0,19,0,28.43,0,3.33-2.34,5.73-5.93,6.16a6.46,6.46,0,0,1-6.86-4.59,5.16,5.16,0,0,1-.12-1.3q0-18.48,0-36.95a5.88,5.88,0,0,1,5.78-5.8C18.72,4.81,24.92,4.82,31.12,4.82Z" transform="translate(-6.66 -4.82)"/><path d="M126.32,148.77c-6,0-12.08-.13-18.11,0a6.31,6.31,0,0,1-6.08-7.35c.62-3.77,2.86-5.62,6.65-5.62,9.27,0,18.55,0,27.83,0,1.07,0,1.19-.35,1.18-1.27q0-14.16,0-28.31c0-3.34,2.3-5.71,5.93-6.17a6.51,6.51,0,0,1,6.83,4.46,4.94,4.94,0,0,1,.15,1.42q0,18.42,0,36.83a5.9,5.9,0,0,1-5.89,5.93H126.32Z" transform="translate(-6.66 -4.82)"/><path d="M150.7,29.18c0,5.92-.24,11.85.07,17.75.26,4.79-5.22,8.24-9.85,5.68a5.75,5.75,0,0,1-3.15-5.37c0-9.44,0-18.87,0-28.31,0-1-.29-1.21-1.25-1.21q-14.16.06-28.31,0c-3.35,0-5.73-2.24-6.14-5.91A6.39,6.39,0,0,1,106.51,5a5.34,5.34,0,0,1,1.42-.16h36.94a5.92,5.92,0,0,1,5.82,5.88Q150.7,20,150.7,29.18Z" transform="translate(-6.66 -4.82)"/><path d="M6.74,124.42c0-5.92.25-11.85-.07-17.75-.26-4.78,5.22-8.25,9.85-5.68a5.75,5.75,0,0,1,3.15,5.37c0,9.44,0,18.87,0,28.31,0,1,.28,1.21,1.25,1.21q14.14-.06,28.3,0c3.36,0,5.73,2.23,6.15,5.91a6.39,6.39,0,0,1-4.41,6.85,4.94,4.94,0,0,1-1.42.15H12.57a5.93,5.93,0,0,1-5.82-5.88Q6.74,133.65,6.74,124.42Z" transform="translate(-6.66 -4.82)"/><path d="M94.38,82.05A15.66,15.66,0,1,1,78.72,66.26,15.72,15.72,0,0,1,94.38,82.05Z" transform="translate(-6.66 -4.82)"/></svg> Captura</button>'
+            : ''
+        }
+        ${
+          imgCount > 0 && !this.inlineImages
+            ? '<button class="card-actions-btn card-images-btn" title="Ver imágenes"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Imágenes <span class="card-actions-count">' +
+              imgCount +
+              '</span></button>'
+            : ''
+        }
+        ${
+          adjCount > 0 && !this.inlineAdjuntos
+            ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${adjCount}</span></button><div class="card-adjuntos-menu">${(
+                card.adjuntos || []
+              )
+                .map(
+                  (a) =>
+                    `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`
+                )
+                .join('')}</div></div>`
+            : ''
+        }
+        ${
+          card.link_web
+            ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Ir
+        </a>`
+            : ''
+        }
+        ${
+          this.internalButtons && card.link_edit_entry
+            ? `<a class="card-actions-btn card-edit" href="${card.link_edit_entry}" target="_blank" rel="noopener">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+          Editar
+        </a>`
+            : ''
+        }
+      </div>`;
+  }
+
+  /** Build the "Información" menu rows (ID, Tipo, Oficial, Captura) */
+  protected _buildInfoMenuHtml(card: TimelineItem): string {
+    return `<div class="card-info-row">
+        <span class="card-info-label">ID</span>
+        <span class="card-info-value">${card.id}</span>
+      </div>
+      <div class="card-info-row">
+        <span class="card-info-label">Tipo</span>
+        <span class="card-info-value">${card.tipo_fuente}</span>
+      </div>
+      <div class="card-info-row">
+        <span class="card-info-label">Oficial</span>
+        <span class="card-info-value">${card.es_oficial ? 'Sí' : 'No'}</span>
+      </div>
+      <div class="card-info-row">
+        <span class="card-info-label">Captura</span>
+        <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
+      </div>`;
+  }
+
   /** Fill the card detail slots and bind their interactions */
   protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void {
+    const actionsEl = cardEl.querySelector('.card-actions') as HTMLElement | null;
     const descSlot = cardEl.querySelector('.card-desc-slot') as HTMLElement | null;
     const temasSlot = cardEl.querySelector('.card-temas-slot') as HTMLElement | null;
     const protagFuenteSlot = cardEl.querySelector('.card-protag-fuente-slot') as HTMLElement | null;
     const mediaSlot = cardEl.querySelector('.card-media-slot') as HTMLElement | null;
     const videosSlot = cardEl.querySelector('.card-videos-slot') as HTMLElement | null;
 
-    if (descSlot) {
-      descSlot.innerHTML = card.resumen_ia ? `<div class="card-desc">${card.resumen_ia}</div>` : '';
+    if (actionsEl) {
+      actionsEl.innerHTML = this._buildActionsHtml(card);
+      const screenshotBtn = actionsEl.querySelector('.card-screenshot-btn') as HTMLElement | null;
+      if (screenshotBtn) {
+        screenshotBtn.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          this._openLightGallery([{ thumb: card.screenshot!, full: card.screenshot! }], card.nombre_fuente, false);
+        });
+      }
+      const imagesBtn = actionsEl.querySelector('.card-images-btn') as HTMLElement | null;
+      if (imagesBtn) {
+        imagesBtn.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          if (card.imagenes && card.imagenes.length) {
+            this._openLightGallery(card.imagenes, card.nombre_fuente, true);
+          }
+        });
+      }
+      const adjuntosWrap = actionsEl.querySelector('.card-adjuntos') as HTMLElement | null;
+      if (adjuntosWrap) {
+        const adjuntosBtn = adjuntosWrap.querySelector('.card-adjuntos-btn') as HTMLElement;
+        const adjuntosMenu = adjuntosWrap.querySelector('.card-adjuntos-menu') as HTMLElement;
+        adjuntosBtn.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          adjuntosMenu.classList.toggle('open');
+          const infoMenu = cardEl.querySelector('.card-info-menu') as HTMLElement | null;
+          if (infoMenu) infoMenu.classList.remove('open');
+        });
+      }
+    }
+
+    if (descSlot && card.resumen_ia) {
+      descSlot.innerHTML = `<div class="card-desc">${card.resumen_ia}</div>`;
     }
     if (temasSlot) temasSlot.innerHTML = this._buildTemasHtml(card);
     if (protagFuenteSlot) {
@@ -955,14 +958,23 @@ export default class Timeline {
         }
       });
     }
-    const adjuntosMenuEl = cardEl.querySelector('.card-adjuntos-menu') as HTMLElement | null;
-    if (adjuntosMenuEl && card.adjuntos && card.adjuntos.length) {
-      adjuntosMenuEl.innerHTML = card.adjuntos
-        .map(
-          (a) =>
-            `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`
-        )
-        .join('');
+    const embedSlot = cardEl.querySelector('.card-embed-slot') as HTMLElement | null;
+    if (embedSlot) {
+      const embedUrl = card.link_web ? this._parseLinkWeb(card.link_web) : null;
+      if (embedUrl) {
+        embedSlot.innerHTML = `<div class="card-embed"><div class="card-subtitle card-iframe-subtitle">Publicación original</div>${this._buildEmbed(embedUrl)}</div>`;
+        embedSlot.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
+          const iframe = wrap.querySelector('iframe') as HTMLIFrameElement | null;
+          if (iframe) {
+            iframe.addEventListener('load', () => wrap.classList.add('loaded'));
+            if (iframe.contentDocument?.readyState === 'complete') wrap.classList.add('loaded');
+          }
+        });
+      }
+    }
+    const infoMenuEl = cardEl.querySelector('.card-info-menu') as HTMLElement | null;
+    if (infoMenuEl) {
+      infoMenuEl.innerHTML = this._buildInfoMenuHtml(card);
     }
     cardEl.dataset.detailLoaded = '1';
   }
@@ -978,7 +990,10 @@ export default class Timeline {
       return;
     }
     const detail = await this._fetchDetail(id);
-    if (detail) this._injectCardDetail(cardEl, detail);
+    if (detail) {
+      this._injectCardDetail(cardEl, detail);
+      this._preloadEmbedLibraries();
+    }
   }
 
   /** Process the lazy social embeds (Instagram, Twitter, Facebook) once the card is expanded */
@@ -1183,6 +1198,13 @@ export default class Timeline {
         const parsed = this._parseLinkWeb(url);
         if (parsed) types.add(parsed.type);
       });
+    });
+    this.container.querySelectorAll('.card-iframe-wrap').forEach((wrap) => {
+      const cls = wrap.classList;
+      if (cls.contains('card-iframe-instagram')) types.add('instagram');
+      else if (cls.contains('card-iframe-twitter')) types.add('twitter');
+      else if (cls.contains('card-iframe-facebook')) types.add('facebook');
+      else if (cls.contains('card-iframe-youtube')) types.add('youtube');
     });
 
     const _watchEmbeds = (selector: string) => {
@@ -1659,13 +1681,18 @@ export default class Timeline {
     this._renderAll();
   }
 
+  /** Label of the expand toggle; uses the custom function when provided, otherwise the Spanish singular/plural default */
+  protected _relatedLabel(n: number): string {
+    if (this.relatedLabel) return this.relatedLabel(n);
+    return n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+  }
+
   /** Render featured cards, timeline, and load-more button if needed */
   protected _renderAll(): void {
     if (this.api) {
       const n = this._apiTotal;
       this.remainingCount.textContent = String(n);
-      this.container.querySelector('#remaining-text')!.textContent =
-        n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+      this.container.querySelector('#remaining-text')!.textContent = this._relatedLabel(n);
       this._renderFeatured(this._apiFeatured as unknown as TimelineItem[]);
       this._renderTimeline(this.allCards);
       if (this._hasMorePages()) {
@@ -1683,8 +1710,7 @@ export default class Timeline {
     const featured = this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
     const n = this.allCards.length;
     this.remainingCount.textContent = String(this._originalCards.length);
-    this.container.querySelector('#remaining-text')!.textContent =
-      n === 1 ? 'publicación relacionada' : 'publicaciones relacionadas';
+    this.container.querySelector('#remaining-text')!.textContent = this._relatedLabel(n);
     this._renderFeatured(featured);
     const displayCards = this.itemsPerPage > 0 ? this.allCards.slice(0, this._displayedCount) : this.allCards;
     this._renderTimeline(displayCards);

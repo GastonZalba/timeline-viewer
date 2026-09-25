@@ -111,30 +111,25 @@ function sortItems(items, sortAsc) {
   });
 }
 
-/** Lightweight card projection used by the list endpoint */
+/** Lightweight card projection used by the list endpoint (only what the collapsed card renders) */
 function toSummary(item) {
-  return {
+  const summary = {
     id: item.id,
     nombre_fuente: item.nombre_fuente,
+    resumen_ia: item.resumen_ia,
     thumbnail: item.thumbnail,
     fecha_publicacion: item.fecha_publicacion,
-    fecha_scrapeo: item.fecha_scrapeo,
     tonos_sociales: item.tonos_sociales,
-    tipo_fuente: item.tipo_fuente,
     es_oficial: item.es_oficial,
     validado: item.validado,
     capturado: item.capturado,
     descartado: item.descartado,
-    link_web: item.link_web,
-    link_edit_entry: item.link_edit_entry,
-    notas_de_trabajo: item.notas_de_trabajo,
-    has_video: item.has_video,
-    actores_principales: item.actores_principales,
-    fuente_institucional: item.fuente_institucional,
-    screenshot: item.screenshot,
-    imagenes_count: (item.imagenes || []).length,
-    adjuntos_count: (item.adjuntos || []).length
+    notas_de_trabajo: item.notas_de_trabajo
   };
+  if (item.capturado === false) {
+    summary.link_web = item.link_web;
+  }
+  return summary;
 }
 
 /** GET /api/items — paginated list with search, filters, sort, facets and featured */

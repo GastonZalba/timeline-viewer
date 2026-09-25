@@ -1177,22 +1177,6 @@
       overflow: hidden;
     }
 
-    .card-desc-placeholder {
-      position: relative;
-      min-height: 48px;
-      border-radius: 8px;
-      overflow: hidden;
-
-      &::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, var(--tv-bg-card) 0%, rgba(255, 255, 255, 0.06) 50%, var(--tv-bg-card) 100%);
-        background-size: 200% 100%;
-        animation: shimmer 1.5s ease-in-out infinite;
-      }
-    }
-
     .card-fecha-pub {
       display: none;
       align-items: center;
