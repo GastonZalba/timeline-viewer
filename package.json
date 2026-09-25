@@ -1,6 +1,6 @@
 {
   "name": "timeline-viewer",
-  "version": "1.26.2",
+  "version": "1.27.0",
   "description": "A frontend timeline card viewer for news articles with expandable details",
   "type": "module",
   "main": "dist/TimelineViewer.js",
