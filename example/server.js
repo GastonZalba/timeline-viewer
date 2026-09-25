@@ -132,7 +132,7 @@ function toSummary(item) {
   return summary;
 }
 
-/** GET /api/items — paginated list with search, filters, sort, facets and featured */
+/** GET /api — paginated list with search, filters, sort, facets and featured */
 function handleItems(url, res) {
   const params = Object.fromEntries(url.searchParams.entries());
   const q = normalize(params.q || '');
@@ -167,7 +167,7 @@ function handleItems(url, res) {
   );
 }
 
-/** GET /api/items/:id — full detail of a single item */
+/** GET /api/:id — full detail of a single item */
 function handleItem(id, res) {
   const item = mockData.items.find((i) => String(i.id) === id);
   if (!item) {
@@ -176,16 +176,22 @@ function handleItem(id, res) {
     return;
   }
   res.writeHead(200, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ item }));
+  res.end(JSON.stringify(item));
 }
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const pathname = url.pathname;
 
+  if (pathname === '/api' || pathname === '/api/') {
+    if (req.method === 'GET') return handleItems(url, res);
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
   if (pathname.startsWith('/api/')) {
-    if (req.method === 'GET' && pathname === '/api/items') return handleItems(url, res);
-    const detailMatch = pathname.match(/^\/api\/items\/([^/]+)$/);
+    const detailMatch = pathname.match(/^\/api\/([^/]+)$/);
     if (req.method === 'GET' && detailMatch) return handleItem(decodeURIComponent(detailMatch[1]), res);
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
@@ -220,5 +226,5 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
-  console.log(`Mock API available at http://localhost:${PORT}/api/items`);
+  console.log(`Mock API available at http://localhost:${PORT}/api`);
 });

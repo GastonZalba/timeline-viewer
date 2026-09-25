@@ -67,8 +67,8 @@ export interface TimelineItem {
   adjuntos: string[];
   contenido: string;
   screenshot: string | null;
-  imagenes: { thumb: string; full: string }[];
-  links_videos?: string[];
+  imagenes: { thumb: string; full: string }[] | null;
+  links_videos?: string[] | null;
   has_video: boolean; // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
   link_edit_entry?: string;
   notas_de_trabajo?: string | null;
@@ -727,7 +727,7 @@ export default class Timeline {
 
   /** True if the card already carries its full detail payload (local mode) */
   protected _hasDetail(card: TimelineItem | TimelineItemSummary): boolean {
-    return Array.isArray((card as TimelineItem).imagenes);
+    return 'tipo_fuente' in card;
   }
 
   /** Build the "Actores principales" HTML block */
@@ -985,6 +985,7 @@ export default class Timeline {
   /** Ensure the full detail of the card is present (fetches it when missing) */
   protected async _ensureCardDetail(cardEl: HTMLElement): Promise<void> {
     if (cardEl.dataset.detailLoaded) return;
+    if (!this.api) return;
     const id = cardEl.dataset.cardId;
     if (!id) return;
     const cached = this._apiDetails.get(id);
@@ -1527,7 +1528,7 @@ export default class Timeline {
     return (await response.json()) as T;
   }
 
-  /** Build the query string params for the items list endpoint from the current UI state */
+  /** Build the query string params for the list endpoint from the current UI state */
   protected _buildQueryParams(page: number): Record<string, string> {
     const params: Record<string, string> = {
       page: String(page),
@@ -1552,7 +1553,7 @@ export default class Timeline {
     this._apiError = '';
     this._renderStatus();
     try {
-      const data = await this._apiFetch<TimelineApiPageResponse>('/items', this._buildQueryParams(page));
+      const data = await this._apiFetch<TimelineApiPageResponse>('', this._buildQueryParams(page));
       if (seq !== this._apiSeq) return;
       this._apiTotal = typeof data.total === 'number' ? data.total : this.allCards.length;
       this._apiTotalAll = typeof data.totalAll === 'number' ? data.totalAll : this._apiTotal;
@@ -1582,7 +1583,7 @@ export default class Timeline {
     this._apiError = '';
     this._renderStatus();
     try {
-      const data = await this._apiFetch<TimelineApiPageResponse>('/items', this._buildQueryParams(nextPage));
+      const data = await this._apiFetch<TimelineApiPageResponse>('', this._buildQueryParams(nextPage));
       if (seq !== this._apiSeq) return;
       this._apiTotal = typeof data.total === 'number' ? data.total : this._apiTotal;
       if (data.lastUpdated) this.lastUpdated = data.lastUpdated;
@@ -1603,14 +1604,14 @@ export default class Timeline {
   protected async _fetchDetail(id: string): Promise<TimelineItem | null> {
     const seq = ++this._apiSeq;
     try {
-      const data = await this._apiFetch<{ item: TimelineItem }>(`/items/${encodeURIComponent(id)}`, {});
+      const data = await this._apiFetch<TimelineItem>(`/${encodeURIComponent(id)}`, {});
       if (seq !== this._apiSeq) return null;
-      if (!data.item) {
+      if (!data || data.id == null) {
         this._apiDetails.set(id, null);
         return null;
       }
-      this._apiDetails.set(id, data.item);
-      return data.item;
+      this._apiDetails.set(id, data);
+      return data;
     } catch {
       if (seq !== this._apiSeq) return null;
       this._apiDetails.set(id, null);

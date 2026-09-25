@@ -29,8 +29,8 @@ export interface TimelineItem {
     imagenes: {
         thumb: string;
         full: string;
-    }[];
-    links_videos?: string[];
+    }[] | null;
+    links_videos?: string[] | null;
     has_video: boolean;
     link_edit_entry?: string;
     notas_de_trabajo?: string | null;
@@ -230,7 +230,7 @@ export default class Timeline {
     protected _hasMorePages(): boolean;
     /** Fetch a JSON resource from the API with the configured fetch implementation */
     protected _apiFetch<T>(path: string, params: Record<string, string>): Promise<T>;
-    /** Build the query string params for the items list endpoint from the current UI state */
+    /** Build the query string params for the list endpoint from the current UI state */
     protected _buildQueryParams(page: number): Record<string, string>;
     /** Fetch a page of items from the API and (re)build the whole view */
     protected _fetchPage(page: number): Promise<void>;

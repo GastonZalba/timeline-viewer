@@ -115,8 +115,8 @@ interface TimelineItem {
   actores_principales: string[] | null;
   adjuntos: string[];            // Archivos/links adjuntos (puede estar vacío)
   screenshot: string | null;    // URL de captura de pantalla
-  imagenes: { thumb: string; full: string }[];
-  links_videos?: string[];      // Links de videos relacionados (se renderizan como embeds al expandir la tarjeta)
+  imagenes: { thumb: string; full: string }[] | null;  // El backend puede mandar null en vez de []
+  links_videos?: string[] | null;      // Links de videos relacionados (se renderizan como embeds al expandir la tarjeta)
   has_video: boolean;           // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
   link_edit_entry?: string;     // URL de formulario de edición (muestra botón rojo "Editar" en la tarjeta)
   temas: ItemTema[];            // Subtemas del artículo

@@ -58,7 +58,7 @@ The `Timeline` constructor accepts a single config object:
 |-----------------|--------------------------------|------------|--------------------------------------|
 | `container`     | `string` (CSS selector/Element)| **required** | DOM element to mount into          |
 | `items`         | `Array`                        | `[]`       | Array of article card objects        |
-| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `${url}/items` and the lazy detail of each card from `${url}/items/:id`. When set, `items` is ignored and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
+| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}` and the lazy detail of each card from `{url}/:id`. When set, `items` is ignored and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
@@ -91,8 +91,8 @@ Each object in `items` supports these fields:
 | `adjuntos`              | `string[]`                  | Attached files/links — may be empty |
 | `actores_principales`  | `string[]` / `null`        | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
-| `imagenes`             | `{ thumb: string; full: string }[]` | Image gallery with low-res `thumb` and full-res `full` URLs |
-| `links_videos`         | `string[]` (URL)          | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Only supported platforms (YouTube, etc.) are embedded; others are ignored |
+| `imagenes`             | `{ thumb: string; full: string }[]` / `null` | Image gallery with low-res `thumb` and full-res `full` URLs. `null` is accepted and treated as an empty gallery |
+| `links_videos`         | `string[]` (URL) / `null`  | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Only supported platforms (YouTube, etc.) are embedded; others are ignored |
 | `has_video`            | `boolean`                   | Indicates whether the item has audiovisual content: `true` when `links_videos` is non-empty or when `link_web` points to a video (e.g. YouTube, Instagram reel) |
 | `notas_de_trabajo`     | `string` / `null`           | Optional. Working notes displayed as a red badge above the summary in both collapsed and expanded card states |
 | `link_edit_entry`     | `string` (URL) / `null`     | Optional. URL to an edit form. When present, a red "Editar" button is shown next to the "Ir" button in the card actions |
@@ -113,16 +113,16 @@ new Timeline({
 });
 ```
 
-En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediato (título, resumen, thumbnail, badges, tonos y fecha). El resto — barra de acciones (captura, imágenes, adjuntos, abrir, editar), embed de la publicación original, menú de información, actores, fuente, temas, media y videos — se obtiene al expandir la tarjeta con `GET {url}/items/:id`, que devuelve el contrato completo de `TimelineItem`.
+En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediato (título, resumen, thumbnail, badges, tonos y fecha). El resto — barra de acciones (captura, imágenes, adjuntos, abrir, editar), embed de la publicación original, menú de información, actores, fuente, temas, media y videos — se obtiene al expandir la tarjeta con `GET {url}/:id`, que devuelve el contrato completo de `TimelineItem`.
 
 #### Endpoints
 
-| Endpoint               | Uso                                                                 |
-|------------------------|---------------------------------------------------------------------|
-| `GET {url}/items`      | Lista paginada con búsqueda, filtros, orden, facets y destacadas    |
-| `GET {url}/items/:id`  | Detalle completo de un artículo (cargado lazy al expandir la tarjeta) |
+| Endpoint          | Uso                                                                    | Respuesta                    |
+|-------------------|------------------------------------------------------------------------|------------------------------|
+| `GET {url}`       | Lista paginada con búsqueda, filtros, orden, facets y destacadas       | Objeto con `items`, `total`, `totalAll`, `featured`, `facets` y `lastUpdated` opcional |
+| `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
 
-#### Parámetros de `GET {url}/items`
+#### Parámetros de `GET {url}`
 
 | Parámetro          | Tipo      | Descripción                                                              |
 |--------------------|-----------|--------------------------------------------------------------------------|
@@ -140,7 +140,7 @@ En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediat
 | `fecha_publicacion`| `string`  | CSV de años (`2026`) o `sin-fecha`                                       |
 | `contenido`        | `string`  | CSV de `adjuntos`, `video`, `imagenes`                                   |
 
-#### Respuesta de `GET {url}/items`
+#### Respuesta de `GET {url}`
 
 ```jsonc
 {
@@ -166,7 +166,7 @@ Los `facets` se calculan sobre el conjunto búsqueda + filtros, ignorando el fil
 
 #### `TimelineItemSummary`
 
-Los ítems de la lista llevan solo los campos que la tarjeta colapsada muestra de inmediato. Todo lo que aparece al expandir (barra de acciones, embed de `link_web`, menú de información, actores, fuente, temas, imágenes, adjuntos y videos) se carga con `GET {url}/items/:id`.
+Los ítems de la lista llevan solo los campos que la tarjeta colapsada muestra de inmediato. Todo lo que aparece al expandir (barra de acciones, embed de `link_web`, menú de información, actores, fuente, temas, imágenes, adjuntos y videos) se carga con `GET {url}/:id`.
 
 | Field                  | Type                        |
 |------------------------|-----------------------------|

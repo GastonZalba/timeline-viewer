@@ -465,7 +465,8 @@ export default {
     actores_principales: ['react_dev_tips'],
     adjuntos: ['https://archivos.ejemplo.com/twitter/hilo-twitter-react-tips.txt'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
-    imagenes: [],
+    imagenes: null,
+    links_videos: null,
     has_video: false,
     temas: [
       { titulo: 'Performance y la optimizacion de renders con useMemo y useCallback', resumen: 'El hilo comparte consejos para optimizar React con el uso correcto de useMemo y useCallback para evitar renders innecesarios. Explica patrones de memorizacion, errores comunes y la importancia de medir con el profiler en lugar de optimizar a ciegas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-26' },
