@@ -2142,6 +2142,46 @@
     font-style: italic;
   }
 
+  &.single-mode {
+    .timeline-item {
+      display: block;
+      margin-bottom: 0;
+      opacity: 1;
+      transform: none;
+    }
+
+    .timeline-date-col {
+      display: none;
+    }
+
+    .timeline-card {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .single-mode-toolbar {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 4px 0 12px;
+
+      .work-notes-toggle {
+        display: inline-flex;
+        margin-left: 0;
+      }
+    }
+
+    .single-mode-message {
+      padding: 24px;
+      text-align: center;
+      color: var(--tv-text-muted);
+      font-size: 0.9rem;
+      font-style: italic;
+    }
+  }
+
   @container publicaciones (max-width: 768px) {
     .featured-row {
       padding: 10px 10px;

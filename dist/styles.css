@@ -1846,6 +1846,21 @@
   padding: 40px 0;
   font-style: italic;
 }
+.publicaciones-section .timeline-status-item {
+  opacity: 1 !important;
+  transform: none !important;
+  pointer-events: none;
+  margin-bottom: 0;
+}
+.publicaciones-section .timeline-status-text {
+  flex: 1;
+  max-width: 500px;
+  margin-left: 25px;
+  font-size: 12px;
+  color: var(--tv-text-muted);
+  line-height: 1.4;
+  font-style: italic;
+}
 .publicaciones-section .timeline-footer-item {
   opacity: 1 !important;
   transform: none !important;
@@ -1867,6 +1882,38 @@
   font-size: 12px;
   color: var(--tv-text-muted);
   line-height: 1.4;
+  font-style: italic;
+}
+.publicaciones-section.single-mode .timeline-item {
+  display: block;
+  margin-bottom: 0;
+  opacity: 1;
+  transform: none;
+}
+.publicaciones-section.single-mode .timeline-date-col {
+  display: none;
+}
+.publicaciones-section.single-mode .timeline-card {
+  margin-left: auto;
+  margin-right: auto;
+}
+.publicaciones-section.single-mode .single-mode-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 4px 0 12px;
+}
+.publicaciones-section.single-mode .single-mode-toolbar .work-notes-toggle {
+  display: inline-flex;
+  margin-left: 0;
+}
+.publicaciones-section.single-mode .single-mode-message {
+  padding: 24px;
+  text-align: center;
+  color: var(--tv-text-muted);
+  font-size: 0.9rem;
   font-style: italic;
 }
 @container publicaciones (max-width: 768px) {

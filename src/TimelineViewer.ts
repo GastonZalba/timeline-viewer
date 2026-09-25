@@ -115,6 +115,7 @@ export interface TimelineOptions {
   inlineAdjuntos?: boolean;
   internalButtons?: boolean;
   relatedLabel?: (count: number) => string;
+  singleId?: string;
 }
 
 interface ImageInfo {
@@ -157,6 +158,7 @@ export default class Timeline {
   inlineAdjuntos: boolean;
   internalButtons: boolean;
   relatedLabel: ((count: number) => string) | null;
+  singleId: string | null;
   _displayedCount: number;
   allCards: TimelineItem[];
   isExpanded: boolean;
@@ -211,6 +213,7 @@ export default class Timeline {
     this.inlineAdjuntos = config.inlineAdjuntos || false;
     this.internalButtons = config.internalButtons || false;
     this.relatedLabel = config.relatedLabel || null;
+    this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
     this._displayedCount = 0;
     this.allCards = [];
     this.isExpanded = false;
@@ -1849,8 +1852,53 @@ export default class Timeline {
     this.resizeHandle.addEventListener('keydown', onKeyDown);
   }
 
+  /** Render a single already-expanded card without any timeline chrome when `singleId` is set */
+  protected async _renderSingleCard(): Promise<void> {
+    const workNotesHtml = this.internalButtons
+      ? `<div class="single-mode-toolbar">
+            <button class="work-notes-toggle" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
+            </button>
+          </div>`
+      : '';
+    this.container.innerHTML = `<section class="publicaciones-section single-mode" id="publicaciones-section">${workNotesHtml}</section>`;
+    this.section = this.container.querySelector('#publicaciones-section') as HTMLElement;
+    this.workNotesToggle = this.container.querySelector('#work-notes-toggle') as HTMLElement;
+    if (this.workNotesToggle) {
+      this._applyWorkNotesState();
+      this.workNotesToggle.addEventListener('click', () => this._toggleWorkNotes());
+    }
+    const id = this.singleId || '';
+    let card: TimelineItem | null;
+    if (this.api) {
+      card = this._apiDetails.get(id) || (await this._fetchDetail(id));
+    } else {
+      card = this.items.find((it) => String(it.id) === id) || null;
+    }
+    if (!card) {
+      this.section.innerHTML = `<div class="single-mode-message">No se encontró el artículo ${id}.</div>`;
+      return;
+    }
+    const itemEl = this._createTimelineItem(card, 0);
+    const dateCol = itemEl.querySelector('.timeline-date-col') as HTMLElement | null;
+    if (dateCol) dateCol.remove();
+    const collapseBtn = itemEl.querySelector('.card-collapse') as HTMLElement | null;
+    if (collapseBtn) collapseBtn.remove();
+    itemEl.classList.add('visible');
+    const cardEl = itemEl.querySelector('.timeline-card') as HTMLElement;
+    cardEl.classList.add('expanded');
+    this.section.appendChild(itemEl);
+    await this._ensureCardDetail(cardEl);
+    this._preloadEmbedLibraries();
+    this._processCardEmbeds(cardEl);
+  }
+
   /** Initialize the component: build layout, sort data, render, bind events */
   protected _init(): void {
+    if (this.singleId) {
+      void this._renderSingleCard();
+      return;
+    }
     this._buildLayout();
     this._initResizeHandle();
     if (this.api) {

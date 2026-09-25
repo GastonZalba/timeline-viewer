@@ -36,15 +36,44 @@ export interface TimelineItem {
     notas_de_trabajo?: string | null;
     temas: ItemTema[];
 }
+export interface TimelineItemSummary {
+    id: number | string;
+    nombre_fuente: string;
+    resumen_ia?: string | null;
+    thumbnail: string | null;
+    fecha_publicacion: string;
+    tonos_sociales: TonoSocial[];
+    es_oficial: boolean;
+    validado: boolean | null;
+    capturado: boolean;
+    descartado: boolean | null;
+    notas_de_trabajo?: string | null;
+    link_web?: string | null;
+}
+export interface TimelineApiConfig {
+    url: string;
+    fetchImpl?: typeof fetch;
+}
+export interface TimelineApiPageResponse {
+    items: TimelineItemSummary[];
+    total: number;
+    totalAll: number;
+    featured: TimelineItemSummary[];
+    lastUpdated?: string;
+    facets: Record<string, Record<string, number>>;
+}
 export interface TimelineOptions {
     container: string | HTMLElement;
     items?: TimelineItem[];
+    api?: TimelineApiConfig;
     featuredCount?: number;
     lastUpdated?: string;
     itemsPerPage?: number;
     inlineImages?: boolean;
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
+    relatedLabel?: (count: number) => string;
+    singleId?: string;
 }
 interface ImageInfo {
     thumb: string;
@@ -74,6 +103,8 @@ export default class Timeline {
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
+    relatedLabel: ((count: number) => string) | null;
+    singleId: string | null;
     _displayedCount: number;
     allCards: TimelineItem[];
     isExpanded: boolean;
@@ -102,6 +133,18 @@ export default class Timeline {
     _lgInstance: LightGallery | null;
     _lgContainer: HTMLElement | null;
     _originalCards: TimelineItem[];
+    api: TimelineApiConfig | null;
+    _apiPage: number;
+    _apiTotal: number;
+    _apiTotalAll: number;
+    _apiFacets: Record<string, Record<string, number>>;
+    _apiFeatured: TimelineItemSummary[];
+    _apiLoading: boolean;
+    _apiSeq: number;
+    _apiReloadTimer: number;
+    _apiFacetsBuilt: boolean;
+    _apiError: string;
+    _apiDetails: Map<string, TimelineItem | null>;
     constructor(config: TimelineOptions);
     /** Build the main DOM layout and cache element references */
     protected _buildLayout(): void;
@@ -127,6 +170,30 @@ export default class Timeline {
     protected _renderFeatured(cards: TimelineItem[]): void;
     /** Create a single timeline card element with all its event listeners */
     protected _createTimelineItem(card: TimelineItem, index: number): HTMLElement;
+    /** True if the card already carries its full detail payload (local mode) */
+    protected _hasDetail(card: TimelineItem | TimelineItemSummary): boolean;
+    /** Build the "Actores principales" HTML block */
+    protected _buildProtagonistaHtml(card: TimelineItem): string;
+    /** Build the "Fuente" HTML block */
+    protected _buildFuenteHtml(card: TimelineItem): string;
+    /** Build the "Temas destacados" HTML block */
+    protected _buildTemasHtml(card: TimelineItem): string;
+    /** Build the "Videos vinculados" HTML block */
+    protected _buildVideosHtml(card: TimelineItem): string;
+    /** Build the inline "Imágenes" HTML block */
+    protected _buildInlineImagesHtml(card: TimelineItem): string;
+    /** Build the inline "Adjuntos" HTML block */
+    protected _buildInlineAdjuntosHtml(card: TimelineItem): string;
+    /** Build the card actions bar (screenshot, imágenes, adjuntos, abrir, editar) */
+    protected _buildActionsHtml(card: TimelineItem): string;
+    /** Build the "Información" menu rows (ID, Tipo, Oficial, Captura) */
+    protected _buildInfoMenuHtml(card: TimelineItem): string;
+    /** Fill the card detail slots and bind their interactions */
+    protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void;
+    /** Ensure the full detail of the card is present (fetches it when missing) */
+    protected _ensureCardDetail(cardEl: HTMLElement): Promise<void>;
+    /** Process the lazy social embeds (Instagram, Twitter, Facebook) once the card is expanded */
+    protected _processCardEmbeds(cardEl: HTMLElement): void;
     /** Insert an element before the timeline footer, or append if no footer */
     protected _insertBeforeFooter(el: HTMLElement): void;
     /** Render the timeline cards list, including the last-updated footer */
@@ -147,7 +214,7 @@ export default class Timeline {
     protected _applyWorkNotesState(): void;
     /** Toggle work-notes visibility and persist the state to localStorage */
     protected _toggleWorkNotes(): void;
-    /** Build filter checkboxes from the available filter values */
+    /** Build filter checkboxes from the available filter values (local data or API facets) */
     protected _buildFilterCheckboxes(): void;
     /** Load the persisted estado-interno filter state from localStorage */
     protected _loadEstadoFilterState(): Record<string, string[]>;
@@ -157,8 +224,30 @@ export default class Timeline {
     protected _normalizeSearch(value: string | null | undefined): string;
     /** Check whether a card matches the current search term */
     protected _matchesSearch(card: TimelineItem): boolean;
-    /** Apply active filters and re-render the full view */
+    /** Page size used by the API mode (falls back to 6 when itemsPerPage is 0/unset) */
+    protected _apiPageSize(): number;
+    /** True when there are more pages to load */
+    protected _hasMorePages(): boolean;
+    /** Fetch a JSON resource from the API with the configured fetch implementation */
+    protected _apiFetch<T>(path: string, params: Record<string, string>): Promise<T>;
+    /** Build the query string params for the items list endpoint from the current UI state */
+    protected _buildQueryParams(page: number): Record<string, string>;
+    /** Fetch a page of items from the API and (re)build the whole view */
+    protected _fetchPage(page: number): Promise<void>;
+    /** Fetch the next page of items and append them to the timeline */
+    protected _appendPageItems(): Promise<void>;
+    /** Fetch the full detail of a single item by id */
+    protected _fetchDetail(id: string): Promise<TimelineItem | null>;
+    /** Debounce a full page reload triggered by filter/search/sort changes */
+    protected _schedulePageReload(): void;
+    /** Render the API status row (loading / error / count) at the end of the timeline */
+    protected _renderStatus(): void;
+    /** Sync the active class on the search/filter/estado toggle buttons */
+    protected _syncFilterToggleState(): void;
+    /** Apply active filters and re-render the full view (or reload from the API) */
     protected _applyFilters(): void;
+    /** Label of the expand toggle; uses the custom function when provided, otherwise the Spanish singular/plural default */
+    protected _relatedLabel(n: number): string;
     /** Render featured cards, timeline, and load-more button if needed */
     protected _renderAll(): void;
     /** Render the "load more" button and wire its click handler */
@@ -173,8 +262,12 @@ export default class Timeline {
     protected _syncResizeHandleA11y(): void;
     /** Set up the timeline-cards resize handle: drag, keyboard and localStorage persistence */
     protected _initResizeHandle(): void;
+    /** Render a single already-expanded card without any timeline chrome when `singleId` is set */
+    protected _renderSingleCard(): Promise<void>;
     /** Initialize the component: build layout, sort data, render, bind events */
     protected _init(): void;
+    /** Bind the header/global event listeners shared by both local and API modes */
+    protected _bindBaseEvents(): void;
 }
 export {};
 //# sourceMappingURL=TimelineViewer.d.ts.map
