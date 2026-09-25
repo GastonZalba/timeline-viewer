@@ -1395,7 +1395,8 @@
   opacity: 1;
   pointer-events: auto;
 }
-.publicaciones-section .card-info-btn {
+.publicaciones-section .card-info-btn,
+.publicaciones-section .card-share-btn {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -1414,12 +1415,49 @@
   pointer-events: none;
   color: rgba(255, 255, 255, 0.85);
 }
-.publicaciones-section .card-info-btn:hover {
+.publicaciones-section .card-info-btn:hover,
+.publicaciones-section .card-share-btn:hover {
   background: rgba(0, 0, 0, 0.6);
 }
-.publicaciones-section .timeline-card.expanded .card-info-btn {
+.publicaciones-section .card-share-btn {
+  left: 40px;
+}
+.publicaciones-section .timeline-card.expanded .card-info-btn,
+.publicaciones-section .timeline-card.expanded .card-share-btn {
   opacity: 1;
   pointer-events: auto;
+}
+.publicaciones-section .card-share-toast {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  pointer-events: none;
+  max-width: calc(100% - 16px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: #1e2a3a;
+  border: 1px solid var(--tv-border-card);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  font-size: 0.7rem;
+  color: var(--tv-text-primary);
+  white-space: nowrap;
+  animation: tv-share-toast 1.5s ease forwards;
+}
+@keyframes tv-share-toast {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+  12%, 80% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
 }
 .publicaciones-section .card-info-menu {
   display: none;
@@ -1455,6 +1493,26 @@
 .publicaciones-section .card-info-menu .card-info-value {
   font-size: 0.75rem;
   color: var(--tv-text-primary);
+}
+.publicaciones-section .card-info-menu .card-info-link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--tv-accent-light);
+  text-decoration: none;
+  cursor: pointer;
+}
+.publicaciones-section .card-info-menu .card-info-link:hover {
+  color: var(--tv-accent);
+  text-decoration: underline;
+}
+.publicaciones-section .card-info-menu .card-info-link svg {
+  flex: 0 0 auto;
+}
+.publicaciones-section .card-info-menu .card-info-link .card-info-value {
+  color: inherit;
 }
 .publicaciones-section .card-adjuntos {
   position: relative;
@@ -1915,6 +1973,48 @@
   color: var(--tv-text-muted);
   font-size: 0.9rem;
   font-style: italic;
+}
+.publicaciones-section.single-mode .single-taxonomies {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 20px 28px;
+  max-width: 480px;
+  margin: 28px auto 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--tv-border-section);
+}
+.publicaciones-section.single-mode .single-taxonomy {
+  min-width: 0;
+}
+.publicaciones-section.single-mode .single-taxonomy-label {
+  margin-bottom: 8px;
+  font-size: 0.65rem;
+  color: var(--tv-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+.publicaciones-section.single-mode .single-taxonomy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.publicaciones-section.single-mode .single-taxonomy-link {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--tv-accent-light);
+  text-decoration: none;
+  word-break: break-word;
+}
+.publicaciones-section.single-mode .single-taxonomy-link:hover {
+  color: var(--tv-accent);
+  text-decoration: underline;
 }
 @container publicaciones (max-width: 768px) {
   .publicaciones-section .featured-row {

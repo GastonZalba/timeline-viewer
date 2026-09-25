@@ -38,6 +38,8 @@ export default class Timeline {
         this.internalButtons = config.internalButtons || false;
         this.relatedLabel = config.relatedLabel || null;
         this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
+        this.singleUrl = config.singleUrl || null;
+        this.singleTaxonomies = config.singleTaxonomies || [];
         this._displayedCount = 0;
         this.allCards = [];
         this.isExpanded = false;
@@ -77,6 +79,7 @@ export default class Timeline {
         this._apiFacetsBuilt = false;
         this._apiError = '';
         this._apiDetails = new Map();
+        this._shareTimer = 0;
         this._init();
     }
     /** Build the main DOM layout and cache element references */
@@ -370,6 +373,20 @@ export default class Timeline {
         const clean = url.split('?')[0].split('#')[0];
         return clean.includes('.') ? clean.substring(clean.lastIndexOf('.') + 1).toLowerCase() : '';
     }
+    /**
+     * Escapar los caracteres especiales de HTML de un texto plano para poder
+     * interpolarlo en markup o en un atributo. Los valores que provienen de la
+     * config del consumidor se escapan siempre; para contenido con markup hay que
+     * pasar un `HTMLElement`, que se inserta como nodo del DOM.
+     */
+    _escapeHtml(value) {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
     /** Codificar con encodeURIComponent el nombre de archivo de una URL, preservando el resto */
     _encodeFileName(url) {
         const qIdx = url.indexOf('?');
@@ -387,6 +404,89 @@ export default class Timeline {
             return '<svg class="card-inline-adjunto-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><text x="12" y="16.5" text-anchor="middle" font-size="6" font-weight="700" fill="currentColor">PDF</text></svg>';
         }
         return generic;
+    }
+    /** SVG del icono de enlace externo (el mismo que usa el botón "Ir") */
+    _externalLinkIconSvg() {
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+    }
+    /**
+     * Resolver la URL de la vista single (modo single) de un ítem a partir de la
+     * plantilla `singleUrl`. Devuelve null si no hay plantilla configurada o si el
+     * componente ya se está mostrando en modo single (`singleId`), donde el link
+     * apuntaría a la misma vista.
+     */
+    _buildSingleUrl(id) {
+        if (!this.singleUrl || this.singleId)
+            return null;
+        return this.singleUrl.replace(/\{id\}/g, encodeURIComponent(String(id)));
+    }
+    /** SVG del icono de compartir (nodos) */
+    _shareIconSvg() {
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
+    }
+    /** SVG del ícono de confirmación (visto al copiar al portapapeles) */
+    _checkIconSvg() {
+        return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    }
+    /**
+     * Compartir la URL de la vista single: usa la Web Share API cuando está
+     * disponible y, si no, copia el enlace al portapapeles. `navigator.share()`
+     * se invoca de forma síncrona dentro del click porque el navegador exige
+     * activación del usuario para abrir el share sheet.
+     */
+    async _shareItem(url, title, btn) {
+        if (navigator.share && (!navigator.canShare || navigator.canShare({ title, url }))) {
+            try {
+                await navigator.share({ title, url });
+                return;
+            }
+            catch (err) {
+                if (err instanceof Error && err.name === 'AbortError')
+                    return;
+            }
+        }
+        try {
+            await navigator.clipboard.writeText(url);
+        }
+        catch {
+            this._copyToClipboard(url);
+        }
+        this._flashCopied(btn);
+    }
+    /** Copiar al portapapeles sin la Clipboard API (contexto no seguro o sin permiso) */
+    _copyToClipboard(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+    }
+    /** Mostrar el ícono de confirmación en el botón de compartir por 1.5s */
+    _flashCopied(btn) {
+        btn.innerHTML = this._checkIconSvg();
+        this._showShareToast(btn);
+        if (this._shareTimer)
+            window.clearTimeout(this._shareTimer);
+        this._shareTimer = window.setTimeout(() => {
+            btn.innerHTML = this._shareIconSvg();
+            this._shareTimer = 0;
+        }, 1500);
+    }
+    /** Cartelito "Copiado al portapapeles!" debajo de los botones de la tarjeta */
+    _showShareToast(btn) {
+        const cardEl = btn.closest('.timeline-card');
+        if (!cardEl)
+            return;
+        cardEl.querySelector('.card-share-toast')?.remove();
+        const toast = document.createElement('div');
+        toast.className = 'card-share-toast';
+        toast.setAttribute('role', 'status');
+        toast.textContent = 'Copiado al portapapeles!';
+        cardEl.appendChild(toast);
+        window.setTimeout(() => toast.remove(), 1500);
     }
     /** Render the featured (overlapping) cards row */
     _renderFeatured(cards) {
@@ -461,6 +561,10 @@ export default class Timeline {
             : '';
         const summary = card;
         const hasDetail = this._hasDetail(card);
+        const shareUrl = this._buildSingleUrl(card.id);
+        const shareBtnHtml = shareUrl
+            ? `<button class="card-share-btn" data-share-url="${new URL(shareUrl, window.location.href).href}" title="Compartir" aria-label="Compartir">${this._shareIconSvg()}</button>`
+            : '';
         el.innerHTML = `
       <div class="timeline-date-col${card.fecha_publicacion ? '' : ' no-date'}">
         <div class="timeline-date" title="Fecha de publicación">${this._formatDate(card.fecha_publicacion)}</div>
@@ -488,6 +592,7 @@ export default class Timeline {
           <button class="card-info-btn" title="Información">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           </button>
+          ${shareBtnHtml}
           <div class="card-info-menu"></div>
           <div class="card-protag-fuente-slot"></div>
           <div class="card-media-slot"></div>
@@ -505,7 +610,7 @@ export default class Timeline {
         const cardEl = el.querySelector('.timeline-card');
         cardEl.addEventListener('click', (e) => {
             if (e.target &&
-                e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-adjuntos, .card-inline-images, .card-inline-adjuntos, .card-edit'))
+                e.target.closest('.card-open, .card-collapse, .card-info-btn, .card-info-menu, .card-share-btn, .card-adjuntos, .card-inline-images, .card-inline-adjuntos, .card-edit'))
                 return;
             cardEl.classList.add('expanded');
             void this._ensureCardDetail(cardEl).then(() => {
@@ -523,6 +628,13 @@ export default class Timeline {
             if (adjuntosMenu)
                 adjuntosMenu.classList.remove('open');
         });
+        const shareBtn = el.querySelector('.card-share-btn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                void this._shareItem(shareBtn.dataset.shareUrl || '', card.nombre_fuente, shareBtn);
+            });
+        }
         cardEl.dataset.cardId = String(card.id);
         if (hasDetail) {
             this._injectCardDetail(cardEl, card);
@@ -633,9 +745,15 @@ export default class Timeline {
     }
     /** Build the "Información" menu rows (ID, Tipo, Oficial, Captura) */
     _buildInfoMenuHtml(card) {
+        const singleUrl = this._buildSingleUrl(card.id);
+        const idRow = singleUrl
+            ? `<a class="card-info-link" href="${singleUrl}" target="_blank" rel="noopener" title="Ver en vista individual">
+          <span class="card-info-value">${card.id}</span>${this._externalLinkIconSvg()}
+        </a>`
+            : `<span class="card-info-value">${card.id}</span>`;
         return `<div class="card-info-row">
         <span class="card-info-label">ID</span>
-        <span class="card-info-value">${card.id}</span>
+        ${idRow}
       </div>
       <div class="card-info-row">
         <span class="card-info-label">Tipo</span>
@@ -649,6 +767,70 @@ export default class Timeline {
         <span class="card-info-label">Captura</span>
         <span class="card-info-value">${this._formatDateTime(card.fecha_scrapeo)}</span>
       </div>`;
+    }
+    /**
+     * Build the taxonomy navigation block shown under the card in single mode
+     * (`singleTaxonomies`). Every group renders its label as a heading (cropped by
+     * CSS, with the full text in the `title`) and its items as links.
+     *
+     * An item's `content` can be a plain string (escaped, rendered as text) or an
+     * `HTMLElement` (moved into the block, so it can't be interpolated). Element
+     * contents are returned apart in `nodes`, each paired with the `slot` index of
+     * the placeholder left in the markup for `_appendTaxonomies()` to swap.
+     *
+     * Groups with no label, no items, or items with no content/link are ignored,
+     * and an empty `html` is returned when nothing is renderable so no orphan
+     * markup is left in the DOM.
+     */
+    _buildTaxonomies() {
+        const nodes = [];
+        let slot = 0;
+        const groups = (this.singleTaxonomies || [])
+            .filter((tax) => tax && tax.label && Array.isArray(tax.items) && tax.items.length)
+            .map((tax) => {
+            const items = tax.items
+                .filter((item) => item && item.link && item.content)
+                .map((item) => {
+                const open = `<li><a class="single-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">`;
+                if (typeof item.content === 'string') {
+                    return `${open}${this._escapeHtml(item.content)}</a></li>`;
+                }
+                const index = slot++;
+                nodes.push({ slot: index, node: item.content });
+                return `${open}<span data-taxonomy-slot="${index}"></span></a></li>`;
+            })
+                .join('');
+            if (!items)
+                return '';
+            const label = this._escapeHtml(tax.label);
+            return `<div class="single-taxonomy">
+          <div class="single-taxonomy-label" title="${label}">${label}</div>
+          <ul class="single-taxonomy-list">${items}</ul>
+        </div>`;
+        })
+            .filter((group) => group !== '');
+        if (!groups.length)
+            return { html: '', nodes: [] };
+        return { html: `<div class="single-taxonomies">${groups.join('')}</div>`, nodes };
+    }
+    /**
+     * Append the taxonomy navigation block at the end of the single mode section
+     * and swap the element contents (`content` as `HTMLElement`) into their slots.
+     */
+    _appendTaxonomies() {
+        const { html, nodes } = this._buildTaxonomies();
+        if (!html)
+            return;
+        this.section.insertAdjacentHTML('beforeend', html);
+        if (!nodes.length)
+            return;
+        const blocks = this.section.querySelectorAll('.single-taxonomies');
+        const block = blocks[blocks.length - 1];
+        if (!block)
+            return;
+        nodes.forEach(({ slot, node }) => {
+            block.querySelector(`[data-taxonomy-slot="${slot}"]`)?.replaceWith(node);
+        });
     }
     /** Fill the card detail slots and bind their interactions */
     _injectCardDetail(cardEl, card) {
@@ -1667,6 +1849,7 @@ export default class Timeline {
         }
         if (!card) {
             this.section.innerHTML = `<div class="single-mode-message">No se encontró el artículo ${id}.</div>`;
+            this._appendTaxonomies();
             return;
         }
         const itemEl = this._createTimelineItem(card, 0);
@@ -1683,6 +1866,7 @@ export default class Timeline {
         await this._ensureCardDetail(cardEl);
         this._preloadEmbedLibraries();
         this._processCardEmbeds(cardEl);
+        this._appendTaxonomies();
     }
     /** Initialize the component: build layout, sort data, render, bind events */
     _init() {

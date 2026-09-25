@@ -62,6 +62,14 @@ export interface TimelineApiPageResponse {
     lastUpdated?: string;
     facets: Record<string, Record<string, number>>;
 }
+export interface SingleTaxonomyItem {
+    content: string | HTMLElement;
+    link: string;
+}
+export interface SingleTaxonomy {
+    label: string;
+    items: SingleTaxonomyItem[];
+}
 export interface TimelineOptions {
     container: string | HTMLElement;
     items?: TimelineItem[];
@@ -74,6 +82,8 @@ export interface TimelineOptions {
     internalButtons?: boolean;
     relatedLabel?: (count: number) => string;
     singleId?: string;
+    singleUrl?: string;
+    singleTaxonomies?: SingleTaxonomy[];
 }
 interface ImageInfo {
     thumb: string;
@@ -105,6 +115,8 @@ export default class Timeline {
     internalButtons: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
+    singleUrl: string | null;
+    singleTaxonomies: SingleTaxonomy[];
     _displayedCount: number;
     allCards: TimelineItem[];
     isExpanded: boolean;
@@ -145,6 +157,7 @@ export default class Timeline {
     _apiFacetsBuilt: boolean;
     _apiError: string;
     _apiDetails: Map<string, TimelineItem | null>;
+    _shareTimer: number;
     constructor(config: TimelineOptions);
     /** Build the main DOM layout and cache element references */
     protected _buildLayout(): void;
@@ -162,10 +175,43 @@ export default class Timeline {
     protected _oficialIconSvg(): string;
     /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */
     protected _getFileExt(url: string): string;
+    /**
+     * Escapar los caracteres especiales de HTML de un texto plano para poder
+     * interpolarlo en markup o en un atributo. Los valores que provienen de la
+     * config del consumidor se escapan siempre; para contenido con markup hay que
+     * pasar un `HTMLElement`, que se inserta como nodo del DOM.
+     */
+    protected _escapeHtml(value: string): string;
     /** Codificar con encodeURIComponent el nombre de archivo de una URL, preservando el resto */
     protected _encodeFileName(url: string): string;
     /** SVG del icono de archivo según su extensión (pdf vs genérico) */
     protected _fileIconSvg(ext: string): string;
+    /** SVG del icono de enlace externo (el mismo que usa el botón "Ir") */
+    protected _externalLinkIconSvg(): string;
+    /**
+     * Resolver la URL de la vista single (modo single) de un ítem a partir de la
+     * plantilla `singleUrl`. Devuelve null si no hay plantilla configurada o si el
+     * componente ya se está mostrando en modo single (`singleId`), donde el link
+     * apuntaría a la misma vista.
+     */
+    protected _buildSingleUrl(id: number | string): string | null;
+    /** SVG del icono de compartir (nodos) */
+    protected _shareIconSvg(): string;
+    /** SVG del ícono de confirmación (visto al copiar al portapapeles) */
+    protected _checkIconSvg(): string;
+    /**
+     * Compartir la URL de la vista single: usa la Web Share API cuando está
+     * disponible y, si no, copia el enlace al portapapeles. `navigator.share()`
+     * se invoca de forma síncrona dentro del click porque el navegador exige
+     * activación del usuario para abrir el share sheet.
+     */
+    protected _shareItem(url: string, title: string, btn: HTMLElement): Promise<void>;
+    /** Copiar al portapapeles sin la Clipboard API (contexto no seguro o sin permiso) */
+    protected _copyToClipboard(text: string): void;
+    /** Mostrar el ícono de confirmación en el botón de compartir por 1.5s */
+    protected _flashCopied(btn: HTMLElement): void;
+    /** Cartelito "Copiado al portapapeles!" debajo de los botones de la tarjeta */
+    protected _showShareToast(btn: HTMLElement): void;
     /** Render the featured (overlapping) cards row */
     protected _renderFeatured(cards: TimelineItem[]): void;
     /** Create a single timeline card element with all its event listeners */
@@ -188,6 +234,32 @@ export default class Timeline {
     protected _buildActionsHtml(card: TimelineItem): string;
     /** Build the "Información" menu rows (ID, Tipo, Oficial, Captura) */
     protected _buildInfoMenuHtml(card: TimelineItem): string;
+    /**
+     * Build the taxonomy navigation block shown under the card in single mode
+     * (`singleTaxonomies`). Every group renders its label as a heading (cropped by
+     * CSS, with the full text in the `title`) and its items as links.
+     *
+     * An item's `content` can be a plain string (escaped, rendered as text) or an
+     * `HTMLElement` (moved into the block, so it can't be interpolated). Element
+     * contents are returned apart in `nodes`, each paired with the `slot` index of
+     * the placeholder left in the markup for `_appendTaxonomies()` to swap.
+     *
+     * Groups with no label, no items, or items with no content/link are ignored,
+     * and an empty `html` is returned when nothing is renderable so no orphan
+     * markup is left in the DOM.
+     */
+    protected _buildTaxonomies(): {
+        html: string;
+        nodes: {
+            slot: number;
+            node: HTMLElement;
+        }[];
+    };
+    /**
+     * Append the taxonomy navigation block at the end of the single mode section
+     * and swap the element contents (`content` as `HTMLElement`) into their slots.
+     */
+    protected _appendTaxonomies(): void;
     /** Fill the card detail slots and bind their interactions */
     protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void;
     /** Ensure the full detail of the card is present (fetches it when missing) */

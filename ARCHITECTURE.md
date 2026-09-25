@@ -64,6 +64,9 @@ new Timeline({ container, items, ... })
 | `_createTimelineItem(card, index)` | 285 | Crea una tarjeta individual con todos sus event listeners |
 | `_renderLoadMoreButton()` | 798 | Agrega el botón "Cargar más" al final del timeline |
 | `_insertBeforeFooter(el)` | 527 | Helper: inserta antes del footer o al final si no hay footer |
+| `_renderSingleCard()` | 2013 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
+| `_buildTaxonomies()` | 1024 | Modo single: markup del bloque de taxonomías (`singleTaxonomies`) + los `nodes` para los items con `content` como `HTMLElement` (que no se pueden interpolar). Filtra grupos/items incompletos y devuelve `html: ''` si no hay nada que renderizar |
+| `_appendTaxonomies()` | 1058 | Inserta el bloque de taxonomías al final de la `.publicaciones-section` en modo single y luego reemplaza cada placeholder `[data-taxonomy-slot]` por su elemento (`replaceWith`, semántica de **mover**: el nodo del consumidor entra al bloque) |
 
 ### UI/Interacción
 
@@ -91,6 +94,8 @@ new Timeline({ container, items, ... })
 | `_getFileExt(url)` | — | Extrae la extensión de una URL en minúsculas |
 | `_fileIconSvg(ext)` | — | SVG de icono de archivo según extensión (pdf vs genérico) |
 | `_openLightGallery(images, title, showFileName, startIndex?)` | 228 | Abre modal lightGallery con galería de imágenes |
+| `_buildSingleUrl(id)` | 618 | Resuelve la URL de la vista single desde la plantilla `singleUrl`, reemplazando el placeholder `{id}` por el `encodeURIComponent` del id (`null` si no hay plantilla o si ya se está en modo single) |
+| `_escapeHtml(value)` | 578 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores de la config del consumidor (`singleTaxonomies`: `content` string, `link` y `label`). El contenido con markup va en un `HTMLElement`, no en un string |
 
 ### Observers
 
@@ -160,8 +165,13 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 │   │           ├── .card-temas > .tema-item × N
 │   │           ├── .card-hint
 │   │           ├── button.card-collapse
-│   │           ├── button.card-info-btn
-│   │           ├── .card-info-menu
+              │   │           ├── button.card-info-btn
+              │   │           ├── button.card-share-btn (si `singleUrl`, a la derecha del de info)
+              │   │           ├── .card-share-toast (transitorio, al copiar al portapapeles)
+              │   │           ├── .card-info-menu
+              │   │           │   └── a.card-info-link (si `singleUrl`) > span.card-info-value + svg
+
+
 │   │           ├── .card-protagonista
 │   │           ├── .card-fuente
 │   │           ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook, publicación original)
@@ -171,6 +181,28 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
               │   └── .timeline-item.timeline-empty-item (si no hay resultados)
 
 ```
+
+### Modo single (`singleId`)
+
+Cuando `singleId` está seteado, `_init()` corta antes de `_buildLayout()` y delega en `_renderSingleCard()`, que monta un árbol mínimo: sin featured, sin filtros, sin búsqueda, sin sort, sin paginación ni footer. La `.timeline-date-col` y el `button.card-collapse` se eliminan y la tarjeta queda siempre expandida.
+
+```
+section.publicaciones-section.single-mode
+├── .single-mode-toolbar (si internalButtons)
+│   └── button.work-notes-toggle
+├── .timeline-item.visible (sin .timeline-date-col)
+│   └── .timeline-card.expanded   (misma estructura que en el timeline, ver arriba)
+└── .single-taxonomies (si `singleTaxonomies` y hay algo renderizable)
+    └── .single-taxonomy × N
+        ├── .single-taxonomy-label (texto plano, crop con `...`, texto completo en `title`)
+        └── .single-taxonomy-list
+            └── li > a.single-taxonomy-link × N  (target=_blank, rel=noopener)
+                └── [texto escapado | span[data-taxonomy-slot] → HTMLElement movido]
+```
+
+El bloque de taxonomías se inserta al final de la sección con `_appendTaxonomies()`, tanto en el caso normal como en el de "article not found" (donde queda debajo de `.single-mode-message`). Los grupos con `label` vacío, `items` vacío, o items sin `content`/`link` se descartan; si no queda ningún grupo, no se inyecta markup. Sus estilos viven dentro de `&.single-mode` en `styles.scss`, así que solo existen en este modo.
+
+**Render en dos fases.** `_buildTaxonomies()` genera el markup y, en paralelo, va anotando en `nodes` los items cuyo `content` es un `HTMLElement` (cada uno con el índice del placeholder `data-taxonomy-slot` que dejó en el HTML). `_appendTaxonomies()` inserta el markup con `insertAdjacentHTML` y después hace `replaceWith(node)` sobre cada placeholder, porque un nodo del DOM no se puede interpolar en un string. Consecuencia de la semántica de **mover**: un mismo elemento no se puede usar en dos items (el segundo `replaceWith` lo sacaría del primer link), y conviene usar elementos inline porque `.single-taxonomy-link` es `inline-block`.
 
 ## Sistema de theming CSS
 
@@ -275,6 +307,9 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `itemsPerPage` | `number` | Items por página (0 = sin paginación) |
 | `inlineImages` | `boolean` | Muestra thumbnails de `imagenes` inline en la tarjeta expandida (opción del constructor) |
 | `inlineAdjuntos` | `boolean` | Muestra `adjuntos` inline en la tarjeta expandida (nombre + icono por tipo) (opción del constructor) |
+| `singleId` | `string \| null` | Cuando está seteado, renderiza una única tarjeta ya expandida (modo single) |
+| `singleUrl` | `string \| null` | Plantilla de URL de la vista single (`{id}` = placeholder). Convierte el `ID` del menú de información en link y agrega el botón de compartir (opción del constructor) |
+| `singleTaxonomies` | `SingleTaxonomy[]` | Grupos de links de navegación (`{ label, items: [{ content, link }] }`) que se renderizan al pie de la tarjeta en modo single. `content` es texto (escapado) o un `HTMLElement` que se mueve al link. Solo aplica con `singleId` (opción del constructor) |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |
@@ -290,6 +325,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `filterToggle` | `HTMLElement` | `#filter-toggle` |
 | `filterMenu` | `HTMLElement` | `#filter-menu` |
 | `_lgInstance` | `LightGallery \| null` | Instancia actual de lightGallery |
+| `_shareTimer` | `number` | Timer del ícono de confirmación tras copiar al portapapeles (`0` = inactivo) |
 | `_lgContainer` | `HTMLElement \| null` | Container para lightGallery |
 
 ## Estados CSS del componente
@@ -305,6 +341,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `.loaded` | `.card-iframe-wrap` | Iframe/embed cargado |
 | `.open` | `.filter-menu` | Menú de filtros abierto |
 | `.open` | `.card-info-menu` | Menú de info de tarjeta abierto |
+| `tv-share-toast` | `.card-share-toast` | Animación del cartelito "Copiado al portapapeles!" (fade in/out, 1.5s) |
 | `.active` | `.filter-toggle` | Filtros activos (al menos uno seleccionado) |
 | `.asc` | `.sort-toggle` | Orden ascendente activo |
 | `.rotated` | `.expand-icon` | Icono de expand rotado 180° |
