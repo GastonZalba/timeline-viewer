@@ -70,18 +70,46 @@ export interface SingleTaxonomy {
     label: string;
     items: SingleTaxonomyItem[];
 }
+/**
+ * Media taxonomy: a labelled group of timeline items.
+ * Each group becomes an option of the taxonomy selector shown above the timeline.
+ */
+export interface ContentGroup {
+    label: string;
+    items: TimelineItem[];
+}
 export interface TimelineOptions {
     container: string | HTMLElement;
+    /**
+     * Items grouped by medium taxonomy. Takes precedence over `items`.
+     * The labels of the groups are the options of the taxonomy selector; the timeline and
+     * the filters are scoped to the selected group, while the related counter keeps showing
+     * the total of every group. With two or more groups a trailing "Ver todo" option is
+     * added, which scopes the timeline back to the whole pool.
+     */
+    content?: ContentGroup[];
+    /**
+     * Legacy flat list of items. When `content` is not provided the component behaves
+     * exactly as before and no taxonomy selector is rendered.
+     */
     items?: TimelineItem[];
     api?: TimelineApiConfig;
     featuredCount?: number;
+    /**
+     * Start the timeline already expanded instead of collapsed (default: false).
+     * It only sets the initial state: the expand toggle keeps working normally and the
+     * choice is not persisted, so every page load starts from this value. Ignored in
+     * single mode (`singleId`), which always renders a single expanded card.
+     */
+    startExpanded?: boolean;
     lastUpdated?: string;
     itemsPerPage?: number;
     inlineImages?: boolean;
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
     /**
-     * Label of the expand toggle for the given remaining count.
+     * Label of the expand toggle for the given count.
+     * The count is the total number of publications, independent of the selected taxonomy.
      * The returned string is injected as HTML (it is not escaped), so it can contain markup
      * (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`).
      * Escape any untrusted value before returning it.
@@ -123,8 +151,17 @@ export default class Timeline {
     singleId: string | null;
     singleUrl: string | null;
     singleTaxonomies: SingleTaxonomy[];
+    content: ContentGroup[];
+    /** Index of the selected group, or `ALL_TAXONOMIES_INDEX` when "Ver todo" is selected */
+    _contentIndex: number;
+    taxonomyRow: HTMLElement;
+    taxonomySelectWrap: HTMLElement;
+    taxonomySelectLabel: HTMLElement | null;
+    taxonomySelectCount: HTMLElement | null;
+    taxonomySelect: HTMLSelectElement | null;
     _displayedCount: number;
     allCards: TimelineItem[];
+    _featuredCards: TimelineItem[];
     isExpanded: boolean;
     featuredContainer: HTMLElement;
     featuredRow: HTMLElement;
@@ -150,7 +187,6 @@ export default class Timeline {
     searchTerm: string;
     _lgInstance: LightGallery | null;
     _lgContainer: HTMLElement | null;
-    _originalCards: TimelineItem[];
     api: TimelineApiConfig | null;
     _apiPage: number;
     _apiTotal: number;
@@ -165,8 +201,47 @@ export default class Timeline {
     _apiDetails: Map<string, TimelineItem | null>;
     _shareTimer: number;
     constructor(config: TimelineOptions);
+    /**
+     * Normalize the `content` option: drop groups without a label or without items.
+     * An empty result means the component falls back to the legacy flat `items` list.
+     */
+    protected _normalizeContent(content: ContentGroup[] | undefined): ContentGroup[];
+    /** Every item of every taxonomy, used by the featured stack, the counter and single mode */
+    protected _allItems(): TimelineItem[];
+    /**
+     * Items of the currently selected taxonomy, or every taxonomy when "Ver todo" is selected.
+     * Falls back to the legacy flat `items` list when no group is configured.
+     */
+    protected _scopeItems(): TimelineItem[];
+    /** Sorted copy: newest first, undated items last */
+    protected _sortByDateDesc(items: TimelineItem[]): TimelineItem[];
+    /**
+     * Number of items of the active scope, shown next to the taxonomy label.
+     * The selector is a scope, not a filter, so this is the raw size of the group
+     * (or of the whole pool for "Ver todo") and never reacts to the checkboxes.
+     */
+    protected _scopeCount(): number;
     /** Build the main DOM layout and cache element references */
     protected _buildLayout(): void;
+    /**
+     * Populate the taxonomy selector with the labels of the `content` groups.
+     * Nothing is rendered when there are no groups (legacy `items` option) or in API mode,
+     * so the layout stays exactly as it was. With a single group the select is shown
+     * but disabled, still displaying that group label. With two or more groups a trailing
+     * "Ver todo" option is added, which scopes the timeline to the whole pool.
+     */
+    protected _buildTaxonomySelect(): void;
+    /**
+     * Sync the two visible spans of the custom select with the selected taxonomy.
+     * The `<option>` text carries `label (N)` for screen readers and the native popup,
+     * while the pill is split in two: the label crops with an ellipsis and the count
+     * never shrinks, so a long taxonomy still shows how many articles it holds.
+     */
+    protected _syncTaxonomyLabel(): void;
+    /** Plain label of the selected taxonomy ("Ver todo" when the whole pool is selected) */
+    protected _currentLabel(): string;
+    /** Re-scope the timeline, the filters and the counter to the taxonomy picked in the select */
+    protected _onTaxonomyChange(): void;
     /** Format a date string (YYYY-MM-DD) to a locale display string */
     protected _formatDate(dateStr: string): string;
     /** Format a full datetime string to a locale display string */
@@ -192,7 +267,7 @@ export default class Timeline {
     protected _encodeFileName(url: string): string;
     /** SVG del icono de archivo según su extensión (pdf vs genérico) */
     protected _fileIconSvg(ext: string): string;
-    /** SVG del icono de enlace externo (el mismo que usa el botón "Ir") */
+    /** SVG del icono de enlace externo (el mismo que usa el botón "Visitar") */
     protected _externalLinkIconSvg(): string;
     /**
      * Resolver la URL de la vista single (modo single) de un ítem a partir de la
@@ -282,6 +357,14 @@ export default class Timeline {
     protected _setupTimelineObserver(): void;
     /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
     protected _preloadEmbedLibraries(): void;
+    /**
+     * Turn the expanded state on (classes, icon and aria) without flipping `isExpanded`.
+     * Shared by the toggle and by `_init` when the `startExpanded` option is set, so the
+     * initial state and a click end up with exactly the same DOM.
+     */
+    protected _applyExpandState(): void;
+    /** Mirror of _applyExpandState for the collapsed state */
+    protected _collapseExpandState(): void;
     /** Toggle between expanded (timeline visible) and collapsed state */
     protected _toggleExpand(scrollTo?: boolean): void;
     /** Scroll the page/section to make the timeline container visible */

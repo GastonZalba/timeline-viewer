@@ -14,6 +14,10 @@ const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.ph
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 const ESTADO_FILTER_FIELDS = ['validado', 'capturado', 'descartado'];
+/** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
+const ALL_TAXONOMIES_LABEL = 'Ver todo';
+/** `_contentIndex` value that means "every taxonomy" instead of a single group */
+const ALL_TAXONOMIES_INDEX = -1;
 const RESIZE_MIN_HEIGHT = 180;
 const RESIZE_MAX_HEIGHT = 1200;
 const RESIZE_STEP = 24;
@@ -30,6 +34,8 @@ export default class Timeline {
                 ? document.querySelector(config.container)
                 : config.container;
         this.items = config.items || [];
+        this.content = this._normalizeContent(config.content);
+        this._contentIndex = 0;
         this.featured_count = config.featuredCount || 6;
         this.lastUpdated = config.lastUpdated || '';
         this.itemsPerPage = config.itemsPerPage || 10;
@@ -40,9 +46,15 @@ export default class Timeline {
         this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
         this.singleUrl = config.singleUrl || null;
         this.singleTaxonomies = config.singleTaxonomies || [];
+        this.taxonomyRow = null;
+        this.taxonomySelectWrap = null;
+        this.taxonomySelectLabel = null;
+        this.taxonomySelectCount = null;
+        this.taxonomySelect = null;
         this._displayedCount = 0;
         this.allCards = [];
-        this.isExpanded = false;
+        this._featuredCards = [];
+        this.isExpanded = config.startExpanded === true;
         this.featuredContainer = null;
         this.featuredRow = null;
         this.timelineContainer = null;
@@ -66,7 +78,6 @@ export default class Timeline {
         this.searchTerm = '';
         this._lgInstance = null;
         this._lgContainer = null;
-        this._originalCards = [];
         this.api = config.api || null;
         this._apiPage = 1;
         this._apiTotal = 0;
@@ -81,6 +92,57 @@ export default class Timeline {
         this._apiDetails = new Map();
         this._shareTimer = 0;
         this._init();
+    }
+    /**
+     * Normalize the `content` option: drop groups without a label or without items.
+     * An empty result means the component falls back to the legacy flat `items` list.
+     */
+    _normalizeContent(content) {
+        if (!Array.isArray(content))
+            return [];
+        return content
+            .filter((g) => !!g && typeof g.label === 'string' && g.label.trim() !== '')
+            .map((g) => ({ label: g.label.trim(), items: Array.isArray(g.items) ? g.items : [] }))
+            .filter((g) => g.items.length > 0);
+    }
+    /** Every item of every taxonomy, used by the featured stack, the counter and single mode */
+    _allItems() {
+        if (this.content.length === 0)
+            return this.items;
+        return this.content.flatMap((g) => g.items);
+    }
+    /**
+     * Items of the currently selected taxonomy, or every taxonomy when "Ver todo" is selected.
+     * Falls back to the legacy flat `items` list when no group is configured.
+     */
+    _scopeItems() {
+        if (this.content.length === 0)
+            return this.items;
+        if (this._contentIndex === ALL_TAXONOMIES_INDEX)
+            return this._allItems();
+        return this.content[this._contentIndex]?.items || [];
+    }
+    /** Sorted copy: newest first, undated items last */
+    _sortByDateDesc(items) {
+        return [...items].sort((a, b) => {
+            if (!a.fecha_publicacion)
+                return 1;
+            if (!b.fecha_publicacion)
+                return -1;
+            return new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
+        });
+    }
+    /**
+     * Number of items of the active scope, shown next to the taxonomy label.
+     * The selector is a scope, not a filter, so this is the raw size of the group
+     * (or of the whole pool for "Ver todo") and never reacts to the checkboxes.
+     */
+    _scopeCount() {
+        if (this.content.length === 0)
+            return this.items.length;
+        if (this._contentIndex === ALL_TAXONOMIES_INDEX)
+            return this._allItems().length;
+        return this.content[this._contentIndex]?.items.length || 0;
     }
     /** Build the main DOM layout and cache element references */
     _buildLayout() {
@@ -103,7 +165,7 @@ export default class Timeline {
       <section class="publicaciones-section" id="publicaciones-section">
         <div class="featured-row">
           <div class="noticias-top">
-            <button class="expand-toggle" id="expand-toggle">
+            <button class="expand-toggle" id="expand-toggle" aria-expanded="false" aria-controls="timeline-container">
               <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">${this._relatedLabel(0)}</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
@@ -154,6 +216,14 @@ export default class Timeline {
         <div class="timeline-container" id="timeline-container">
           <div class="timeline-collapse-wrap">
             <div class="timeline-line"></div>
+            <div class="taxonomy-row" id="taxonomy-row" hidden>
+              <div class="taxonomy-row-spacer"></div>
+              <div class="taxonomy-select-wrap" id="taxonomy-select-wrap">
+                <span class="taxonomy-select-label" id="taxonomy-select-label" aria-hidden="true"></span>
+                <span class="taxonomy-select-count" id="taxonomy-select-count" aria-hidden="true"></span>
+                <select class="taxonomy-select" id="taxonomy-select" aria-label="Taxonomía"></select>
+              </div>
+            </div>
             <div class="timeline-content">
               <div class="timeline-cards-col">
                 <div class="timeline-cards" id="timeline-cards"></div>
@@ -186,6 +256,12 @@ export default class Timeline {
         this.searchWrap = this.container.querySelector('#search-wrap');
         this.searchToggle = this.container.querySelector('#search-toggle');
         this.searchInput = this.container.querySelector('#search-input');
+        this.taxonomyRow = this.container.querySelector('#taxonomy-row');
+        this.taxonomySelectWrap = this.container.querySelector('#taxonomy-select-wrap');
+        this.taxonomySelectLabel = this.container.querySelector('#taxonomy-select-label');
+        this.taxonomySelectCount = this.container.querySelector('#taxonomy-select-count');
+        this.taxonomySelect = this.container.querySelector('#taxonomy-select');
+        this._buildTaxonomySelect();
         this.filters = [
             {
                 field: 'tonos_sociales',
@@ -273,6 +349,82 @@ export default class Timeline {
                 formatLabel: (val) => (val === 'adjuntos' ? 'Con adjuntos' : val === 'video' ? 'Con video' : 'Con imágenes')
             }
         ];
+    }
+    /**
+     * Populate the taxonomy selector with the labels of the `content` groups.
+     * Nothing is rendered when there are no groups (legacy `items` option) or in API mode,
+     * so the layout stays exactly as it was. With a single group the select is shown
+     * but disabled, still displaying that group label. With two or more groups a trailing
+     * "Ver todo" option is added, which scopes the timeline to the whole pool.
+     */
+    _buildTaxonomySelect() {
+        const groups = this.content;
+        const row = this.taxonomyRow;
+        const select = this.taxonomySelect;
+        if (!row || !select)
+            return;
+        if (groups.length === 0 || this.api) {
+            row.remove();
+            this.taxonomySelectWrap = null;
+            this.taxonomySelectLabel = null;
+            this.taxonomySelectCount = null;
+            this.taxonomySelect = null;
+            return;
+        }
+        select.innerHTML = '';
+        groups.forEach((g) => {
+            const opt = document.createElement('option');
+            opt.value = g.label;
+            opt.textContent = `${g.label} (${g.items.length})`;
+            select.appendChild(opt);
+        });
+        if (groups.length > 1) {
+            const all = document.createElement('option');
+            all.value = ALL_TAXONOMIES_LABEL;
+            all.textContent = `${ALL_TAXONOMIES_LABEL} (${this._allItems().length})`;
+            select.appendChild(all);
+        }
+        this._contentIndex = 0;
+        select.selectedIndex = 0;
+        select.disabled = groups.length === 1;
+        row.hidden = false;
+        this._syncTaxonomyLabel();
+    }
+    /**
+     * Sync the two visible spans of the custom select with the selected taxonomy.
+     * The `<option>` text carries `label (N)` for screen readers and the native popup,
+     * while the pill is split in two: the label crops with an ellipsis and the count
+     * never shrinks, so a long taxonomy still shows how many articles it holds.
+     */
+    _syncTaxonomyLabel() {
+        const label = this._currentLabel();
+        const count = this._scopeCount();
+        if (this.taxonomySelectLabel)
+            this.taxonomySelectLabel.textContent = label;
+        if (this.taxonomySelectCount)
+            this.taxonomySelectCount.textContent = `(${count})`;
+        if (!this.taxonomySelect)
+            return;
+        this.taxonomySelect.title = `${label} (${count})`;
+        this.taxonomySelect.setAttribute('aria-label', label || 'Taxonomía');
+    }
+    /** Plain label of the selected taxonomy ("Ver todo" when the whole pool is selected) */
+    _currentLabel() {
+        if (this.content.length === 0)
+            return ALL_TAXONOMIES_LABEL;
+        return this._contentIndex === ALL_TAXONOMIES_INDEX
+            ? ALL_TAXONOMIES_LABEL
+            : this.content[this._contentIndex]?.label || '';
+    }
+    /** Re-scope the timeline, the filters and the counter to the taxonomy picked in the select */
+    _onTaxonomyChange() {
+        if (!this.taxonomySelect)
+            return;
+        const i = this.taxonomySelect.selectedIndex;
+        this._contentIndex = i >= this.content.length ? ALL_TAXONOMIES_INDEX : i;
+        this._syncTaxonomyLabel();
+        this._buildFilterCheckboxes();
+        this._applyFilters();
     }
     /** Format a date string (YYYY-MM-DD) to a locale display string */
     _formatDate(dateStr) {
@@ -405,7 +557,7 @@ export default class Timeline {
         }
         return generic;
     }
-    /** SVG del icono de enlace externo (el mismo que usa el botón "Ir") */
+    /** SVG del icono de enlace externo (el mismo que usa el botón "Visitar") */
     _externalLinkIconSvg() {
         return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
     }
@@ -540,7 +692,7 @@ export default class Timeline {
               ${card.link_web
                 ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                Ir
+                Visitar
               </a>`
                 : ''}
               ${this.internalButtons && card.link_edit_entry
@@ -732,7 +884,7 @@ export default class Timeline {
         ${card.link_web
             ? `<a class="card-actions-btn card-open" href="${card.link_web}" target="_blank" rel="noopener">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Ir
+          Visitar
         </a>`
             : ''}
         ${this.internalButtons && card.link_edit_entry
@@ -1241,13 +1393,29 @@ export default class Timeline {
             }
         });
     }
+    /**
+     * Turn the expanded state on (classes, icon and aria) without flipping `isExpanded`.
+     * Shared by the toggle and by `_init` when the `startExpanded` option is set, so the
+     * initial state and a click end up with exactly the same DOM.
+     */
+    _applyExpandState() {
+        this.section.classList.add('expanded');
+        this.timelineContainer.classList.add('expanded');
+        this.expandIcon.classList.add('rotated');
+        this.expandToggle.setAttribute('aria-expanded', 'true');
+    }
+    /** Mirror of _applyExpandState for the collapsed state */
+    _collapseExpandState() {
+        this.section.classList.remove('expanded');
+        this.timelineContainer.classList.remove('expanded');
+        this.expandIcon.classList.remove('rotated');
+        this.expandToggle.setAttribute('aria-expanded', 'false');
+    }
     /** Toggle between expanded (timeline visible) and collapsed state */
     _toggleExpand(scrollTo = false) {
         this.isExpanded = !this.isExpanded;
         if (this.isExpanded) {
-            this.section.classList.add('expanded');
-            this.timelineContainer.classList.add('expanded');
-            this.expandIcon.classList.add('rotated');
+            this._applyExpandState();
             requestAnimationFrame(() => {
                 this._setupTimelineObserver();
             });
@@ -1259,9 +1427,7 @@ export default class Timeline {
             cards.forEach((c) => c.classList.remove('visible'));
             void this.featuredContainer.offsetHeight;
             cards.forEach((c) => (c.style.transition = ''));
-            this.section.classList.remove('expanded');
-            this.timelineContainer.classList.remove('expanded');
-            this.expandIcon.classList.remove('rotated');
+            this._collapseExpandState();
             this.container.querySelectorAll('.timeline-item').forEach((item) => {
                 item.classList.remove('visible');
             });
@@ -1347,7 +1513,7 @@ export default class Timeline {
                 values = f.fixedValues
                     ? [...f.fixedValues]
                     : [
-                        ...new Set(this.items.flatMap((c) => {
+                        ...new Set(this._scopeItems().flatMap((c) => {
                             const v = f.extract ? f.extract(c) : c[f.field];
                             const arr = v == null ? [] : Array.isArray(v) ? v : [v];
                             return arr.map((x) => String(x)).filter(Boolean);
@@ -1355,7 +1521,7 @@ export default class Timeline {
                     ];
                 counts = {};
                 values.forEach((val) => {
-                    counts[val] = this.items.filter((c) => {
+                    counts[val] = this._scopeItems().filter((c) => {
                         const v = f.extract ? f.extract(c) : c[f.field];
                         const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
                         return arr.includes(val);
@@ -1644,7 +1810,7 @@ export default class Timeline {
             this._schedulePageReload();
             return;
         }
-        this.allCards = this._originalCards.filter((c) => this._matchesSearch(c) &&
+        const matches = (c) => this._matchesSearch(c) &&
             this.filters.every((f) => {
                 const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
                 if (active.length === 0)
@@ -1652,9 +1818,13 @@ export default class Timeline {
                 const v = f.extract ? f.extract(c) : c[f.field];
                 const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
                 return arr.some((x) => active.includes(x));
-            }));
-        if (this.sortAscending)
+            });
+        this.allCards = this._sortByDateDesc(this._scopeItems().filter(matches));
+        this._featuredCards = this._sortByDateDesc(this._allItems().filter(matches));
+        if (this.sortAscending) {
             this.allCards.reverse();
+            this._featuredCards.reverse();
+        }
         if (this.itemsPerPage > 0)
             this._displayedCount = this.itemsPerPage;
         this._renderAll();
@@ -1691,10 +1861,10 @@ export default class Timeline {
             }
             return;
         }
-        const featured = this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
-        const n = this.allCards.length;
-        this.remainingCount.textContent = String(this._originalCards.length);
-        this._setRelatedLabel(n);
+        const featured = this._featuredCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
+        const total = this._allItems().length;
+        this.remainingCount.textContent = String(total);
+        this._setRelatedLabel(total);
         this._renderFeatured(featured);
         const displayCards = this.itemsPerPage > 0 ? this.allCards.slice(0, this._displayedCount) : this.allCards;
         this._renderTimeline(displayCards);
@@ -1851,7 +2021,7 @@ export default class Timeline {
             card = this._apiDetails.get(id) || (await this._fetchDetail(id));
         }
         else {
-            card = this.items.find((it) => String(it.id) === id) || null;
+            card = this._allItems().find((it) => String(it.id) === id) || null;
         }
         if (!card) {
             this.section.innerHTML = `<div class="single-mode-message">No se encontró el artículo ${id}.</div>`;
@@ -1881,24 +2051,28 @@ export default class Timeline {
             return;
         }
         this._buildLayout();
+        // Applied before _applyFilters: the timeline observer is attached from _renderAll
+        // (guarded by isExpanded), and it must find the container already open, otherwise
+        // the items would intersect a collapsed (max-height: 0) container and never show.
+        if (this.isExpanded)
+            this._applyExpandState();
         this._initResizeHandle();
         if (this.api) {
             this._bindBaseEvents();
             this._renderStatus();
-            void this._fetchPage(1);
+            // The embed preload reads the rendered cards, so it waits for the first page.
+            if (this.isExpanded)
+                void this._fetchPage(1).then(() => this._preloadEmbedLibraries());
+            else
+                void this._fetchPage(1);
             return;
         }
         this._buildFilterCheckboxes();
-        this._originalCards = [...this.items].sort((a, b) => {
-            if (!a.fecha_publicacion)
-                return 1;
-            if (!b.fecha_publicacion)
-                return -1;
-            return new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
-        });
         if (this.itemsPerPage > 0)
             this._displayedCount = this.itemsPerPage;
         this._applyFilters();
+        if (this.isExpanded)
+            this._preloadEmbedLibraries();
         requestAnimationFrame(() => {
             const cards = this.featuredContainer.querySelectorAll('.featured-card');
             cards.forEach((c) => c.classList.add('visible'));
@@ -1917,6 +2091,9 @@ export default class Timeline {
             this._toggleExpand();
         });
         this.sortToggle.addEventListener('click', () => this._toggleSort());
+        if (this.taxonomySelect) {
+            this.taxonomySelect.addEventListener('change', () => this._onTaxonomyChange());
+        }
         this._applyWorkNotesState();
         if (this.workNotesToggle)
             this.workNotesToggle.addEventListener('click', () => this._toggleWorkNotes());

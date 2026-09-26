@@ -3,9 +3,14 @@ import mockData from './mock-data.js';
 
 // Uso: abrir index.html con ?api para probar el modo API contra el mock.
 // ?id=FUE-0001 (opcional) renderiza solo esa tarjeta, ya expandida.
-// El menú de información muestra el ID con el icono "Ir" hacia esa misma vista (singleUrl).
+// ?flat renderiza la lista plana (alias legacy `items`) en lugar de `content`, para
+// verificar que sin taxonomías no se agrega el selector y el layout queda igual.
+// ?expanded arranca el timeline expandido (`startExpanded`), en vez de colapsado.
+// El menú de información muestra el ID con el icono "Visitar" hacia esa misma vista (singleUrl).
 // En el modo single, singleTaxonomies agrega un bloque de links de navegación al pie de la tarjeta.
 const useApi = new URLSearchParams(window.location.search).has('api');
+const useFlat = new URLSearchParams(window.location.search).has('flat');
+const useExpanded = new URLSearchParams(window.location.search).has('expanded');
 const singleId = new URLSearchParams(window.location.search).get('id');
 
 // Un item acepta `content` como string (se escapa y se muestra como texto) o como HTMLElement
@@ -21,8 +26,9 @@ const baseOptions = {
   inlineImages: true,
   inlineAdjuntos: true,
   internalButtons: true,
-  relatedLabel: (count) =>
-    count === 1 ? 'publicación relacionada' : 'publicaciones relacionadas',
+  // Con ?expanded el timeline arranca abierto en vez de colapsado sobre las featured.
+  startExpanded: useExpanded,
+  relatedLabel: (count) => (count === 1 ? 'publicación relacionada' : 'publicaciones relacionadas'),
   singleId,
   singleUrl: '?id={id}',
   singleTaxonomies: [
@@ -62,7 +68,9 @@ if (useApi) {
 } else {
   new Timeline({
     ...baseOptions,
-    items: mockData.items,
+    // `content` agrupa los artículos por taxonomía media: el label de cada grupo es la
+    // opción del selector que se muestra al expandir el timeline.
+    ...(useFlat ? { items: mockData.items } : { content: mockData.content }),
     lastUpdated: mockData.lastUpdated
   });
 }

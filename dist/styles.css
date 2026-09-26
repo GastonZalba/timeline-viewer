@@ -206,7 +206,6 @@
 .publicaciones-section .expand-toggle #remaining-text {
   max-width: 250px;
   display: inline-block;
-  text-wrap: auto;
   text-align: left;
 }
 .publicaciones-section #remaining-count {
@@ -775,7 +774,7 @@
   position: absolute;
   left: 110px;
   top: 0px;
-  bottom: 40px;
+  bottom: 19px;
   width: 1px;
   background: var(--tv-accent);
   border-radius: 2px;
@@ -786,13 +785,94 @@
 .publicaciones-section .timeline-container.expanded .timeline-line {
   transform: scaleY(1);
 }
+.publicaciones-section .taxonomy-row {
+  display: flex;
+  align-items: center;
+  padding: 18px 0 8px;
+}
+.publicaciones-section .taxonomy-row[hidden] {
+  display: none;
+}
+.publicaciones-section .taxonomy-row-spacer {
+  width: var(--tv-date-col-width);
+  flex-shrink: 0;
+}
+.publicaciones-section .taxonomy-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 240px;
+  min-width: 0;
+  padding: 6px 24px 6px 8px;
+  border: 1px solid var(--tv-accent);
+  border-radius: 0 50px 50px 0;
+  background-color: rgba(59, 130, 246, 0.25);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23a4a4a4' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolygon points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  color: var(--tv-text-primary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.publicaciones-section .taxonomy-select-wrap:has(.taxonomy-select:hover:not(:disabled)) {
+  background-color: var(--tv-accent);
+  color: #fff;
+}
+.publicaciones-section .taxonomy-select-wrap:has(.taxonomy-select:focus-visible) {
+  outline: none;
+  border-color: var(--tv-accent);
+}
+.publicaciones-section .taxonomy-select-wrap:has(.taxonomy-select:disabled) {
+  opacity: 0.55;
+  cursor: default;
+  background-image: none;
+  padding-right: 8px;
+}
+.publicaciones-section .taxonomy-select-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.publicaciones-section .taxonomy-select-count {
+  flex: 0 0 auto;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.publicaciones-section .taxonomy-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.publicaciones-section .taxonomy-select::-ms-expand {
+  display: none;
+}
+.publicaciones-section .taxonomy-select:disabled {
+  cursor: default;
+}
+.publicaciones-section .taxonomy-select option {
+  background: var(--tv-bg-card);
+  color: var(--tv-text-primary);
+}
 .publicaciones-section .timeline-cards-col {
   flex: 0 0 auto;
   max-width: 100%;
 }
 .publicaciones-section .timeline-cards {
   width: 100%;
-  padding: 20px 5px 20px 0;
+  padding: 10px 5px 0px 0;
   max-height: 650px;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -1808,8 +1888,6 @@
   background: var(--tv-accent);
   color: #fff;
   font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
   text-decoration: none;
   margin-left: auto;
   width: 80px;
@@ -1824,8 +1902,6 @@
   background: #dc3545;
   color: #fff;
   font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
   text-decoration: none;
   justify-content: center;
 }
@@ -2114,6 +2190,10 @@
   }
   .publicaciones-section .timeline-cards-col {
     --tv-date-col-width: 65px;
+  }
+  .publicaciones-section .taxonomy-row {
+    padding-top: 2px;
+    --tv-date-col-width: 63px;
   }
   .publicaciones-section .timeline-date-col {
     padding-right: 16px;

@@ -1,6 +1,5 @@
-export default {
-  lastUpdated: '2026-06-25T14:30:00',
-  items: [
+// Listado completo de artículos, en el orden original.
+const allItems = [
   {
     id: 'FUE-00001',
     nombre_fuente: 'Lanzamiento del nuevo framework de JavaScript',
@@ -542,4 +541,25 @@ export default {
     has_video: false,
     temas: []
   }
-] };
+];
+
+// Taxonomías medias. Cada grupo es una taxonomía y su `label` es exactamente lo que
+// muestra el `<select>` que aparece al expandir el timeline, a la derecha de la línea.
+// Al colapsar, las featured cards mezclan los artículos de todas las taxonomías.
+// Los grupos se arman por rangos del listado completo para no duplicar los artículos.
+export default {
+  lastUpdated: '2026-06-25T14:30:00',
+  content: [
+    { label: 'Tecnología y herramientas', items: allItems.slice(0, 9) },
+    { label: 'Práctica y arquitectura', items: allItems.slice(9, 13) },
+    // Label deliberadamente largo: se verifica el recorte contra el max-width de 240px
+    // del select, y el texto completo en el tooltip (title).
+    {
+      label: 'Taxonomías y fuentes consultadas durante la verificación de este artículo',
+      items: allItems.slice(13)
+    }
+  ],
+  // Alias legacy: la lista plana original. Solo se usa con ?flat, para comparar el
+  // layout sin selector de taxonomías (ver script.js).
+  items: allItems
+};

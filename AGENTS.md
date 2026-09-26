@@ -94,7 +94,16 @@ El `build` ejecuta `format` automáticamente. Para formateo manual: `npm run for
 
 ## Modelo de datos
 
-El componente consume un array de `TimelineItem`. La estructura es plana (no jerárquica), diseñada para un pipeline de scraping de noticias:
+El componente consume **taxonomías medias**: un array de `ContentGroup`, cada una con un `label` y su propio listado de `TimelineItem`. Los `label` son las opciones del `<select>` que se muestra al expandir el timeline; el timeline, los filtros y la paginación quedan acotados al grupo seleccionado. El contador del botón de expandir y las featured cards colapsadas usan el **pool completo** (todas las taxonomías).
+
+```typescript
+interface ContentGroup {
+  label: string;           // Nombre de la taxonomía (texto plano, opción del selector)
+  items: TimelineItem[];   // Artículos de la taxonomía (mismo formato que la lista plana de siempre)
+}
+```
+
+`TimelineOptions.content?: ContentGroup[]` tiene prioridad sobre `TimelineOptions.items?: TimelineItem[]`, que queda como **alias legacy**: sin `content` el componente se comporta exactamente como antes y **no renderiza ningún selector**. La estructura interna de `TimelineItem` es plana (no jerárquica), diseñada para un pipeline de scraping de noticias:
 
 ```typescript
 interface TimelineItem {
@@ -125,6 +134,15 @@ interface TimelineItem {
 
 **No modificar esta interfaz** sin considerar que los datos vienen de un sistema externo.
 
+`ContentGroup` **no** es lo mismo que `SingleTaxonomy` (que agrupa *links* de navegación bajo la tarjeta en modo single). No confundirlos ni mezclar sus campos.
+
+Helpers que definen el scope de datos en `src/TimelineViewer.ts`:
+
+- `_allItems()` → todos los items de todas las taxonomías. Se usa en single mode (buscar por `id`), para armar las featured cards, para el scope de "Ver todo" y para el total del contador.
+- `_scopeItems()` → items de la taxonomía activa, o el pool completo si `_contentIndex === ALL_TAXONOMIES_INDEX` ("Ver todo").
+- `_sortByDateDesc()` → copia ordenada por fecha descendente (sin fecha al final). **Se aplica después de filtrar**: no existe un pool pre-filtrado ordenado.
+- `_applyFilters()` calcula **los dos** conjuntos en una sola pasada: `allCards` (scope activo) y `_featuredCards` (pool completo). Las featured están ocultas en CSS cuando el timeline está expandido, así que nunca se re-renderizan al colapsar.
+
 ### Regla de oro: Mock ↔ Interfaces ↔ README
 
 `example/mock-data.js` es la **fuente de verdad** para probar el componente. Cualquier cambio en el mock **obliga** a aplicar el mismo cambio en el mismo commit:
@@ -135,6 +153,8 @@ interface TimelineItem {
 4. **Documentación**: tabla de campos en `README.md` (y este documento).
 
 No se puede modificar el mock sin actualizar interfaces y README en el mismo cambio, y viceversa.
+
+El mock exporta **las dos formas**: `content` (los grupos por taxonomía, armados con `slice` sobre el listado completo) e `items` (la lista plana, usada por `example/server.js` para el modo API y por el flag `?flat` de `script.js`). `mockData.items` debe seguir siendo el listado completo.
 
 ## Embeds sociales — Dependencia crítica de carga
 
@@ -183,7 +203,7 @@ dist/
 example/
   index.html           ← Demo page con importmap para lightGallery CDN
   script.js            ← Entry point del demo
-  mock-data.js         ← 17 artículos de ejemplo
+  mock-data.js         ← 19 artículos de ejemplo agrupados en 3 taxonomías (`content`) + lista plana (`items`)
   server.js            ← HTTP server estático (:3010)
   base.css             ← Reset/base styles del demo
 ```
@@ -201,4 +221,6 @@ example/
 - **Agregar un nuevo campo a TimelineItem**: Agregar a la interfaz `TimelineItem` + usar en `_createTimelineItem()` + actualizar `dist/TimelineViewer.d.ts` con build.
 - **Modificar `example/mock-data.js`**: Aplicar el cambio en el mismo commit en la interfaz `TimelineItem`, regenerar los tipos distribuidos (`npm run build`) y actualizar la tabla de campos del README. Ver "Regla de oro: Mock ↔ Interfaces ↔ README".
 - **Agregar un nuevo filtro**: Agregar entrada en `this.filters` array en `_buildFilterCheckboxes()`.
+- **Tocar el estado expandido/colapsado del timeline**: El estado vive en `isExpanded` y solo se refleja en el DOM por `_applyExpandState()` / `_collapseExpandState()` (clases `expanded` en `section` y `timelineContainer`, rotación de `expandIcon` y `aria-expanded` del botón). `_toggleExpand()` solo hace el flip de `isExpanded` y delega en esos dos helpers: no agregar `classList.add/remove('expanded')` en ningún otro lado. La opción `startExpanded` (default `false`, sin persistencia) se aplica en `_init()` **antes** de `_applyFilters()`, porque el IntersectionObserver del timeline se engancha desde `_renderAll` y debe encontrar el container ya abierto (`max-height: 99999px`) en lugar de colapsado (`max-height: 0`). El preload de embeds va **después** de los datos, porque `_preloadEmbedLibraries()` deduce los tipos leyendo `this.allCards`. En modo API va enganchado a la promesa de `_fetchPage(1)`, para no correr en cada re-render.
+- **Cambiar el scope de los datos** (taxonomías): `_scopeItems()` para el timeline/filtros/paginación y `_allItems()` para las featured, el total del contador y el modo single. El selector vive en `_buildTaxonomySelect()` y su change en `_onTaxonomyChange()`. `_contentIndex === ALL_TAXONOMIES_INDEX` (`-1`) significa "Ver todo" y hace que `_scopeItems()` devuelva el pool completo. No agregar una tercera fuente de datos.
 - **Modificar estilos**: Editar `src/styles.scss`. Todos los estilos están bajo `.publicaciones-section`. Las variables CSS custom están al inicio del archivo.

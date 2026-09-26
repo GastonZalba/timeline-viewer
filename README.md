@@ -15,31 +15,36 @@ import Timeline from 'timeline-viewer';
 
 new Timeline({
   container: '#my-container',
-  items: [
+  content: [
     {
-      id: 'FUE-00001',
-      nombre_fuente: 'Lanzamiento del nuevo framework de JavaScript',
-      resumen_ia: 'El nuevo framework promete revolucionar la forma en que construimos aplicaciones web.',
-      thumbnail: 'https://picsum.photos/seed/noticia1/600/400',
-      link_web: 'https://dev.to/news/javascript-framework-2026',
-      fecha_publicacion: '2026-06-25',
-      fecha_scrapeo: '2026-06-25T14:30:00',
-      tonos_sociales: ['Positivo'],
-      fuente_institucional: 'Dev.to',
-      tipo_fuente: 'Sitio web o portal',
-      es_oficial: true,
-      validado: true,
-      adjuntos: [],
-      actores_principales: ['Ana García', 'Carlos Ruiz'],
-      screenshot: 'https://picsum.photos/seed/captura/400/800',
-      imagenes: [
+      label: 'Tecnología y herramientas',
+      items: [
         {
-          thumb: 'https://picsum.photos/seed/img1/300/200',
-          full: 'https://picsum.photos/seed/img1/600/400'
+          id: 'FUE-00001',
+          nombre_fuente: 'Lanzamiento del nuevo framework de JavaScript',
+          resumen_ia: 'El nuevo framework promete revolucionar la forma en que construimos aplicaciones web.',
+          thumbnail: 'https://picsum.photos/seed/noticia1/600/400',
+          link_web: 'https://dev.to/news/javascript-framework-2026',
+          fecha_publicacion: '2026-06-25',
+          fecha_scrapeo: '2026-06-25T14:30:00',
+          tonos_sociales: ['Positivo'],
+          fuente_institucional: 'Dev.to',
+          tipo_fuente: 'Sitio web o portal',
+          es_oficial: true,
+          validado: true,
+          adjuntos: [],
+          actores_principales: ['Ana García', 'Carlos Ruiz'],
+          screenshot: 'https://picsum.photos/seed/captura/400/800',
+          imagenes: [
+            {
+              thumb: 'https://picsum.photos/seed/img1/300/200',
+              full: 'https://picsum.photos/seed/img1/600/400'
+            }
+          ],
+          links_videos: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
+          temas: []
         }
-      ],
-      links_videos: ['https://www.youtube.com/watch?v=dQw4w9WgXcQ'],
-      temas: []
+      ]
     }
   ],
   featuredCount: 6,
@@ -57,22 +62,24 @@ The `Timeline` constructor accepts a single config object:
 | Option          | Type                           | Default    | Description                          |
 |-----------------|--------------------------------|------------|--------------------------------------|
 | `container`     | `string` (CSS selector/Element)| **required** | DOM element to mount into          |
-| `items`         | `Array`                        | `[]`       | Array of article card objects        |
-| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}` and the lazy detail of each card from `{url}/:id`. When set, `items` is ignored and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
+| `content`       | `ContentGroup[]`              | `[]`       | Optional. Array of `{ label, items }` groups: the **medium taxonomies**. The `label` of each group becomes an option of the selector shown above the expanded timeline, shown next to the number of articles of that group, and the timeline and the filters are scoped to the selected group (with 2+ groups a trailing **"Ver todo"** option scopes the timeline back to the whole pool). The counter in the expand button always shows the **total of every group**, regardless of the selected taxonomy. Takes precedence over `items`. Groups with no `label` or with an empty `items` array are ignored. When no group survives (or in API mode) **no selector is rendered and the layout is unchanged**. See [Content taxonomies](#content-taxonomies) |
+| `items`         | `TimelineItem[]`              | `[]`       | Legacy flat list of article card objects. Ignored when `content` is set. Kept for backwards compatibility: with no `content` the component behaves exactly as before |
+| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}` and the lazy detail of each card from `{url}/:id`. When set, `content` and `items` are ignored, **no taxonomy selector is rendered**, and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
+| `startExpanded` | `boolean`                      | `false`    | When `true`, the timeline starts **already expanded** instead of collapsed on the featured stack. It only sets the initial state: the expand toggle keeps working and the choice is **not persisted**, so every page load starts from this value. Ignored in single mode (`singleId`), which always renders a single expanded card. |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
 | `inlineAdjuntos`| `boolean`                      | `false`    | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button |
 | `internalButtons`| `boolean`                     | `false`    | When `true`, shows the internal work controls in the timeline toolbar: the red "work notes" toggle (hide/show `notas_de_trabajo` on cards and topics) and the red "Estado interno" filter button (validado / capturado / descartado). When `false` (default) those buttons are not rendered |
-| `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given remaining count. When unset, the default Spanish label is used with singular/plural logic. The returned string is injected as **HTML (not escaped)**, so it can contain markup (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`); escape any untrusted value before returning it |
+| `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given count. When unset, the default Spanish label is used with singular/plural logic. `count` is the **total number of publications, independent of the selected taxonomy** (the same number shown next to the label), which keeps the singular/plural grammatical. The returned string is injected as **HTML (not escaped)**, so it can contain markup (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`); escape any untrusted value before returning it |
 | `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode |
 | `singleUrl`      | `string`                       | —          | Optional. URL template of the **single view** of an item (the same one `singleId` renders). Two things are built from it: the "Información" menu shows the `ID` value as a link with the external-link icon (both open that view in a new tab, `target="_blank"`), and a floating share button appears below the card's info button. Use `{id}` as the placeholder for the item id (e.g. `'/articulos/{id}'` or `'?id={id}'`); all occurrences are replaced with the `encodeURIComponent` of the id. If the template has no `{id}`, the URL is used as-is. The link/button are rendered only when `singleUrl` is set **and** the component is not already in single mode (`singleId`). The share button uses the [Web Share API](https://developer.mozilla.org/docs/Web/API/Navigator/share) (`{ title, url }`) when available — mobile and Safari; where it is not available (e.g. desktop Chrome) it copies the absolute URL to the clipboard, the icon turns into a checkmark and a small "Copiado al portapapeles!" toast appears under the card buttons for 1.5s |
 | `singleTaxonomies` | `SingleTaxonomy[]`           | `[]`       | Optional. **Only used in single mode** (`singleId`): renders a navigation block under the card, laid out as a responsive grid of columns (`auto-fit`, 480px max width, aligned with the card). Each entry is a group `{ label, items }` and each item is `{ content, link }` opened in a new tab (`target="_blank"`, `rel="noopener"`). `content` is a `string` (escaped, rendered as text) or an `HTMLElement` (moved into the link as a DOM node, so it can carry markup, classes or listeners). The group `label` is plain text: it is cropped with `...` when the column is too narrow and the full text is exposed in the `title` attribute. Groups with no `label`, with an empty `items` array, or with items missing `content`/`link` are ignored; when nothing is renderable no markup is added. Example: `singleTaxonomies: [{ label: 'Fuentes oficiales', items: [{ content: 'Boletín Oficial', link: '/boletin' }] }]` |
 
 ### Item fields
 
-Each object in `items` supports these fields:
+Each object in `content[].items` (or in the legacy `items`) supports these fields:
 
 | Field                  | Type                        | Description                              |
 |------------------------|-----------------------------|------------------------------------------|
@@ -97,14 +104,14 @@ Each object in `items` supports these fields:
 | `links_videos`         | `string[]` (URL) / `null`  | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Only supported platforms (YouTube, etc.) are embedded; others are ignored |
 | `has_video`            | `boolean`                   | Indicates whether the item has audiovisual content: `true` when `links_videos` is non-empty or when `link_web` points to a video (e.g. YouTube, Instagram reel) |
 | `notas_de_trabajo`     | `string` / `null`           | Optional. Working notes displayed as a red badge above the summary in both collapsed and expanded card states |
-| `link_edit_entry`     | `string` (URL) / `null`     | Optional. URL to an edit form. When present, a red "Editar" button is shown next to the "Ir" button in the card actions |
+| `link_edit_entry`     | `string` (URL) / `null`     | Optional. URL to an edit form. When present, a red "Editar" button is shown next to the "Visitar" button in the card actions |
 | `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa?, notas_de_trabajo? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null`. `notas_de_trabajo` is an optional working note displayed as a red badge below the theme description |
 
 > **Importante:** `example/mock-data.js` es la fuente de verdad para probar el componente. Cualquier campo que se agregue, renombre o elimine en el mock **debe** actualizarse en el mismo cambio en la interfaz `TimelineItem` (`src/TimelineViewer.ts`), en la declaración de tipos generada (`dist/TimelineViewer.d.ts` vía `npm run build`) y en esta tabla de campos. Los valores de `tipo_fuente` y los `tonos_sociales` se documentan según los que existen en el mock.
 
 ### Modo API (servidor)
 
-Para volúmenes grandes se puede delegar el filtrado, la búsqueda, el orden y la paginación al servidor. En vez de `items`, se pasa una configuración `api`:
+Para volúmenes grandes se puede delegar el filtrado, la búsqueda, el orden y la paginación al servidor. En vez de `content` (o `items`), se pasa una configuración `api`:
 
 ```js
 new Timeline({
@@ -123,6 +130,8 @@ En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediat
 |-------------------|------------------------------------------------------------------------|------------------------------|
 | `GET {url}`       | Lista paginada con búsqueda, filtros, orden, facets y destacadas       | Objeto con `items`, `total`, `totalAll`, `featured`, `facets` y `lastUpdated` opcional |
 | `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
+
+> El campo `items` de la respuesta es la lista paginada que devuelve el servidor y **no** tiene relación con la opción `content` ni con el alias legacy `items`. En modo API no se renderiza el selector de taxonomías.
 
 #### Parámetros de `GET {url}`
 
@@ -201,6 +210,41 @@ Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of 
 
 Profile pages, channels, playlists and other non-content URLs are ignored.
 
+### Content taxonomies
+
+The `content` option groups the articles by **medium taxonomy**. Each group is a `{ label, items }` pair, where `label` is the name of the taxonomy and `items` is a regular list of `TimelineItem`.
+
+```js
+new Timeline({
+  container: '#noticias-container',
+  content: [
+    {
+      label: 'Tecnología y herramientas',
+      items: [/* TimelineItem[] */]
+    },
+    {
+      label: 'Taxonomías y fuentes consultadas durante la verificación de este artículo',
+      items: [/* TimelineItem[] */]
+    }
+  ]
+});
+```
+
+Behaviour:
+
+- **Collapsed timeline — nothing changes.** The featured stack keeps showing the first `featuredCount` captured items of **the whole pool**, mixing every taxonomy, and no selector is visible.
+- **Expanded timeline** — a small pill-shaped selector appears right under the "publicaciones relacionadas" button, aligned just to the right of the timeline line (in the same column as the dates). Its options are the taxonomy labels, in the order they were passed, **each followed by the raw number of articles of that group** (`Tecnología y herramientas (9)`). The trailing "Ver todo" option shows the grand total (`Ver todo (19)`). These counts are static: the selector is a *scope*, not a filter, so they never react to the checkboxes.
+- **The first taxonomy is selected by default** and the select displays its label.
+- **With two or more taxonomies a trailing "Ver todo" option is added** (last in the list, never the default). Selecting it shows every article of every taxonomy at once — the same set the collapsed featured stack draws from. Internally the "all" state is `_contentIndex === -1`, and `_scopeItems()` falls back to the whole pool.
+- **With a single taxonomy the label is still shown**, but the select is rendered **disabled** (muted, no dropdown arrow) and **no "Ver todo" option is added** — there is nothing to aggregate.
+- **Selecting a taxonomy re-scopes the timeline**: the cards, the filter checkboxes and their `(N)` counts and the pagination are all computed over the items of the selected group only. The estado interno filters keep their `localStorage` state, the rest fall back to each filter's defaults. Both sets are sorted by date descending (undated last) and honour the sort toggle.
+- **The number in the expand button never changes with the taxonomy**: it always shows the total of every group, and `relatedLabel(count)` receives that same total, so the singular/plural always matches. Narrowing a taxonomy changes *what* the timeline lists, not *how many* publications the section has.
+- The selector is **not rendered at all** when: `content` is not set, every group is invalid, the legacy `items` alias is used, or the component runs in API mode. In those cases the layout is byte-for-byte the previous one.
+- Group `label`s are plain text (no HTML). A label longer than the pill crops with a real ellipsis (`...`) while its **`(N)` count always stays visible**, because the pill is a flex row where only the label shrinks. The pill is capped at `max-width: 240px` and its full width is `shrink-to-content`, so it narrows on short labels. Hovering shows the complete `label (N)` in a tooltip.
+- `content` takes precedence over `items`; `items` is kept as a legacy alias and simply behaves like before (one implicit group, no selector).
+
+> Not to be confused with [`singleTaxonomies`](#single-view-taxonomies), which is a block of navigation links rendered under the card in **single mode**. `ContentGroup` groups the articles of the timeline; `SingleTaxonomy` groups links around a single article.
+
 ### Single view taxonomies
 
 In single mode (`singleId`) the `singleTaxonomies` option renders a navigation block under the card. It is meant for the link groups a single-article page needs around the article: official sources, topic indexes, related portals, etc.
@@ -232,7 +276,7 @@ new Timeline({
 });
 ```
 
-- The block is only rendered in single mode. Without `singleId` the option is ignored and nothing changes in the timeline.
+- The block is only rendered in single mode. Without `singleId` the option is ignored and nothing changes in the timeline. This is unrelated to the [`content`](#content-taxonomies) option, which groups timeline articles by taxonomy.
 - **`content` as string** is always escaped and rendered as text: `'A < B & C'` shows literally and can never break the markup. For rich content pass an **`HTMLElement`** instead.
 - **`content` as `HTMLElement` is moved**, not cloned: the node ends up inside the `<a>` exactly as it was passed, keeping its markup, classes and listeners. Use inline elements (`span`, `em`, `strong`) since the link is `inline-block`, and create one element per item — passing the same node twice would leave the first link empty, because the node gets moved again.
 - **`link`** is used verbatim as the `href` (escaped for the attribute context) — there is no placeholder substitution. Build the URLs on the consumer side. Every link opens in a new tab (`target="_blank"`, `rel="noopener"`).
@@ -270,6 +314,16 @@ npm start
 ```
 
 The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency.
+
+Query flags of the demo page:
+
+| Flag | Effect |
+|------|--------|
+| *(none)* | Local mode with `content`: 3 taxonomies, so the selector and the "Ver todo" option are visible |
+| `?flat` | Local mode with the legacy `items` alias: verifies that no taxonomy selector is rendered and the layout is unchanged |
+| `?expanded` | Starts the timeline expanded (`startExpanded: true`) instead of collapsed. Combinable with the other flags |
+| `?api` | API mode against the mock server (`example/server.js`): no taxonomy selector, server-side filters |
+| `?id=FUE-0001` | Single mode: renders just that card, already expanded |
 
 ## Preview
 
