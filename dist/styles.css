@@ -2103,7 +2103,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: help;
 }
 .publicaciones-section.single-mode .single-taxonomy-list {
   display: flex;

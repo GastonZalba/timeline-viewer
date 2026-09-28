@@ -64,9 +64,9 @@ new Timeline({ container, items, ... })
 | `_createTimelineItem(card, index)` | 285 | Crea una tarjeta individual con todos sus event listeners |
 | `_renderLoadMoreButton()` | 798 | Agrega el botón "Cargar más" al final del timeline |
 | `_insertBeforeFooter(el)` | 527 | Helper: inserta antes del footer o al final si no hay footer |
-| `_renderSingleCard()` | 2013 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
-| `_buildTaxonomies()` | 1024 | Modo single: markup del bloque de taxonomías (`singleTaxonomies`) + los `nodes` para los items con `content` como `HTMLElement` (que no se pueden interpolar). Filtra grupos/items incompletos y devuelve `html: ''` si no hay nada que renderizar |
-| `_appendTaxonomies()` | 1058 | Inserta el bloque de taxonomías al final de la `.publicaciones-section` en modo single y luego reemplaza cada placeholder `[data-taxonomy-slot]` por su elemento (`replaceWith`, semántica de **mover**: el nodo del consumidor entra al bloque) |
+| `_renderSingleCard()` | 2258 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
+| `_buildTaxonomies(taxonomias)` | 1217 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
+| `_appendTaxonomies(taxonomias)` | 1244 | Inserta el bloque de taxonomías al final de la `.publicaciones-section` en modo single. Sin datos: no se invoca (en el camino de "article not found" no hay ítem del cual leerlas) |
 
 ### UI/Interacción
 
@@ -94,8 +94,8 @@ new Timeline({ container, items, ... })
 | `_getFileExt(url)` | — | Extrae la extensión de una URL en minúsculas |
 | `_fileIconSvg(ext)` | — | SVG de icono de archivo según extensión (pdf vs genérico) |
 | `_openLightGallery(images, title, showFileName, startIndex?)` | 228 | Abre modal lightGallery con galería de imágenes |
-| `_buildSingleUrl(id)` | 618 | Resuelve la URL de la vista single desde la plantilla `singleUrl`, reemplazando el placeholder `{id}` por el `encodeURIComponent` del id (`null` si no hay plantilla o si ya se está en modo single) |
-| `_escapeHtml(value)` | 578 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores de la config del consumidor (`singleTaxonomies`: `content` string, `link` y `label`). El contenido con markup va en un `HTMLElement`, no en un string |
+| `_absoluteUrl(url)` | 810 | Resuelve una URL del ítem contra `window.location.href` para poder compartirla (devuelve el valor crudo si no es una URL válida). Se usa con `link_view_entry` |
+| `_escapeHtml(value)` | 773 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores del dato de `taxonomias` (`content`, `link` y `label`), que siempre son texto plano |
 
 ### Observers
 
@@ -172,10 +172,10 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 │   │           ├── .card-hint
 │   │           ├── button.card-collapse
               │   │           ├── button.card-info-btn
-              │   │           ├── button.card-share-btn (si `singleUrl`, a la derecha del de info)
+              │   │           ├── button.card-share-btn (si `link_view_entry`, a la derecha del de info)
               │   │           ├── .card-share-toast (transitorio, al copiar al portapapeles)
               │   │           ├── .card-info-menu
-              │   │           │   └── a.card-info-link (si `singleUrl`) > span.card-info-value + svg
+              │   │           │   └── a.card-info-link (si `link_view_entry`) > span.card-info-value + svg
 
 
 │   │           ├── .card-protagonista
@@ -198,17 +198,17 @@ section.publicaciones-section.single-mode
 │   └── button.work-notes-toggle
 ├── .timeline-item.visible (sin .timeline-date-col)
 │   └── .timeline-card.expanded   (misma estructura que en el timeline, ver arriba)
-└── .single-taxonomies (si `singleTaxonomies` y hay algo renderizable)
+└── .single-taxonomies (si la card declara `taxonomias` y hay algo renderizable)
     └── .single-taxonomy × N
         ├── .single-taxonomy-label (texto plano, crop con `...`, texto completo en `title`)
         └── .single-taxonomy-list
             └── li > a.single-taxonomy-link × N  (target=_blank, rel=noopener)
-                └── [texto escapado | span[data-taxonomy-slot] → HTMLElement movido]
+                └── texto escapado
 ```
 
-El bloque de taxonomías se inserta al final de la sección con `_appendTaxonomies()`, tanto en el caso normal como en el de "article not found" (donde queda debajo de `.single-mode-message`). Los grupos con `label` vacío, `items` vacío, o items sin `content`/`link` se descartan; si no queda ningún grupo, no se inyecta markup. Sus estilos viven dentro de `&.single-mode` en `styles.scss`, así que solo existen en este modo.
+El bloque de taxonomías se inserta al final de la sección con `_appendTaxonomies(card.taxonomias)`, **solo cuando la card se pudo cargar**: los grupos vienen en el propio ítem (en modo API viajan en el detalle de `GET {url}/:id`), así que en el camino de "article not found" no hay datos y no se inserta nada. Los grupos con `label` vacío, `items` vacío, o items sin `content`/`link` se descartan; si no queda ningún grupo, no se inyecta markup. Sus estilos viven dentro de `&.single-mode` en `styles.scss`, así que solo existen en este modo.
 
-**Render en dos fases.** `_buildTaxonomies()` genera el markup y, en paralelo, va anotando en `nodes` los items cuyo `content` es un `HTMLElement` (cada uno con el índice del placeholder `data-taxonomy-slot` que dejó en el HTML). `_appendTaxonomies()` inserta el markup con `insertAdjacentHTML` y después hace `replaceWith(node)` sobre cada placeholder, porque un nodo del DOM no se puede interpolar en un string. Consecuencia de la semántica de **mover**: un mismo elemento no se puede usar en dos items (el segundo `replaceWith` lo sacaría del primer link), y conviene usar elementos inline porque `.single-taxonomy-link` es `inline-block`.
+**Render en una fase.** `_buildTaxonomies(taxonomias)` devuelve el markup completo como string: `content` y `label` son texto plano y se escapan con `_escapeHtml`, `link` va al `href`. No hay placeholders ni nodos que intercambiar (antes `content` aceptaba un `HTMLElement` que había que mover con `replaceWith`): el dato viene de la API, que solo puede mandar strings.
 
 ## Sistema de theming CSS
 
@@ -314,8 +314,6 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `inlineImages` | `boolean` | Muestra thumbnails de `imagenes` inline en la tarjeta expandida (opción del constructor) |
 | `inlineAdjuntos` | `boolean` | Muestra `adjuntos` inline en la tarjeta expandida (nombre + icono por tipo) (opción del constructor) |
 | `singleId` | `string \| null` | Cuando está seteado, renderiza una única tarjeta ya expandida (modo single) |
-| `singleUrl` | `string \| null` | Plantilla de URL de la vista single (`{id}` = placeholder). Convierte el `ID` del menú de información en link y agrega el botón de compartir (opción del constructor) |
-| `singleTaxonomies` | `SingleTaxonomy[]` | Grupos de links de navegación (`{ label, items: [{ content, link }] }`) que se renderizan al pie de la tarjeta en modo single. `content` es texto (escapado) o un `HTMLElement` que se mueve al link. Solo aplica con `singleId` (opción del constructor) |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |

@@ -33,7 +33,13 @@ export interface TimelineItem {
     links_videos?: string[] | null;
     has_video: boolean;
     link_edit_entry?: string;
+    link_view_entry?: string;
     notas_de_trabajo?: string | null;
+    /**
+     * Grupos de links de navegación que se renderizan al pie de la tarjeta en modo single.
+     * Viaja en el detalle del ítem (`GET {url}/:id`), nunca en la lista paginada.
+     */
+    taxonomias?: SingleTaxonomy[];
     temas: ItemTema[];
 }
 export interface TimelineItemSummary {
@@ -49,6 +55,7 @@ export interface TimelineItemSummary {
     descartado: boolean | null;
     notas_de_trabajo?: string | null;
     link_web?: string | null;
+    link_view_entry?: string;
 }
 export interface TimelineApiConfig {
     url: string;
@@ -63,9 +70,10 @@ export interface TimelineApiPageResponse {
     facets: Record<string, Record<string, number>>;
 }
 export interface SingleTaxonomyItem {
-    content: string | HTMLElement;
+    content: string;
     link: string;
 }
+/** Grupo de links de navegación que se renderiza al pie de la tarjeta en modo single (`item.taxonomias`) */
 export interface SingleTaxonomy {
     label: string;
     items: SingleTaxonomyItem[];
@@ -116,8 +124,6 @@ export interface TimelineOptions {
      */
     relatedLabel?: (count: number) => string;
     singleId?: string;
-    singleUrl?: string;
-    singleTaxonomies?: SingleTaxonomy[];
 }
 interface ImageInfo {
     thumb: string;
@@ -149,8 +155,6 @@ export default class Timeline {
     internalButtons: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
-    singleUrl: string | null;
-    singleTaxonomies: SingleTaxonomy[];
     content: ContentGroup[];
     /** Index of the selected group, or `ALL_TAXONOMIES_INDEX` when "Ver todo" is selected */
     _contentIndex: number;
@@ -271,18 +275,18 @@ export default class Timeline {
     /** SVG del icono de enlace externo (el mismo que usa el botón "Visitar") */
     protected _externalLinkIconSvg(): string;
     /**
-     * Resolver la URL de la vista single (modo single) de un ítem a partir de la
-     * plantilla `singleUrl`. Devuelve null si no hay plantilla configurada o si el
-     * componente ya se está mostrando en modo single (`singleId`), donde el link
-     * apuntaría a la misma vista.
+     * Resolver una URL del ítem contra la location actual. `link_view_entry` viene
+     * del pipeline de scraping y puede venir relativa (`/articulos/FUE-00001`), así
+     * que hay que absolutizarla para compartir. Si el valor no es una URL válida,
+     * `new URL` lanza y se devuelve el valor crudo para no romper el render de la tarjeta.
      */
-    protected _buildSingleUrl(id: number | string): string | null;
+    protected _absoluteUrl(url: string): string;
     /** SVG del icono de compartir (nodos) */
     protected _shareIconSvg(): string;
     /** SVG del ícono de confirmación (visto al copiar al portapapeles) */
     protected _checkIconSvg(): string;
     /**
-     * Compartir la URL de la vista single: usa la Web Share API cuando está
+     * Compartir la URL de la vista individual: usa la Web Share API cuando está
      * disponible y, si no, copia el enlace al portapapeles. `navigator.share()`
      * se invoca de forma síncrona dentro del click porque el navegador exige
      * activación del usuario para abrir el share sheet.
@@ -318,30 +322,20 @@ export default class Timeline {
     protected _buildInfoMenuHtml(card: TimelineItem): string;
     /**
      * Build the taxonomy navigation block shown under the card in single mode
-     * (`singleTaxonomies`). Every group renders its label as a heading (cropped by
-     * CSS, with the full text in the `title`) and its items as links.
-     *
-     * An item's `content` can be a plain string (escaped, rendered as text) or an
-     * `HTMLElement` (moved into the block, so it can't be interpolated). Element
-     * contents are returned apart in `nodes`, each paired with the `slot` index of
-     * the placeholder left in the markup for `_appendTaxonomies()` to swap.
+     * (`item.taxonomias`, i.e. the field the detail endpoint returns). Every group
+     * renders its label as a heading (cropped by CSS, with the full text in the
+     * `title`) and its items as links.
      *
      * Groups with no label, no items, or items with no content/link are ignored,
-     * and an empty `html` is returned when nothing is renderable so no orphan
+     * and an empty string is returned when nothing is renderable so no orphan
      * markup is left in the DOM.
      */
-    protected _buildTaxonomies(): {
-        html: string;
-        nodes: {
-            slot: number;
-            node: HTMLElement;
-        }[];
-    };
+    protected _buildTaxonomies(taxonomias: SingleTaxonomy[] | undefined): string;
     /**
-     * Append the taxonomy navigation block at the end of the single mode section
-     * and swap the element contents (`content` as `HTMLElement`) into their slots.
+     * Append the taxonomy navigation block at the end of the single mode section,
+     * with the groups declared by the item itself.
      */
-    protected _appendTaxonomies(): void;
+    protected _appendTaxonomies(taxonomias: SingleTaxonomy[] | undefined): void;
     /** Fill the card detail slots and bind their interactions */
     protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void;
     /** Ensure the full detail of the card is present (fetches it when missing) */

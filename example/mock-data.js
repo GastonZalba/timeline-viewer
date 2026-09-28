@@ -6,6 +6,7 @@ const allItems = [
     resumen_ia: 'El nuevo framework promete revolucionar la forma en que construimos aplicaciones web, con mejor rendimiento y una DX sin precedentes. Entre las características mas destacadas se incluye un compilador optimizado que genera bundles hasta 60% mas livianos, un sistema de reactividad basado en señales que elimina la necesidad de reconciliaión virtual del DOM, y una arquitectura de renderizado por islas que permite hidratar solo las partes interactivas de la página. Los desarrolladores destacan también el hot module replacement nativo, que conserva el estado de la aplicación durante el desarrollo, y un sistema de errores con sugerencias contextuales en tiempo real. El equipo detrás del proyecto planea lanzar una versión estable a finales de año, con soporte oficial para TypeScript, integración con las principales herramientas de testing y un CLI unificado. La comunidad ya prepara tutoriales, cursos y conferencias para acompañar el lanzamiento, y los primeros benchmarks muestran resultados alentadores tanto en cargas iniciales como en interacciones complejas, posicionándolo como una alternativa seria a los frameworks tradicionales.',
     thumbnail: 'https://picsum.photos/seed/noticia1/600/400',
     link_web: 'https://www.instagram.com/reels/C_lUZmQv_R8',
+    link_view_entry: '?id=FUE-00001',
     link_edit_entry: 'https://ejemplo.com/admin/editar/FUE-00001',
     fecha_publicacion: '2026-06-25',
     fecha_scrapeo: '2026-07-17T03:00:00.000Z',
@@ -30,6 +31,35 @@ const allItems = [
       'https://www.youtube.com/watch?v=jNQXAC9IVRw',
       'https://www.youtube.com/watch?v=9bZkp7q19f0'
     ],
+    // Grupos de links de navegación que se renderizan al pie de la tarjeta en modo
+    // single. Viaja en el detalle del ítem (`GET {api}/{id}`), no en la lista paginada.
+    // `content` es texto plano y siempre se escapa; `label` se croppea con CSS.
+    taxonomias: [
+      {
+        label: 'Fuentes oficiales',
+        items: [
+          { content: 'Boletín Oficial', link: 'https://www.boletinoficial.gob.ar/' },
+          { content: 'Infoleg', link: 'https://www.infoleg.gob.ar/' }
+        ]
+      },
+      {
+        label: 'También en',
+        items: [
+          { content: 'Cronista', link: 'https://www.cronista.com/' },
+          { content: 'Semanario | de esta publicación, en la edición del domingo', link: 'https://www.semanario.com.uy/' }
+        ]
+      },
+      {
+        // Label deliberadamente largo: se verifica el crop con "..." y el texto completo
+        // en el tooltip (title). El último content trae caracteres especiales para
+        // comprobar que el escapado muestra el texto literal sin romper el markup.
+        label: 'Taxonomías y fuentes consultadas durante la verificación de este artículo',
+        items: [
+          { content: 'Salud & Bienestar', link: 'https://example.com/salud' },
+          { content: 'A < B & C > D', link: 'https://example.com/notas' }
+        ]
+      }
+    ],
     temas: [
       { titulo: 'Rendimiento y optimizacion del tiempo de carga inicial en dispositivos moviles', resumen: 'Los benchmarks muestran una mejora del 40% en el tiempo de carga inicial, con reducciones aun mayores en moviles de gama baja. Las metricas de Core Web Vitals mejoran gracias al compilador optimizado y al renderizado por islas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-24', notas_de_trabajo: 'Preguntar al equipo de frontend si estos benchmarks replican en nuestro stack actual. Medir antes y despues de la migracion.' },
       { titulo: 'Experiencia de desarrollo (DX) para equipos que trabajan de forma remota', resumen: 'La experiencia de desarrollo mejora con hot module replacement nativo que conserva el estado, errores con sugerencias contextuales y una integracion profunda con editores populares. El CLI unificado simplifica la creacion de proyectos y reduce las tareas repetitivas.', tono_social: 'Positivo', fecha_narrativa: '2026-06-25' },
@@ -42,6 +72,7 @@ const allItems = [
     resumen_ia: 'Los principales navegadores liberan parches criticos que afectan a millones de usuarios en todo el mundo.',
     thumbnail: 'https://picsum.photos/seed/noticia2/600/400',
     link_web: 'https://blog.mozilla.org/security-update',
+    link_view_entry: '?id=FUE-00002',
     fecha_publicacion: '2026-06-22',
     fecha_scrapeo: '2026-06-22T09:15:00',
     tonos_sociales: ['Negativo'],
@@ -57,6 +88,24 @@ const allItems = [
     imagenes: [],
     has_video: true,
     links_videos: ['https://www.youtube.com/watch?v=kXYiU_JCYtU'],
+    // Grupos incompletos a propósito: se descartan los que no tienen label, los que
+    // vienen sin items y los items a los que les falta content o link. Solo sobrevive
+    // (y se renderiza) el último grupo.
+    taxonomias: [
+      { label: '', items: [{ content: 'Grupo sin label', link: 'https://example.com/sin-label' }] },
+      { label: 'Grupo sin items', items: [] },
+      {
+        label: 'Items incompletos',
+        items: [
+          { content: 'Item sin link' },
+          { link: 'https://example.com/item-sin-content' }
+        ]
+      },
+      {
+        label: 'También en',
+        items: [{ content: 'Mozilla Security Blog', link: 'https://blog.mozilla.org/security/' }]
+      }
+    ],
     temas: [
       { titulo: 'Parche critico de seguridad para la vulnerabilidad CVE-2026-1234 en navegadores', resumen: 'Se parcheo la vulnerabilidad CVE-2026-1234, catalogada como critica, que afectaba a todos los navegadores basados en Chromium y permitia ejecucion remota de codigo. Se recomienda actualizar todas las versiones afectadas: hay explotaciones activas que instalan malware sin que el usuario lo note.', tono_social: 'Negativo', fecha_narrativa: '2026-06-22' }
     ]
@@ -133,6 +182,7 @@ const allItems = [
     resumen_ia: 'La version de soporte a largo plazo trae mejoras significativas en rendimiento y nuevas APIs estables.',
     thumbnail: 'https://picsum.photos/seed/noticia5/600/400',
     link_web: 'https://nodejs.org/blog/node-24-lts',
+    link_view_entry: '?id=FUE-00005',
     fecha_publicacion: '2026-06-10',
     fecha_scrapeo: '2026-06-10T16:30:00',
     tonos_sociales: ['Positivo', 'Neutro'],
@@ -158,6 +208,16 @@ const allItems = [
       'https://www.youtube.com/watch?v=ckZ7mTfj2oE',
       'https://www.youtube.com/watch?v=nfWlot6h_JM',
       'https://www.youtube.com/watch?v=vLx9fBdfF0E'
+    ],
+    // Un solo grupo: el bloque queda en una columna (layout responsive, auto-fit).
+    taxonomias: [
+      {
+        label: 'Fuentes oficiales',
+        items: [
+          { content: 'Node.js Releases', link: 'https://nodejs.org/en/about/previous-releases' },
+          { content: 'Fin de soporte por versión', link: 'https://endoflife.date/nodejs' }
+        ]
+      }
     ],
     temas: [
       { titulo: 'Nuevas APIs estables de testing nativo y watch mode integrado', resumen: 'La version LTS incorpora una API nativa de testing que elimina dependencias externas para los casos mas comunes, y un watch mode integrado. Tambien se estabilizan APIs de red y streams, manteniendo compatibilidad hacia atras para una adopcion gradual.', tono_social: 'Positivo', fecha_narrativa: '2026-06-10', notas_de_trabajo: 'La API de testing nativa podria reemplazar vitest en algunos proyectos. Hacer una prueba de concepto con un modulo pequeño.' },
@@ -226,6 +286,7 @@ const allItems = [
     resumen_ia: 'Cada vez mas frameworks adoptan WASM para ejecutar codigo intensivo en el servidor con rendimiento nativo.',
     thumbnail: null,
     link_web: 'https://wasm.org/server-side-2026',
+    link_view_entry: '?id=FUE-00008',
     fecha_publicacion: '2026-05-15',
     fecha_scrapeo: '2026-05-15T13:45:00',
     tonos_sociales: ['Positivo', 'Neutro'],
@@ -284,6 +345,7 @@ const allItems = [
     resumen_ia: 'Desde unit tests con Vitest hasta tests end-to-end con Playwright: todo lo que tu equipo necesita.',
     thumbnail: 'https://picsum.photos/seed/noticia10/600/400',
     link_web: 'https://vitest.dev/guides/frontend-testing',
+    link_view_entry: '?id=FUE-00010',
     fecha_publicacion: '2026-04-10',
     fecha_scrapeo: '2026-04-10T19:00:00',
     tonos_sociales: ['Positivo', 'Neutro'],
@@ -371,6 +433,7 @@ const allItems = [
     resumen_ia: 'Nuevas herramientas y estandares facilitan la creacion de experiencias inclusivas para todos los usuarios.',
     thumbnail: 'https://picsum.photos/seed/noticia12/600/400',
     link_web: 'https://w3.org/wai/accessibility-2026',
+    link_view_entry: '?id=FUE-00013',
     fecha_publicacion: '2025-02-05',
     fecha_scrapeo: '2026-02-05T10:00:00',
     tonos_sociales: ['Positivo', 'Negativo', 'Neutro'],
@@ -404,6 +467,7 @@ const allItems = [
     resumen_ia: null,
     thumbnail: 'https://picsum.photos/seed/youtube1/600/400',
     link_web: 'https://www.youtube.com/watch?v=jNQXAC9IVRw',
+    link_view_entry: '?id=FUE-00014',
     fecha_publicacion: '2025-06-28',
     fecha_scrapeo: '2026-06-28T10:00:00',
     tonos_sociales: ['Positivo'],
@@ -452,6 +516,7 @@ const allItems = [
     resumen_ia: 'Un hilo en Twitter/X con consejos practicos para evitar re-renders innecesarios en aplicaciones React.',
     thumbnail: 'https://picsum.photos/seed/twitter1/600/400',
     link_web: 'https://x.com/elonmusk/status/1593459801966538755',
+    link_view_entry: '?id=FUE-00016',
     fecha_publicacion: '2026-06-26',
     fecha_scrapeo: '2026-06-26T09:45:00',
     tonos_sociales: ['Positivo', 'Neutro'],
@@ -547,6 +612,12 @@ const allItems = [
 // muestra el `<select>` que aparece al expandir el timeline, a la derecha de la línea.
 // Al colapsar, las featured cards mezclan los artículos de todas las taxonomías.
 // Los grupos se arman por rangos del listado completo para no duplicar los artículos.
+//
+// Ojo con los dos conceptos de "taxonomía" que conviven en el mismo mock:
+// - `content` (abajo) agrupa artículos del timeline por taxonomía media.
+// - `taxonomias` (dentro de algunos ítems) son los grupos de links de navegación del
+//   pie de la tarjeta en modo single. Viaja en el detalle del ítem y es opcional: los
+//   artículos que no lo declaran no renderizan ese bloque.
 export default {
   lastUpdated: '2026-06-25T14:30:00',
   content: [

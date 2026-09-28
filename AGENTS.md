@@ -128,13 +128,19 @@ interface TimelineItem {
   links_videos?: string[] | null;      // Links de videos relacionados (se renderizan como embeds al expandir la tarjeta)
   has_video: boolean;           // Indica si el ítem tiene contenido audiovisual (links_videos o link_web de video)
   link_edit_entry?: string;     // URL de formulario de edición (muestra botón rojo "Editar" en la tarjeta)
+  link_view_entry?: string;     // URL de la vista individual del ítem (vuelve el ID del menú de información un link y agrega el botón de compartir)
+  taxonomias?: SingleTaxonomy[];  // Grupos de links de navegación del pie de la tarjeta en modo single. Opcional, y solo texto plano
   temas: ItemTema[];            // Subtemas del artículo
 }
 ```
 
+`link_view_entry` es un campo **por ítem**, no una opción del constructor: puede venir en relativa (`?id=FUE-00001`, `/articulos/FUE-00001`) y se absolutiza con `_absoluteUrl()` para compartir. También viaja en el `TimelineItemSummary` de modo API (va en `toSummary()` de `example/server.js`), porque el botón de compartir y el link del ID se renderizan en la tarjeta colapsada, antes de que exista el detalle.
+
+`taxonomias` también es un campo **por ítem**, no una opción del constructor: el bloque de links de navegación del modo single sale del propio dato (`_appendTaxonomies(card.taxonomias)` en `_renderSingleCard`), nunca de la config. En modo API llega en el detalle (`GET {url}/:id`) y **no** en la lista paginada, porque solo se usa con `singleId`, donde el artículo ya se pide entero. `SingleTaxonomyItem.content` es `string` y siempre se escapa: el dato viene de la API (JSON), así que no admite markup ni nodos DOM. Si el detalle no se puede cargar, no hay ítem y por lo tanto no hay bloque que renderizar.
+
 **No modificar esta interfaz** sin considerar que los datos vienen de un sistema externo.
 
-`ContentGroup` **no** es lo mismo que `SingleTaxonomy` (que agrupa *links* de navegación bajo la tarjeta en modo single). No confundirlos ni mezclar sus campos.
+`ContentGroup` **no** es lo mismo que `SingleTaxonomy` (que agrupa *links* de navegación bajo la tarjeta en modo single). No confundirlos ni mezclar sus campos: `ContentGroup` viene de la opción `content` y agrupa artículos del timeline; `SingleTaxonomy` viene del campo `taxonomias` del ítem y agrupa links.
 
 Helpers que definen el scope de datos en `src/TimelineViewer.ts`:
 

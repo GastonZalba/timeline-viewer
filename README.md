@@ -73,9 +73,7 @@ The `Timeline` constructor accepts a single config object:
 | `inlineAdjuntos`| `boolean`                      | `false`    | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button |
 | `internalButtons`| `boolean`                     | `false`    | When `true`, shows the internal work controls in the timeline toolbar: the red "work notes" toggle (hide/show `notas_de_trabajo` on cards and topics) and the red "Estado interno" filter button (validado / capturado / descartado). When `false` (default) those buttons are not rendered |
 | `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given count. When unset, the default Spanish label is used with singular/plural logic. `count` is the **total number of publications, independent of the selected taxonomy** (the same number shown next to the label), which keeps the singular/plural grammatical. The returned string is injected as **HTML (not escaped)**, so it can contain markup (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`); escape any untrusted value before returning it |
-| `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode |
-| `singleUrl`      | `string`                       | —          | Optional. URL template of the **single view** of an item (the same one `singleId` renders). Two things are built from it: the "Información" menu shows the `ID` value as a link with the external-link icon (both open that view in a new tab, `target="_blank"`), and a floating share button appears below the card's info button. Use `{id}` as the placeholder for the item id (e.g. `'/articulos/{id}'` or `'?id={id}'`); all occurrences are replaced with the `encodeURIComponent` of the id. If the template has no `{id}`, the URL is used as-is. The link/button are rendered only when `singleUrl` is set **and** the component is not already in single mode (`singleId`). The share button uses the [Web Share API](https://developer.mozilla.org/docs/Web/API/Navigator/share) (`{ title, url }`) when available — mobile and Safari; where it is not available (e.g. desktop Chrome) it copies the absolute URL to the clipboard, the icon turns into a checkmark and a small "Copiado al portapapeles!" toast appears under the card buttons for 1.5s |
-| `singleTaxonomies` | `SingleTaxonomy[]`           | `[]`       | Optional. **Only used in single mode** (`singleId`): renders a navigation block under the card, laid out as a responsive grid of columns (`auto-fit`, 480px max width, aligned with the card). Each entry is a group `{ label, items }` and each item is `{ content, link }` opened in a new tab (`target="_blank"`, `rel="noopener"`). `content` is a `string` (escaped, rendered as text) or an `HTMLElement` (moved into the link as a DOM node, so it can carry markup, classes or listeners). The group `label` is plain text: it is cropped with `...` when the column is too narrow and the full text is exposed in the `title` attribute. Groups with no `label`, with an empty `items` array, or with items missing `content`/`link` are ignored; when nothing is renderable no markup is added. Example: `singleTaxonomies: [{ label: 'Fuentes oficiales', items: [{ content: 'Boletín Oficial', link: '/boletin' }] }]` |
+| `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode. The navigation links block under the card is not configured here: it comes from the item's own `taxonomias` field. See [Single view taxonomies](#single-view-taxonomies) |
 
 ### Item fields
 
@@ -105,7 +103,9 @@ Each object in `content[].items` (or in the legacy `items`) supports these field
 | `has_video`            | `boolean`                   | Indicates whether the item has audiovisual content: `true` when `links_videos` is non-empty or when `link_web` points to a video (e.g. YouTube, Instagram reel) |
 | `notas_de_trabajo`     | `string` / `null`           | Optional. Working notes displayed as a red badge above the summary in both collapsed and expanded card states |
 | `link_edit_entry`     | `string` (URL) / `null`     | Optional. URL to an edit form. When present, a red "Editar" button is shown next to the "Visitar" button in the card actions |
+| `link_view_entry`     | `string` (URL)               | Optional. URL of the item's own **individual view** (the one `singleId` renders). Two things are built from it: the "Información" menu shows the `ID` value as a link with the external-link icon (opened in a new tab, `target="_blank"`), and a floating share button appears below the card's info button. Relative URLs are resolved against the current page (e.g. `'?id=FUE-00001'` or `'/articulos/FUE-00001'`). When the field is absent, the `ID` is plain text and no share button is rendered. The share button uses the [Web Share API](https://developer.mozilla.org/docs/Web/API/Navigator/share) (`{ title, url }`) when available — mobile and Safari; where it is not available (e.g. desktop Chrome) it copies the absolute URL to the clipboard, the icon turns into a checkmark and a small "Copiado al portapapeles!" toast appears under the card buttons for 1.5s |
 | `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa?, notas_de_trabajo? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null`. `notas_de_trabajo` is an optional working note displayed as a red badge below the theme description |
+| `taxonomias`           | `{ label: string, items: { content: string, link: string }[] }[]` | Optional. Groups of navigation links rendered as a block **under the card in single mode** (`singleId`), each group in its own column. See [Single view taxonomies](#single-view-taxonomies) |
 
 > **Importante:** `example/mock-data.js` es la fuente de verdad para probar el componente. Cualquier campo que se agregue, renombre o elimine en el mock **debe** actualizarse en el mismo cambio en la interfaz `TimelineItem` (`src/TimelineViewer.ts`), en la declaración de tipos generada (`dist/TimelineViewer.d.ts` vía `npm run build`) y en esta tabla de campos. Los valores de `tipo_fuente` y los `tonos_sociales` se documentan según los que existen en el mock.
 
@@ -122,14 +122,14 @@ new Timeline({
 });
 ```
 
-En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediato (título, resumen, thumbnail, badges, tonos y fecha). El resto — barra de acciones (captura, imágenes, adjuntos, abrir, editar), embed de la publicación original, menú de información, actores, fuente, temas, media y videos — se obtiene al expandir la tarjeta con `GET {url}/:id`, que devuelve el contrato completo de `TimelineItem`.
+En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediato (título, resumen, thumbnail, badges, tonos, fecha y `link_view_entry` para el botón de compartir). El resto — barra de acciones (captura, imágenes, adjuntos, abrir, editar), embed de la publicación original, menú de información, actores, fuente, temas, media, videos y los grupos de `taxonomias` del modo single — se obtiene con `GET {url}/:id`, que devuelve el contrato completo de `TimelineItem`.
 
 #### Endpoints
 
 | Endpoint          | Uso                                                                    | Respuesta                    |
 |-------------------|------------------------------------------------------------------------|------------------------------|
 | `GET {url}`       | Lista paginada con búsqueda, filtros, orden, facets y destacadas       | Objeto con `items`, `total`, `totalAll`, `featured`, `facets` y `lastUpdated` opcional |
-| `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
+| `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta, y en single mode) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
 
 > El campo `items` de la respuesta es la lista paginada que devuelve el servidor y **no** tiene relación con la opción `content` ni con el alias legacy `items`. En modo API no se renderiza el selector de taxonomías.
 
@@ -192,8 +192,11 @@ Los ítems de la lista llevan solo los campos que la tarjeta colapsada muestra d
 | `capturado`            | `boolean`                   |
 | `descartado`           | `boolean` / `null`          |
 | `notas_de_trabajo`     | `string` / `null` (opcional) |
+| `link_view_entry`      | `string` (URL) (opcional) |
 
-`link_web` solo se incluye cuando `capturado === false` (esos ítems no son expandibles y muestran únicamente su `id` y enlace).
+`link_web` solo se incluye cuando `capturado === false` (esos ítems no son expandibles y muestran únicamente su `id` y enlace). `link_view_entry` sí viaja en la lista, porque el botón de compartir y el link del `ID` se renderizan en la tarjeta colapsada.
+
+El campo `taxonomias` **no viaja en la lista**: solo se usa debajo de la tarjeta en modo single, y en ese modo el artículo ya se pide entero con `GET {url}/:id`.
 
 ### Embedded content
 
@@ -243,20 +246,20 @@ Behaviour:
 - Group `label`s are plain text (no HTML). A label longer than the pill crops with a real ellipsis (`...`) while its **`(N)` count always stays visible**, because the pill is a flex row where only the label shrinks. The pill is capped at `max-width: 240px` and its full width is `shrink-to-content`, so it narrows on short labels. Hovering shows the complete `label (N)` in a tooltip.
 - `content` takes precedence over `items`; `items` is kept as a legacy alias and simply behaves like before (one implicit group, no selector).
 
-> Not to be confused with [`singleTaxonomies`](#single-view-taxonomies), which is a block of navigation links rendered under the card in **single mode**. `ContentGroup` groups the articles of the timeline; `SingleTaxonomy` groups links around a single article.
+> Not to be confused with [`item.taxonomias`](#single-view-taxonomies), which is a block of navigation links rendered under the card in **single mode**. `ContentGroup` groups the articles of the timeline; `SingleTaxonomy` groups links around a single article.
 
 ### Single view taxonomies
 
-In single mode (`singleId`) the `singleTaxonomies` option renders a navigation block under the card. It is meant for the link groups a single-article page needs around the article: official sources, topic indexes, related portals, etc.
+In single mode (`singleId`) the item's own `taxonomias` field renders a navigation block under the card. It is meant for the link groups a single-article page needs around the article: official sources, topic indexes, related portals, etc.
+
+The block is **not a constructor option**: it comes from the data, so every article declares its own groups and the server can vary them per article (e.g. only the ones relevant to it). In API mode the field arrives in the item detail (`GET {url}/:id`, which single mode already fetches); in local mode it is read straight from the `TimelineItem` passed in `content`/`items`.
 
 ```js
-const tag = document.createElement('em');
-tag.textContent = 'Cronista';
-
-new Timeline({
-  container: '#noticias-container',
-  singleId: 'FUE-0001',
-  singleTaxonomies: [
+{
+  id: 'FUE-00001',
+  nombre_fuente: 'Lanzamiento del nuevo framework de JavaScript',
+  // ...
+  taxonomias: [
     {
       label: 'Fuentes oficiales',
       items: [
@@ -266,23 +269,23 @@ new Timeline({
     },
     {
       label: 'También en',
-      items: [{ content: tag, link: 'https://www.cronista.com/' }]
+      items: [{ content: 'Cronista', link: 'https://www.cronista.com/' }]
     },
     {
       label: 'Taxonomías y fuentes consultadas durante la verificación de este artículo',
       items: [{ content: 'Salud & Bienestar', link: '/salud' }]
     }
   ]
-});
+}
 ```
 
-- The block is only rendered in single mode. Without `singleId` the option is ignored and nothing changes in the timeline. This is unrelated to the [`content`](#content-taxonomies) option, which groups timeline articles by taxonomy.
-- **`content` as string** is always escaped and rendered as text: `'A < B & C'` shows literally and can never break the markup. For rich content pass an **`HTMLElement`** instead.
-- **`content` as `HTMLElement` is moved**, not cloned: the node ends up inside the `<a>` exactly as it was passed, keeping its markup, classes and listeners. Use inline elements (`span`, `em`, `strong`) since the link is `inline-block`, and create one element per item — passing the same node twice would leave the first link empty, because the node gets moved again.
-- **`link`** is used verbatim as the `href` (escaped for the attribute context) — there is no placeholder substitution. Build the URLs on the consumer side. Every link opens in a new tab (`target="_blank"`, `rel="noopener"`).
+- The block is only rendered in single mode. In timeline mode `taxonomias` is ignored and nothing changes. This is unrelated to the [`content`](#content-taxonomies) option, which groups timeline articles by taxonomy.
+- **`content` is a `string` and is always escaped**, so `'A < B & C'` shows literally and can never break the markup. There is no way to inject markup or a DOM node: the field is plain data, and the API sends JSON. A tag with markup cannot be a taxonomy link.
+- **`link`** is used verbatim as the `href` (escaped for the attribute context) — there is no placeholder substitution. Build the URLs on the producer side. Every link opens in a new tab (`target="_blank"`, `rel="noopener"`).
 - **The group `label` is plain text** and is cropped with `...` when the column is too narrow; the full text is always available in the native tooltip (`title`), and the text stays complete in the DOM for screen readers.
 - Layout is a responsive grid: one column per taxonomy (`auto-fit`, min 160px), 480px max width so it lines up with the card, and a top border separating it from the article. Each taxonomy label is an uppercase muted heading, its items are a vertical list of accent-colored links that wrap on long content.
 - Groups with no `label`, with an empty `items` array, or with items missing `content`/`link` are skipped. If nothing is renderable, no markup is added at all.
+- When the field is absent, or when the detail request fails and the card is not found, **no block is rendered at all**: there are no links to show.
 
 ## Build
 
@@ -323,7 +326,7 @@ Query flags of the demo page:
 | `?flat` | Local mode with the legacy `items` alias: verifies that no taxonomy selector is rendered and the layout is unchanged |
 | `?expanded` | Starts the timeline expanded (`startExpanded: true`) instead of collapsed. Combinable with the other flags |
 | `?api` | API mode against the mock server (`example/server.js`): no taxonomy selector, server-side filters |
-| `?id=FUE-0001` | Single mode: renders just that card, already expanded |
+| `?id=FUE-00001` | Single mode: renders just that card, already expanded, with the navigation block from the item's `taxonomias` (FUE-00001 has the three groups, FUE-00002 exercises the incomplete-group filtering, FUE-00005 a single column, the rest have no `taxonomias` and render no block) |
 
 ## Preview
 

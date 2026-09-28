@@ -111,7 +111,11 @@ function sortItems(items, sortAsc) {
   });
 }
 
-/** Lightweight card projection used by the list endpoint (only what the collapsed card renders) */
+/**
+ * Lightweight card projection used by the list endpoint (only what the collapsed card renders).
+ * `taxonomias` no viaja acá a propósito: solo se usa en modo single, donde el artículo se pide
+ * entero con `GET /api/:id` (ver handleItem).
+ */
 function toSummary(item) {
   const summary = {
     id: item.id,
@@ -124,7 +128,8 @@ function toSummary(item) {
     validado: item.validado,
     capturado: item.capturado,
     descartado: item.descartado,
-    notas_de_trabajo: item.notas_de_trabajo
+    notas_de_trabajo: item.notas_de_trabajo,
+    link_view_entry: item.link_view_entry
   };
   if (item.capturado === false) {
     summary.link_web = item.link_web;
