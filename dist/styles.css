@@ -774,7 +774,7 @@
   position: absolute;
   left: 110px;
   top: 0px;
-  bottom: 19px;
+  bottom: 20px;
   width: 1px;
   background: var(--tv-accent);
   border-radius: 2px;
@@ -2010,7 +2010,7 @@
   opacity: 1 !important;
   transform: none !important;
   pointer-events: none;
-  margin-bottom: 0;
+  margin-bottom: 0 !important;
 }
 .publicaciones-section .timeline-footer-dot {
   width: 10px !important;
@@ -2186,10 +2186,9 @@
   .publicaciones-section .timeline-line {
     left: 63px;
     top: -24px;
-    bottom: 5px;
   }
   .publicaciones-section .timeline-cards-col {
-    --tv-date-col-width: 65px;
+    --tv-date-col-width: 63px;
   }
   .publicaciones-section .taxonomy-row {
     padding-top: 2px;
