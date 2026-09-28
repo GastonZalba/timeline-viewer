@@ -326,6 +326,10 @@ export default class Timeline {
      * renders its label as a heading (cropped by CSS, with the full text in the
      * `title`) and its items as links.
      *
+     * Groups with more than `TAXONOMY_VISIBLE_LINKS` links render only the first
+     * ones: the rest go in the markup as hidden `li` and a "Ver más (N)" button
+     * toggles them, so no link is lost and no extra fetch is needed.
+     *
      * Groups with no label, no items, or items with no content/link are ignored,
      * and an empty string is returned when nothing is renderable so no orphan
      * markup is left in the DOM.
@@ -333,7 +337,11 @@ export default class Timeline {
     protected _buildTaxonomies(taxonomias: SingleTaxonomy[] | undefined): string;
     /**
      * Append the taxonomy navigation block at the end of the single mode section,
-     * with the groups declared by the item itself.
+     * with the groups declared by the item itself, and bind the "Ver más" toggles
+     * of the groups that overflow `TAXONOMY_VISIBLE_LINKS`. Each toggle is
+     * independent: it shows/hides only its own group, adding `expanded` to the
+     * `ul` (the class is what the component CSS keys on, the `hidden` attribute is
+     * kept in sync for the case where the stylesheet is not loaded).
      */
     protected _appendTaxonomies(taxonomias: SingleTaxonomy[] | undefined): void;
     /** Fill the card detail slots and bind their interactions */

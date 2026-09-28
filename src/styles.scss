@@ -2427,6 +2427,45 @@
         text-decoration: underline;
       }
     }
+
+    .single-taxonomy-more-item {
+      margin-top: 2px;
+    }
+
+    // El overflow se oculta con el CSS del componente y no con el atributo `hidden`:
+    // la regla `[hidden]` de la UA cede ante cualquier `display` de autor (el mismo
+    // motivo por el que `.taxonomy-row[hidden]` necesita su regla explícita).
+    .single-taxonomy-extra {
+      display: none;
+    }
+
+    .single-taxonomy-list.expanded .single-taxonomy-extra {
+      display: block;
+    }
+
+    .single-taxonomy-more {
+      display: inline-block;
+      padding: 0;
+      border: 0;
+      background: none;
+      font-family: inherit;
+      font-size: 0.7rem;
+      font-style: italic;
+      color: var(--tv-text-muted);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      cursor: pointer;
+
+      &:hover {
+        color: var(--tv-accent);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--tv-accent);
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+    }
   }
 
   @container publicaciones (max-width: 768px) {

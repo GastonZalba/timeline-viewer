@@ -43,10 +43,17 @@ const allItems = [
         ]
       },
       {
+        // 7 links a propósito: solo se muestran los primeros 3 y aparece el
+        // "Ver más (4)" que expande el resto de este grupo.
         label: 'También en',
         items: [
           { content: 'Cronista', link: 'https://www.cronista.com/' },
-          { content: 'Semanario | de esta publicación, en la edición del domingo', link: 'https://www.semanario.com.uy/' }
+          { content: 'Semanario | de esta publicación, en la edición del domingo', link: 'https://www.semanario.com.uy/' },
+          { content: 'La Nación', link: 'https://www.lanacion.com.ar/' },
+          { content: 'Clarín', link: 'https://www.clarin.com/' },
+          { content: 'Infobae', link: 'https://www.infobae.com/' },
+          { content: 'Página/12', link: 'https://www.pagina12.com.ar/' },
+          { content: 'El Cohete a la Luna', link: 'https://www.cohetealaluna.com/' }
         ]
       },
       {

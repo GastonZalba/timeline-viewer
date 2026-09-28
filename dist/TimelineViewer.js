@@ -14,6 +14,8 @@ const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.ph
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 const ESTADO_FILTER_FIELDS = ['validado', 'capturado', 'descartado'];
+/** Links shown per taxonomy group before the "Ver más" toggle appears (single mode) */
+const TAXONOMY_VISIBLE_LINKS = 3;
 /** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
 const ALL_TAXONOMIES_LABEL = 'Ver todo';
 /** `_contentIndex` value that means "every taxonomy" instead of a single group */
@@ -928,6 +930,10 @@ export default class Timeline {
      * renders its label as a heading (cropped by CSS, with the full text in the
      * `title`) and its items as links.
      *
+     * Groups with more than `TAXONOMY_VISIBLE_LINKS` links render only the first
+     * ones: the rest go in the markup as hidden `li` and a "Ver más (N)" button
+     * toggles them, so no link is lost and no extra fetch is needed.
+     *
      * Groups with no label, no items, or items with no content/link are ignored,
      * and an empty string is returned when nothing is renderable so no orphan
      * markup is left in the DOM.
@@ -938,18 +944,25 @@ export default class Timeline {
         const groups = taxonomias
             .filter((tax) => tax && tax.label && Array.isArray(tax.items) && tax.items.length)
             .map((tax) => {
-            const items = tax.items
-                .filter((item) => item && item.link && item.content)
-                .map((item) => {
-                return `<li><a class="single-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">${this._escapeHtml(item.content)}</a></li>`;
-            })
-                .join('');
-            if (!items)
+            const valid = tax.items.filter((item) => item && item.link && item.content);
+            if (!valid.length)
                 return '';
+            const renderLink = (item) => `<a class="single-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">${this._escapeHtml(item.content)}</a>`;
+            const items = valid
+                .slice(0, TAXONOMY_VISIBLE_LINKS)
+                .map((item) => `<li>${renderLink(item)}</li>`)
+                .join('');
+            const overflow = valid.slice(TAXONOMY_VISIBLE_LINKS);
+            const overflowItems = overflow
+                .map((item) => `<li class="single-taxonomy-extra" hidden>${renderLink(item)}</li>`)
+                .join('');
+            const toggle = overflow.length
+                ? `<li class="single-taxonomy-more-item"><button type="button" class="single-taxonomy-more" aria-expanded="false">Ver más (${overflow.length})</button></li>`
+                : '';
             const label = this._escapeHtml(tax.label);
             return `<div class="single-taxonomy">
           <div class="single-taxonomy-label" title="${label}">${label}</div>
-          <ul class="single-taxonomy-list">${items}</ul>
+          <ul class="single-taxonomy-list">${items}${overflowItems}${toggle}</ul>
         </div>`;
         })
             .filter((group) => group !== '');
@@ -959,13 +972,34 @@ export default class Timeline {
     }
     /**
      * Append the taxonomy navigation block at the end of the single mode section,
-     * with the groups declared by the item itself.
+     * with the groups declared by the item itself, and bind the "Ver más" toggles
+     * of the groups that overflow `TAXONOMY_VISIBLE_LINKS`. Each toggle is
+     * independent: it shows/hides only its own group, adding `expanded` to the
+     * `ul` (the class is what the component CSS keys on, the `hidden` attribute is
+     * kept in sync for the case where the stylesheet is not loaded).
      */
     _appendTaxonomies(taxonomias) {
         const html = this._buildTaxonomies(taxonomias);
         if (!html)
             return;
         this.section.insertAdjacentHTML('beforeend', html);
+        this.section.querySelectorAll('.single-taxonomy-more').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const button = e.currentTarget;
+                const list = button.closest('.single-taxonomy-list');
+                if (!list)
+                    return;
+                const extras = list.querySelectorAll('.single-taxonomy-extra');
+                const expanded = button.getAttribute('aria-expanded') === 'true';
+                list.classList.toggle('expanded', !expanded);
+                extras.forEach((extra) => {
+                    extra.hidden = expanded;
+                });
+                button.setAttribute('aria-expanded', String(!expanded));
+                button.textContent = expanded ? `Ver más (${extras.length})` : 'Ver menos';
+            });
+        });
     }
     /** Fill the card detail slots and bind their interactions */
     _injectCardDetail(cardEl, card) {
