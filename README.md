@@ -64,7 +64,7 @@ The `Timeline` constructor accepts a single config object:
 | `container`     | `string` (CSS selector/Element)| **required** | DOM element to mount into          |
 | `content`       | `ContentGroup[]`              | `[]`       | Optional. Array of `{ label, items }` groups: the **medium taxonomies**. The `label` of each group becomes an option of the selector shown above the expanded timeline, shown next to the number of articles of that group, and the timeline and the filters are scoped to the selected group (with 2+ groups a trailing **"Ver todo"** option scopes the timeline back to the whole pool). The counter in the expand button always shows the **total of every group**, regardless of the selected taxonomy. Takes precedence over `items`. Groups with no `label` or with an empty `items` array are ignored. When no group survives (or in API mode) **no selector is rendered and the layout is unchanged**. See [Content taxonomies](#content-taxonomies) |
 | `items`         | `TimelineItem[]`              | `[]`       | Legacy flat list of article card objects. Ignored when `content` is set. Kept for backwards compatibility: with no `content` the component behaves exactly as before |
-| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}` and the lazy detail of each card from `{url}/:id`. When set, `content` and `items` are ignored, **no taxonomy selector is rendered**, and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
+| `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}`, the filter counts from `{url}/facets` (**once at startup**) and the lazy detail of each card from `{url}/:id`. When set, `content` and `items` are ignored, **no taxonomy selector is rendered**, and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
 | `startExpanded` | `boolean`                      | `false`    | When `true`, the timeline starts **already expanded** instead of collapsed on the featured stack. It only sets the initial state: the expand toggle keeps working and the choice is **not persisted**, so every page load starts from this value. Ignored in single mode (`singleId`), which always renders a single expanded card. |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
@@ -124,14 +124,19 @@ new Timeline({
 
 En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediato (título, resumen, thumbnail, badges, tonos, fecha y `link_view_entry` para el botón de compartir). El resto — barra de acciones (captura, imágenes, adjuntos, abrir, editar), embed de la publicación original, menú de información, actores, fuente, temas, media, videos y los grupos de `taxonomias` del modo single — se obtiene con `GET {url}/:id`, que devuelve el contrato completo de `TimelineItem`.
 
+Al iniciar se hacen **dos** requests: `GET {url}/facets` (una sola vez, para armar el panel de filtros) y `GET {url}` (la primera página). A partir de ahí cada cambio de búsqueda, filtro u orden vuelve a pegarle solo a la lista: los facets ya no se vuelven a pedir, y el estado de los checkboxes se conserva.
+
 #### Endpoints
 
 | Endpoint          | Uso                                                                    | Respuesta                    |
 |-------------------|------------------------------------------------------------------------|------------------------------|
-| `GET {url}`       | Lista paginada con búsqueda, filtros, orden, facets y destacadas       | Objeto con `items`, `total`, `totalAll`, `featured`, `facets` y `lastUpdated` opcional |
+| `GET {url}`       | Lista paginada con búsqueda, filtros, orden y destacadas               | Objeto con `items`, `total`, `totalAll`, `featured` y `lastUpdated` opcional |
+| `GET {url}/facets`| Conteos de los filtros. Se pide **una sola vez** al iniciar, antes de la primera página | Objeto con `facets` y `lastUpdated` opcional |
 | `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta, y en single mode) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
 
 > El campo `items` de la respuesta es la lista paginada que devuelve el servidor y **no** tiene relación con la opción `content` ni con el alias legacy `items`. En modo API no se renderiza el selector de taxonomías.
+
+> `GET {url}/facets` tiene prioridad sobre `GET {url}/:id`: una ruta `/facets` no puede ser un id de artículo.
 
 #### Parámetros de `GET {url}`
 
@@ -159,7 +164,14 @@ En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediat
   "total": 123,            // total tras búsqueda + filtros + orden
   "totalAll": 1000,        // total de la colección completa (sin filtros)
   "featured": [ /* TimelineItemSummary[] */ ],
-  "lastUpdated": "2026-06-25T14:30:00",  // opcional
+  "lastUpdated": "2026-06-25T14:30:00"  // opcional
+}
+```
+
+#### Respuesta de `GET {url}/facets`
+
+```jsonc
+{
   "facets": {
     "tonos_sociales": { "Positivo": 15, "Negativo": 5, "Neutro": 8 },
     "tipo_fuente": { "Sitio web o portal": 9 },
@@ -169,11 +181,18 @@ En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediat
     "es_oficial": { "oficial": 10, "no-oficial": 9 },
     "fecha_publicacion": { "2026": 15 },
     "contenido": { "adjuntos": 4, "video": 6, "imagenes": 8 }
-  }
+  },
+  "lastUpdated": "2026-06-25T14:30:00"  // opcional
 }
 ```
 
-Los `facets` se calculan sobre el conjunto búsqueda + filtros, ignorando el filtro del propio campo. Las claves canónicas (`validado`, `no-validado`, `oficial`, `sin-tipo`, etc.) deben coincidir con las que devuelve cada campo.
+Los `facets` se calculan sobre la **colección completa**, sin depender de `q` ni de los filtros activos, y por eso no cambian: se piden una sola vez al iniciar y el panel de filtros se construye con ese único request, antes de la primera página. Como consecuencia, los números entre paréntesis son el total de la colección y **no** el conteo de la búsqueda actual, y los valores de un filtro no desaparecen al filtrar (el grupo completo se oculta solo si la colección tiene un solo valor para ese campo). Las claves canónicas (`validado`, `no-validado`, `oficial`, `sin-tipo`, etc.) deben coincidir con las que devuelve cada campo.
+
+Tres detalles del ciclo de vida:
+
+- Si `GET {url}/facets` falla, la lista se sigue mostrando y el panel de filtros queda sin los conteos (solo sobreviven los filtros de estado, que tienen valores fijos). No hay reintentos.
+- Por compat, si la respuesta de `GET {url}` todavía trae un campo `facets` y el endpoint dedicado no respondió, se usan esos valores. Sirve para backends que todavía no migraron; no hay que mandarlos en las páginas siguientes.
+- Los filtros de estado arrancan con sus valores por defecto (`validado` + `no-validado`, `capturado`, `no-descartado`, persistidos en `localStorage`) y esos defaults viajan en la **primera** request, igual que en el modo local.
 
 #### `TimelineItemSummary`
 

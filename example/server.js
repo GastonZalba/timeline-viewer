@@ -75,14 +75,11 @@ function parseFilters(params) {
   return filters;
 }
 
-/** Filter the mock dataset by search + filters (optionally ignoring one field for its own facet) */
-function poolItems(q, filters, ignoreField) {
+/** Filter the mock dataset by search + filters */
+function poolItems(q, filters) {
   return mockData.items.filter((item) => {
     if (!matchesSearch(item, q)) return false;
-    return Object.keys(filters).every((field) => {
-      if (field === ignoreField) return true;
-      return matchesField(item, field, filters[field]);
-    });
+    return Object.keys(filters).every((field) => matchesField(item, field, filters[field]));
   });
 }
 
@@ -100,6 +97,13 @@ function buildFacets(pool) {
   });
   return facets;
 }
+
+/**
+ * The mock dataset never changes at runtime, so the facets are counted once at startup over
+ * the whole collection: they don't depend on `q` nor on the active filters, which is what lets
+ * the client ask for them a single time (`GET /api/facets`) instead of on every page request.
+ */
+const STATIC_FACETS = buildFacets(mockData.items);
 
 /** Non-destructive sorted copy of the filtered items */
 function sortItems(items, sortAsc) {
@@ -137,7 +141,7 @@ function toSummary(item) {
   return summary;
 }
 
-/** GET /api — paginated list with search, filters, sort, facets and featured */
+/** GET /api — paginated list with search, filters, sort and featured */
 function handleItems(url, res) {
   const params = Object.fromEntries(url.searchParams.entries());
   const q = normalize(params.q || '');
@@ -154,11 +158,6 @@ function handleItems(url, res) {
   const pageSize = Math.max(1, Number(params.pageSize) || 10);
   const items = sorted.slice((page - 1) * pageSize, page * pageSize);
 
-  const facets = {};
-  Object.keys(FIELD_EXTRACT).forEach((field) => {
-    facets[field] = buildFacets(poolItems(q, filters, field))[field];
-  });
-
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(
     JSON.stringify({
@@ -166,8 +165,18 @@ function handleItems(url, res) {
       total: filtered.length,
       totalAll: mockData.items.length,
       featured: featured.map(toSummary),
-      lastUpdated: mockData.lastUpdated,
-      facets
+      lastUpdated: mockData.lastUpdated
+    })
+  );
+}
+
+/** GET /api/facets — static facet counts of the whole collection (requested once by the client) */
+function handleFacets(res) {
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(
+    JSON.stringify({
+      facets: STATIC_FACETS,
+      lastUpdated: mockData.lastUpdated
     })
   );
 }
@@ -190,6 +199,14 @@ const server = http.createServer((req, res) => {
 
   if (pathname === '/api' || pathname === '/api/') {
     if (req.method === 'GET') return handleItems(url, res);
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
+  // Must be matched before the /api/:id branch below, otherwise "facets" would be read as an id.
+  if (pathname === '/api/facets' || pathname === '/api/facets/') {
+    if (req.method === 'GET') return handleFacets(res);
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
     return;
@@ -232,4 +249,5 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Mock API available at http://localhost:${PORT}/api`);
+  console.log(`Static facets available at http://localhost:${PORT}/api/facets`);
 });

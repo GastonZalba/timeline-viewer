@@ -286,7 +286,7 @@ Cinco filtros disponibles, generados dinámicamente desde los datos, distribuido
 | Contenido | `adjuntos`, `links_videos`, `imagenes` | Con adjuntos / Con video / Con imágenes |
 
 Flujo:
-1. `_buildFilterCheckboxes()` extrae valores únicos y crea checkboxes con conteo
+1. `_buildFilterCheckboxes()` extrae valores únicos y crea checkboxes con conteo. En modo API los valores y los conteos salen de `GET {url}/facets`, que se pide una sola vez al iniciar (conteos estáticos de la colección completa), y los checkboxes se arman una única vez, antes de la primera página.
 2. Al cambiar un checkbox, `_applyFilters()` filtra `_originalCards` con AND entre filtros
 3. `_renderAll()` re-renderiza con los datos filtrados
 4. El sort se re-aplica después del filtrado

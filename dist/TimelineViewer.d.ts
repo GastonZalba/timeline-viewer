@@ -67,7 +67,16 @@ export interface TimelineApiPageResponse {
     totalAll: number;
     featured: TimelineItemSummary[];
     lastUpdated?: string;
+    /**
+     * Legacy: los facets se piden una sola vez con `GET {url}/facets`. Solo se lee de acá
+     * cuando ese endpoint no está disponible, para no romper backends que todavía la mandan.
+     */
+    facets?: Record<string, Record<string, number>>;
+}
+/** Respuesta de `GET {url}/facets`: conteos de la colección completa, sin `q` ni filtros */
+export interface TimelineApiFacetsResponse {
     facets: Record<string, Record<string, number>>;
+    lastUpdated?: string;
 }
 export interface SingleTaxonomyItem {
     content: string;
@@ -200,7 +209,7 @@ export default class Timeline {
     _apiLoading: boolean;
     _apiSeq: number;
     _apiReloadTimer: number;
-    _apiFacetsBuilt: boolean;
+    _apiFacetsLoaded: boolean;
     _apiError: string;
     _apiDetails: Map<string, TimelineItem | null>;
     _shareTimer: number;
@@ -378,7 +387,7 @@ export default class Timeline {
     protected _applyWorkNotesState(): void;
     /** Toggle work-notes visibility and persist the state to localStorage */
     protected _toggleWorkNotes(): void;
-    /** Build filter checkboxes from the available filter values (local data or API facets) */
+    /** Build filter checkboxes from the available filter values (local data or the one-time API facets) */
     protected _buildFilterCheckboxes(): void;
     /** Load the persisted estado-interno filter state from localStorage */
     protected _loadEstadoFilterState(): Record<string, string[]>;
@@ -396,8 +405,20 @@ export default class Timeline {
     protected _apiFetch<T>(path: string, params: Record<string, string>): Promise<T>;
     /** Build the query string params for the list endpoint from the current UI state */
     protected _buildQueryParams(page: number): Record<string, string>;
+    /**
+     * Fetch the filter facets once at startup (`GET {url}/facets`).
+     * They are static counts over the whole collection, so they never need to be re-requested.
+     * On failure the filter panel is still built (with empty counts) and `_fetchPage` falls back
+     * to the legacy `facets` of the list response when the server sends them.
+     */
+    protected _loadApiFacets(): Promise<void>;
     /** Fetch a page of items from the API and (re)build the whole view */
     protected _fetchPage(page: number): Promise<void>;
+    /**
+     * Fallback for servers that do not implement `GET {url}/facets` and still send the facets
+     * inside the list response. Runs at most once: after that `_apiFacets` is never reassigned.
+     */
+    protected _adoptLegacyApiFacets(data: TimelineApiPageResponse): void;
     /** Fetch the next page of items and append them to the timeline */
     protected _appendPageItems(): Promise<void>;
     /** Fetch the full detail of a single item by id */

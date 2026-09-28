@@ -87,7 +87,7 @@ export default class Timeline {
         this._apiLoading = false;
         this._apiSeq = 0;
         this._apiReloadTimer = 0;
-        this._apiFacetsBuilt = false;
+        this._apiFacetsLoaded = false;
         this._apiError = '';
         this._apiDetails = new Map();
         this._shareTimer = 0;
@@ -1513,7 +1513,7 @@ export default class Timeline {
             /* localStorage unavailable */
         }
     }
-    /** Build filter checkboxes from the available filter values (local data or API facets) */
+    /** Build filter checkboxes from the available filter values (local data or the one-time API facets) */
     _buildFilterCheckboxes() {
         const savedEstado = this._loadEstadoFilterState();
         let anyFilterVisible = false;
@@ -1692,6 +1692,26 @@ export default class Timeline {
             params.featured = String(this.featured_count);
         return params;
     }
+    /**
+     * Fetch the filter facets once at startup (`GET {url}/facets`).
+     * They are static counts over the whole collection, so they never need to be re-requested.
+     * On failure the filter panel is still built (with empty counts) and `_fetchPage` falls back
+     * to the legacy `facets` of the list response when the server sends them.
+     */
+    async _loadApiFacets() {
+        try {
+            const data = await this._apiFetch('/facets', {});
+            if (data && data.facets) {
+                this._apiFacets = data.facets;
+                this._apiFacetsLoaded = true;
+            }
+            if (data && data.lastUpdated && !this.lastUpdated)
+                this.lastUpdated = data.lastUpdated;
+        }
+        catch {
+            this._apiFacets = {};
+        }
+    }
     /** Fetch a page of items from the API and (re)build the whole view */
     async _fetchPage(page) {
         const seq = ++this._apiSeq;
@@ -1705,7 +1725,6 @@ export default class Timeline {
                 return;
             this._apiTotal = typeof data.total === 'number' ? data.total : this.allCards.length;
             this._apiTotalAll = typeof data.totalAll === 'number' ? data.totalAll : this._apiTotal;
-            this._apiFacets = data.facets || {};
             this._apiFeatured = Array.isArray(data.featured) ? data.featured : [];
             if (data.lastUpdated)
                 this.lastUpdated = data.lastUpdated;
@@ -1713,8 +1732,7 @@ export default class Timeline {
             this.allCards = Array.isArray(data.items) ? data.items : [];
             this._displayedCount = this.allCards.length;
             this._apiDetails.clear();
-            this._buildFilterCheckboxes();
-            this._syncFilterToggleState();
+            this._adoptLegacyApiFacets(data);
             this._renderAll();
         }
         catch {
@@ -1724,6 +1742,18 @@ export default class Timeline {
             this._apiError = 'No se pudieron cargar los datos. Intente nuevamente.';
             this._renderStatus();
         }
+    }
+    /**
+     * Fallback for servers that do not implement `GET {url}/facets` and still send the facets
+     * inside the list response. Runs at most once: after that `_apiFacets` is never reassigned.
+     */
+    _adoptLegacyApiFacets(data) {
+        if (this._apiFacetsLoaded || !data.facets)
+            return;
+        this._apiFacets = data.facets;
+        this._apiFacetsLoaded = true;
+        this._buildFilterCheckboxes();
+        this._syncFilterToggleState();
     }
     /** Fetch the next page of items and append them to the timeline */
     async _appendPageItems() {
@@ -2076,12 +2106,19 @@ export default class Timeline {
         this._initResizeHandle();
         if (this.api) {
             this._bindBaseEvents();
+            this._apiLoading = true;
             this._renderStatus();
+            // The filter checkboxes are built once, from the one-time facets request, before the
+            // first page: their default checks (estado filters) then travel in the initial query,
+            // just like in local mode, and their checked state survives every later re-fetch.
             // The embed preload reads the rendered cards, so it waits for the first page.
-            if (this.isExpanded)
-                void this._fetchPage(1).then(() => this._preloadEmbedLibraries());
-            else
-                void this._fetchPage(1);
+            void this._loadApiFacets().then(() => {
+                this._buildFilterCheckboxes();
+                this._syncFilterToggleState();
+                if (this.isExpanded)
+                    return this._fetchPage(1).then(() => this._preloadEmbedLibraries());
+                return this._fetchPage(1);
+            });
             return;
         }
         this._buildFilterCheckboxes();
