@@ -36,7 +36,7 @@ export interface TimelineItem {
     link_view_entry?: string;
     notas_de_trabajo?: string | null;
     /**
-     * Grupos de links de navegación que se renderizan al pie de la tarjeta en modo single.
+     * Grupos de links de navegación que se renderizan al pie de la tarjeta expandida.
      * Viaja en el detalle del ítem (`GET {url}/:id`), nunca en la lista paginada.
      */
     taxonomias?: SingleTaxonomy[];
@@ -73,7 +73,7 @@ export interface SingleTaxonomyItem {
     content: string;
     link: string;
 }
-/** Grupo de links de navegación que se renderiza al pie de la tarjeta en modo single (`item.taxonomias`) */
+/** Grupo de links de navegación que se renderiza al pie de la tarjeta expandida (`item.taxonomias`) */
 export interface SingleTaxonomy {
     label: string;
     items: SingleTaxonomyItem[];
@@ -321,7 +321,7 @@ export default class Timeline {
     /** Build the "Información" menu rows (ID, Tipo, Oficial, Captura) */
     protected _buildInfoMenuHtml(card: TimelineItem): string;
     /**
-     * Build the taxonomy navigation block shown under the card in single mode
+     * Build the taxonomy navigation block shown at the foot of the expanded card
      * (`item.taxonomias`, i.e. the field the detail endpoint returns). Every group
      * renders its label as a heading (cropped by CSS, with the full text in the
      * `title`) and its items as links.
@@ -336,14 +336,14 @@ export default class Timeline {
      */
     protected _buildTaxonomies(taxonomias: SingleTaxonomy[] | undefined): string;
     /**
-     * Append the taxonomy navigation block at the end of the single mode section,
-     * with the groups declared by the item itself, and bind the "Ver más" toggles
-     * of the groups that overflow `TAXONOMY_VISIBLE_LINKS`. Each toggle is
-     * independent: it shows/hides only its own group, adding `expanded` to the
-     * `ul` (the class is what the component CSS keys on, the `hidden` attribute is
-     * kept in sync for the case where the stylesheet is not loaded).
+     * Bind the "Ver más" toggles of the taxonomy navigation block rendered inside
+     * `root` (the `.card-taxonomies-slot` of a card), for the groups that overflow
+     * `TAXONOMY_VISIBLE_LINKS`. Each toggle is independent: it shows/hides only its
+     * own group, adding `expanded` to the `ul` (the class is what the component
+     * CSS keys on, the `hidden` attribute is kept in sync for the case where the
+     * stylesheet is not loaded).
      */
-    protected _appendTaxonomies(taxonomias: SingleTaxonomy[] | undefined): void;
+    protected _bindTaxonomyToggles(root: HTMLElement): void;
     /** Fill the card detail slots and bind their interactions */
     protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void;
     /** Ensure the full detail of the card is present (fetches it when missing) */

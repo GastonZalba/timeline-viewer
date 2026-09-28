@@ -82,7 +82,7 @@ export interface TimelineItem {
   link_view_entry?: string; // URL de la vista individual del ítem (convierte el ID del menú de información en link y agrega el botón de compartir)
   notas_de_trabajo?: string | null;
   /**
-   * Grupos de links de navegación que se renderizan al pie de la tarjeta en modo single.
+   * Grupos de links de navegación que se renderizan al pie de la tarjeta expandida.
    * Viaja en el detalle del ítem (`GET {url}/:id`), nunca en la lista paginada.
    */
   taxonomias?: SingleTaxonomy[];
@@ -124,7 +124,7 @@ export interface SingleTaxonomyItem {
   link: string;
 }
 
-/** Grupo de links de navegación que se renderiza al pie de la tarjeta en modo single (`item.taxonomias`) */
+/** Grupo de links de navegación que se renderiza al pie de la tarjeta expandida (`item.taxonomias`) */
 export interface SingleTaxonomy {
   label: string;
   items: SingleTaxonomyItem[];
@@ -1009,6 +1009,7 @@ export default class Timeline {
           <div class="card-media-slot"></div>
           <div class="card-embed-slot"></div>
           <div class="card-videos-slot"></div>
+          <div class="card-taxonomies-slot"></div>
         </div>
       </div>
     `;
@@ -1208,7 +1209,7 @@ export default class Timeline {
   }
 
   /**
-   * Build the taxonomy navigation block shown under the card in single mode
+   * Build the taxonomy navigation block shown at the foot of the expanded card
    * (`item.taxonomias`, i.e. the field the detail endpoint returns). Every group
    * renders its label as a heading (cropped by CSS, with the full text in the
    * `title`) and its items as links.
@@ -1229,48 +1230,45 @@ export default class Timeline {
         const valid = tax.items.filter((item) => item && item.link && item.content);
         if (!valid.length) return '';
         const renderLink = (item: SingleTaxonomyItem) =>
-          `<a class="single-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">${this._escapeHtml(item.content)}</a>`;
+          `<a class="card-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">${this._escapeHtml(item.content)}</a>`;
         const items = valid
           .slice(0, TAXONOMY_VISIBLE_LINKS)
           .map((item) => `<li>${renderLink(item)}</li>`)
           .join('');
         const overflow = valid.slice(TAXONOMY_VISIBLE_LINKS);
         const overflowItems = overflow
-          .map((item) => `<li class="single-taxonomy-extra" hidden>${renderLink(item)}</li>`)
+          .map((item) => `<li class="card-taxonomy-extra" hidden>${renderLink(item)}</li>`)
           .join('');
         const toggle = overflow.length
-          ? `<li class="single-taxonomy-more-item"><button type="button" class="single-taxonomy-more" aria-expanded="false">Ver más (${overflow.length})</button></li>`
+          ? `<li class="card-taxonomy-more-item"><button type="button" class="card-taxonomy-more" aria-expanded="false">Ver más (${overflow.length})</button></li>`
           : '';
         const label = this._escapeHtml(tax.label);
-        return `<div class="single-taxonomy">
-          <div class="single-taxonomy-label" title="${label}">${label}</div>
-          <ul class="single-taxonomy-list">${items}${overflowItems}${toggle}</ul>
+        return `<div class="card-taxonomy">
+          <div class="card-taxonomy-label" title="${label}">${label}</div>
+          <ul class="card-taxonomy-list">${items}${overflowItems}${toggle}</ul>
         </div>`;
       })
       .filter((group) => group !== '');
     if (!groups.length) return '';
-    return `<div class="single-taxonomies">${groups.join('')}</div>`;
+    return `<div class="card-taxonomies">${groups.join('')}</div>`;
   }
 
   /**
-   * Append the taxonomy navigation block at the end of the single mode section,
-   * with the groups declared by the item itself, and bind the "Ver más" toggles
-   * of the groups that overflow `TAXONOMY_VISIBLE_LINKS`. Each toggle is
-   * independent: it shows/hides only its own group, adding `expanded` to the
-   * `ul` (the class is what the component CSS keys on, the `hidden` attribute is
-   * kept in sync for the case where the stylesheet is not loaded).
+   * Bind the "Ver más" toggles of the taxonomy navigation block rendered inside
+   * `root` (the `.card-taxonomies-slot` of a card), for the groups that overflow
+   * `TAXONOMY_VISIBLE_LINKS`. Each toggle is independent: it shows/hides only its
+   * own group, adding `expanded` to the `ul` (the class is what the component
+   * CSS keys on, the `hidden` attribute is kept in sync for the case where the
+   * stylesheet is not loaded).
    */
-  protected _appendTaxonomies(taxonomias: SingleTaxonomy[] | undefined): void {
-    const html = this._buildTaxonomies(taxonomias);
-    if (!html) return;
-    this.section.insertAdjacentHTML('beforeend', html);
-    this.section.querySelectorAll('.single-taxonomy-more').forEach((btn) => {
+  protected _bindTaxonomyToggles(root: HTMLElement): void {
+    root.querySelectorAll('.card-taxonomy-more').forEach((btn) => {
       btn.addEventListener('click', (e: Event) => {
         e.preventDefault();
         const button = e.currentTarget as HTMLElement;
-        const list = button.closest('.single-taxonomy-list');
+        const list = button.closest('.card-taxonomy-list');
         if (!list) return;
-        const extras = list.querySelectorAll('.single-taxonomy-extra');
+        const extras = list.querySelectorAll('.card-taxonomy-extra');
         const expanded = button.getAttribute('aria-expanded') === 'true';
         list.classList.toggle('expanded', !expanded);
         extras.forEach((extra) => {
@@ -1290,6 +1288,7 @@ export default class Timeline {
     const protagFuenteSlot = cardEl.querySelector('.card-protag-fuente-slot') as HTMLElement | null;
     const mediaSlot = cardEl.querySelector('.card-media-slot') as HTMLElement | null;
     const videosSlot = cardEl.querySelector('.card-videos-slot') as HTMLElement | null;
+    const taxonomiasSlot = cardEl.querySelector('.card-taxonomies-slot') as HTMLElement | null;
 
     if (actionsEl) {
       actionsEl.innerHTML = this._buildActionsHtml(card);
@@ -1371,6 +1370,10 @@ export default class Timeline {
           if (iframe.contentDocument?.readyState === 'complete') wrap.classList.add('loaded');
         }
       });
+    }
+    if (taxonomiasSlot) {
+      taxonomiasSlot.innerHTML = this._buildTaxonomies(card.taxonomias);
+      this._bindTaxonomyToggles(taxonomiasSlot);
     }
     const embedSlot = cardEl.querySelector('.card-embed-slot') as HTMLElement | null;
     if (embedSlot) {
@@ -2328,7 +2331,6 @@ export default class Timeline {
     await this._ensureCardDetail(cardEl);
     this._preloadEmbedLibraries();
     this._processCardEmbeds(cardEl);
-    this._appendTaxonomies(card.taxonomias);
   }
 
   /** Initialize the component: build layout, sort data, render, bind events */

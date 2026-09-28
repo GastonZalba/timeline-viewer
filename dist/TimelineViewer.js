@@ -754,6 +754,7 @@ export default class Timeline {
           <div class="card-media-slot"></div>
           <div class="card-embed-slot"></div>
           <div class="card-videos-slot"></div>
+          <div class="card-taxonomies-slot"></div>
         </div>
       </div>
     `;
@@ -925,7 +926,7 @@ export default class Timeline {
       </div>`;
     }
     /**
-     * Build the taxonomy navigation block shown under the card in single mode
+     * Build the taxonomy navigation block shown at the foot of the expanded card
      * (`item.taxonomias`, i.e. the field the detail endpoint returns). Every group
      * renders its label as a heading (cropped by CSS, with the full text in the
      * `title`) and its items as links.
@@ -947,50 +948,46 @@ export default class Timeline {
             const valid = tax.items.filter((item) => item && item.link && item.content);
             if (!valid.length)
                 return '';
-            const renderLink = (item) => `<a class="single-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">${this._escapeHtml(item.content)}</a>`;
+            const renderLink = (item) => `<a class="card-taxonomy-link" href="${this._escapeHtml(item.link)}" target="_blank" rel="noopener">${this._escapeHtml(item.content)}</a>`;
             const items = valid
                 .slice(0, TAXONOMY_VISIBLE_LINKS)
                 .map((item) => `<li>${renderLink(item)}</li>`)
                 .join('');
             const overflow = valid.slice(TAXONOMY_VISIBLE_LINKS);
             const overflowItems = overflow
-                .map((item) => `<li class="single-taxonomy-extra" hidden>${renderLink(item)}</li>`)
+                .map((item) => `<li class="card-taxonomy-extra" hidden>${renderLink(item)}</li>`)
                 .join('');
             const toggle = overflow.length
-                ? `<li class="single-taxonomy-more-item"><button type="button" class="single-taxonomy-more" aria-expanded="false">Ver más (${overflow.length})</button></li>`
+                ? `<li class="card-taxonomy-more-item"><button type="button" class="card-taxonomy-more" aria-expanded="false">Ver más (${overflow.length})</button></li>`
                 : '';
             const label = this._escapeHtml(tax.label);
-            return `<div class="single-taxonomy">
-          <div class="single-taxonomy-label" title="${label}">${label}</div>
-          <ul class="single-taxonomy-list">${items}${overflowItems}${toggle}</ul>
+            return `<div class="card-taxonomy">
+          <div class="card-taxonomy-label" title="${label}">${label}</div>
+          <ul class="card-taxonomy-list">${items}${overflowItems}${toggle}</ul>
         </div>`;
         })
             .filter((group) => group !== '');
         if (!groups.length)
             return '';
-        return `<div class="single-taxonomies">${groups.join('')}</div>`;
+        return `<div class="card-taxonomies">${groups.join('')}</div>`;
     }
     /**
-     * Append the taxonomy navigation block at the end of the single mode section,
-     * with the groups declared by the item itself, and bind the "Ver más" toggles
-     * of the groups that overflow `TAXONOMY_VISIBLE_LINKS`. Each toggle is
-     * independent: it shows/hides only its own group, adding `expanded` to the
-     * `ul` (the class is what the component CSS keys on, the `hidden` attribute is
-     * kept in sync for the case where the stylesheet is not loaded).
+     * Bind the "Ver más" toggles of the taxonomy navigation block rendered inside
+     * `root` (the `.card-taxonomies-slot` of a card), for the groups that overflow
+     * `TAXONOMY_VISIBLE_LINKS`. Each toggle is independent: it shows/hides only its
+     * own group, adding `expanded` to the `ul` (the class is what the component
+     * CSS keys on, the `hidden` attribute is kept in sync for the case where the
+     * stylesheet is not loaded).
      */
-    _appendTaxonomies(taxonomias) {
-        const html = this._buildTaxonomies(taxonomias);
-        if (!html)
-            return;
-        this.section.insertAdjacentHTML('beforeend', html);
-        this.section.querySelectorAll('.single-taxonomy-more').forEach((btn) => {
+    _bindTaxonomyToggles(root) {
+        root.querySelectorAll('.card-taxonomy-more').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
                 const button = e.currentTarget;
-                const list = button.closest('.single-taxonomy-list');
+                const list = button.closest('.card-taxonomy-list');
                 if (!list)
                     return;
-                const extras = list.querySelectorAll('.single-taxonomy-extra');
+                const extras = list.querySelectorAll('.card-taxonomy-extra');
                 const expanded = button.getAttribute('aria-expanded') === 'true';
                 list.classList.toggle('expanded', !expanded);
                 extras.forEach((extra) => {
@@ -1009,6 +1006,7 @@ export default class Timeline {
         const protagFuenteSlot = cardEl.querySelector('.card-protag-fuente-slot');
         const mediaSlot = cardEl.querySelector('.card-media-slot');
         const videosSlot = cardEl.querySelector('.card-videos-slot');
+        const taxonomiasSlot = cardEl.querySelector('.card-taxonomies-slot');
         if (actionsEl) {
             actionsEl.innerHTML = this._buildActionsHtml(card);
             const screenshotBtn = actionsEl.querySelector('.card-screenshot-btn');
@@ -1094,6 +1092,10 @@ export default class Timeline {
                         wrap.classList.add('loaded');
                 }
             });
+        }
+        if (taxonomiasSlot) {
+            taxonomiasSlot.innerHTML = this._buildTaxonomies(card.taxonomias);
+            this._bindTaxonomyToggles(taxonomiasSlot);
         }
         const embedSlot = cardEl.querySelector('.card-embed-slot');
         if (embedSlot) {
@@ -2058,7 +2060,6 @@ export default class Timeline {
         await this._ensureCardDetail(cardEl);
         this._preloadEmbedLibraries();
         this._processCardEmbeds(cardEl);
-        this._appendTaxonomies(card.taxonomias);
     }
     /** Initialize the component: build layout, sort data, render, bind events */
     _init() {

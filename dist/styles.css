@@ -1366,6 +1366,79 @@
 .publicaciones-section .timeline-card.expanded .card-temas {
   display: flex;
 }
+.publicaciones-section .timeline-card .card-taxonomies {
+  display: none;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 20px 28px;
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--tv-accent);
+}
+.publicaciones-section .timeline-card.expanded .card-taxonomies {
+  display: grid;
+}
+.publicaciones-section .timeline-card .card-taxonomy {
+  min-width: 0;
+}
+.publicaciones-section .timeline-card .card-taxonomy-label {
+  margin-bottom: 8px;
+  font-size: 0.65rem;
+  color: var(--tv-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.publicaciones-section .timeline-card .card-taxonomy-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.publicaciones-section .timeline-card .card-taxonomy-link {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--tv-accent-light);
+  text-decoration: none;
+  word-break: break-word;
+}
+.publicaciones-section .timeline-card .card-taxonomy-link:hover {
+  color: var(--tv-accent);
+  text-decoration: underline;
+}
+.publicaciones-section .timeline-card .card-taxonomy-more-item {
+  margin-top: 2px;
+}
+.publicaciones-section .timeline-card .card-taxonomy-extra {
+  display: none;
+}
+.publicaciones-section .timeline-card .card-taxonomy-list.expanded .card-taxonomy-extra {
+  display: block;
+}
+.publicaciones-section .timeline-card .card-taxonomy-more {
+  display: inline-block;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--tv-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.publicaciones-section .timeline-card .card-taxonomy-more:hover {
+  color: var(--tv-accent);
+}
+.publicaciones-section .timeline-card .card-taxonomy-more:focus-visible {
+  outline: 2px solid var(--tv-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .publicaciones-section .timeline-card .card-inline-images {
   display: none;
   flex-direction: column;
