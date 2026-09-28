@@ -141,7 +141,7 @@ function toSummary(item) {
   return summary;
 }
 
-/** GET /api — paginated list with search, filters, sort and featured */
+/** GET /api — paginated list with search, filters and sort (no `lastUpdated`: that travels with the facets) */
 function handleItems(url, res) {
   const params = Object.fromEntries(url.searchParams.entries());
   const q = normalize(params.q || '');
@@ -151,9 +151,6 @@ function handleItems(url, res) {
   const filtered = poolItems(q, filters);
   const sorted = sortItems(filtered, sortAsc);
 
-  const featuredCount = Math.max(0, Number(params.featured) || 0);
-  const featured = sorted.filter((item) => item.capturado !== false).slice(0, featuredCount);
-
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = Math.max(1, Number(params.pageSize) || 10);
   const items = sorted.slice((page - 1) * pageSize, page * pageSize);
@@ -162,10 +159,7 @@ function handleItems(url, res) {
   res.end(
     JSON.stringify({
       items: items.map(toSummary),
-      total: filtered.length,
-      totalAll: mockData.items.length,
-      featured: featured.map(toSummary),
-      lastUpdated: mockData.lastUpdated
+      total: filtered.length
     })
   );
 }

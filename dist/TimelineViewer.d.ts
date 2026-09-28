@@ -64,9 +64,6 @@ export interface TimelineApiConfig {
 export interface TimelineApiPageResponse {
     items: TimelineItemSummary[];
     total: number;
-    totalAll: number;
-    featured: TimelineItemSummary[];
-    lastUpdated?: string;
     /**
      * Legacy: los facets se piden una sola vez con `GET {url}/facets`. Solo se lee de acá
      * cuando ese endpoint no está disponible, para no romper backends que todavía la mandan.
@@ -203,9 +200,8 @@ export default class Timeline {
     api: TimelineApiConfig | null;
     _apiPage: number;
     _apiTotal: number;
-    _apiTotalAll: number;
     _apiFacets: Record<string, Record<string, number>>;
-    _apiFeatured: TimelineItemSummary[];
+    _apiFacetsPromise: Promise<void> | null;
     _apiLoading: boolean;
     _apiSeq: number;
     _apiReloadTimer: number;
@@ -363,6 +359,13 @@ export default class Timeline {
     protected _insertBeforeFooter(el: HTMLElement): void;
     /** Render the timeline cards list, including the last-updated footer */
     protected _renderTimeline(cards: TimelineItem[]): void;
+    /**
+     * Write (or rewrite) the last-updated footer at the end of the timeline. Extracted from
+     * `_renderTimeline` because in API mode `lastUpdated` arrives with the facets response,
+     * which is requested long after the page that rendered the timeline: patching the footer
+     * avoids re-rendering the timeline and losing a card the user already expanded.
+     */
+    protected _renderLastUpdated(): void;
     /** Set up IntersectionObserver for the featured cards entrance animation */
     protected _setupObserver(): void;
     /** Set up IntersectionObserver for the timeline items entrance animation */
@@ -406,12 +409,21 @@ export default class Timeline {
     /** Build the query string params for the list endpoint from the current UI state */
     protected _buildQueryParams(page: number): Record<string, string>;
     /**
-     * Fetch the filter facets once at startup (`GET {url}/facets`).
+     * Fetch the filter facets (`GET {url}/facets`), at most once per instance.
      * They are static counts over the whole collection, so they never need to be re-requested.
      * On failure the filter panel is still built (with empty counts) and `_fetchPage` falls back
-     * to the legacy `facets` of the list response when the server sends them.
+     * to the legacy `facets` of the list response when the server sends them: that is why a
+     * failed request must not clear facets that `_adoptLegacyApiFacets` already took.
      */
     protected _loadApiFacets(): Promise<void>;
+    /**
+     * Lazy wrapper around `_loadApiFacets`: the facets are only needed by the filter panel, so
+     * they are requested the first time the timeline expands (see `_toggleExpand`) instead of at
+     * startup. The promise is cached, so collapsing and expanding again never re-requests them.
+     * It also brings the `lastUpdated` of the facets response, the only place it comes from in
+     * API mode, so the last-updated footer can be written without re-rendering the timeline.
+     */
+    protected _ensureApiFacets(): Promise<void>;
     /** Fetch a page of items from the API and (re)build the whole view */
     protected _fetchPage(page: number): Promise<void>;
     /**

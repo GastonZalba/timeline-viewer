@@ -81,9 +81,8 @@ export default class Timeline {
         this.api = config.api || null;
         this._apiPage = 1;
         this._apiTotal = 0;
-        this._apiTotalAll = 0;
         this._apiFacets = {};
-        this._apiFeatured = [];
+        this._apiFacetsPromise = null;
         this._apiLoading = false;
         this._apiSeq = 0;
         this._apiReloadTimer = 0;
@@ -1280,21 +1279,31 @@ export default class Timeline {
                 this.timelineCards.appendChild(this._createTimelineItem(card, i));
             });
         }
-        if (this.lastUpdated) {
-            const d = new Date(this.lastUpdated);
-            const formatted = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
-                ' a las ' +
-                d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            const el = document.createElement('div');
-            el.className = 'timeline-item timeline-footer-item';
-            el.innerHTML = `
-        <div class="timeline-date-col">
-          <div class="timeline-dot timeline-footer-dot"></div>
-        </div>
-        <div class="timeline-footer-text">Actualizado por última vez el ${formatted}.</div>
-      `;
-            this.timelineCards.appendChild(el);
-        }
+        this._renderLastUpdated();
+    }
+    /**
+     * Write (or rewrite) the last-updated footer at the end of the timeline. Extracted from
+     * `_renderTimeline` because in API mode `lastUpdated` arrives with the facets response,
+     * which is requested long after the page that rendered the timeline: patching the footer
+     * avoids re-rendering the timeline and losing a card the user already expanded.
+     */
+    _renderLastUpdated() {
+        this.timelineCards.querySelectorAll('.timeline-footer-item').forEach((f) => f.remove());
+        if (!this.lastUpdated)
+            return;
+        const d = new Date(this.lastUpdated);
+        const formatted = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) +
+            ' a las ' +
+            d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        const el = document.createElement('div');
+        el.className = 'timeline-item timeline-footer-item';
+        el.innerHTML = `
+      <div class="timeline-date-col">
+        <div class="timeline-dot timeline-footer-dot"></div>
+      </div>
+      <div class="timeline-footer-text">Actualizado por última vez el ${formatted}.</div>
+    `;
+        this.timelineCards.appendChild(el);
     }
     /** Set up IntersectionObserver for the featured cards entrance animation */
     _setupObserver() {
@@ -1438,6 +1447,10 @@ export default class Timeline {
             requestAnimationFrame(() => {
                 this._setupTimelineObserver();
             });
+            // The filter panel is the only consumer of the facets, so they are requested here
+            // (first expand) instead of at startup. Cached, so expanding again is free.
+            if (this.api)
+                void this._ensureApiFacets();
             this._preloadEmbedLibraries();
         }
         else {
@@ -1688,15 +1701,14 @@ export default class Timeline {
                 return;
             params[f.field] = active.join(',');
         });
-        if (this.featured_count > 0)
-            params.featured = String(this.featured_count);
         return params;
     }
     /**
-     * Fetch the filter facets once at startup (`GET {url}/facets`).
+     * Fetch the filter facets (`GET {url}/facets`), at most once per instance.
      * They are static counts over the whole collection, so they never need to be re-requested.
      * On failure the filter panel is still built (with empty counts) and `_fetchPage` falls back
-     * to the legacy `facets` of the list response when the server sends them.
+     * to the legacy `facets` of the list response when the server sends them: that is why a
+     * failed request must not clear facets that `_adoptLegacyApiFacets` already took.
      */
     async _loadApiFacets() {
         try {
@@ -1709,8 +1721,28 @@ export default class Timeline {
                 this.lastUpdated = data.lastUpdated;
         }
         catch {
-            this._apiFacets = {};
+            if (!this._apiFacetsLoaded)
+                this._apiFacets = {};
         }
+    }
+    /**
+     * Lazy wrapper around `_loadApiFacets`: the facets are only needed by the filter panel, so
+     * they are requested the first time the timeline expands (see `_toggleExpand`) instead of at
+     * startup. The promise is cached, so collapsing and expanding again never re-requests them.
+     * It also brings the `lastUpdated` of the facets response, the only place it comes from in
+     * API mode, so the last-updated footer can be written without re-rendering the timeline.
+     */
+    _ensureApiFacets() {
+        if (!this.api)
+            return Promise.resolve();
+        if (!this._apiFacetsPromise) {
+            this._apiFacetsPromise = this._loadApiFacets().then(() => {
+                this._buildFilterCheckboxes();
+                this._syncFilterToggleState();
+                this._renderLastUpdated();
+            });
+        }
+        return this._apiFacetsPromise;
     }
     /** Fetch a page of items from the API and (re)build the whole view */
     async _fetchPage(page) {
@@ -1724,10 +1756,6 @@ export default class Timeline {
             if (seq !== this._apiSeq)
                 return;
             this._apiTotal = typeof data.total === 'number' ? data.total : this.allCards.length;
-            this._apiTotalAll = typeof data.totalAll === 'number' ? data.totalAll : this._apiTotal;
-            this._apiFeatured = Array.isArray(data.featured) ? data.featured : [];
-            if (data.lastUpdated)
-                this.lastUpdated = data.lastUpdated;
             this._apiLoading = false;
             this.allCards = Array.isArray(data.items) ? data.items : [];
             this._displayedCount = this.allCards.length;
@@ -1767,8 +1795,6 @@ export default class Timeline {
             if (seq !== this._apiSeq)
                 return;
             this._apiTotal = typeof data.total === 'number' ? data.total : this._apiTotal;
-            if (data.lastUpdated)
-                this.lastUpdated = data.lastUpdated;
             this._apiPage = nextPage;
             this._apiLoading = false;
             this.allCards.push(...(data.items || []));
@@ -1896,7 +1922,7 @@ export default class Timeline {
             const n = this._apiTotal;
             this.remainingCount.textContent = String(n);
             this._setRelatedLabel(n);
-            this._renderFeatured(this._apiFeatured);
+            this._renderFeatured(this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count));
             this._renderTimeline(this.allCards);
             if (this._hasMorePages()) {
                 this._renderLoadMoreButton();
@@ -2108,17 +2134,20 @@ export default class Timeline {
             this._bindBaseEvents();
             this._apiLoading = true;
             this._renderStatus();
-            // The filter checkboxes are built once, from the one-time facets request, before the
-            // first page: their default checks (estado filters) then travel in the initial query,
-            // just like in local mode, and their checked state survives every later re-fetch.
+            // The checkboxes are built here, before the first page, so the default checks (estado
+            // filters) travel in the initial query just like in local mode. With no facets yet the
+            // non-estado groups stay hidden, so nothing can be checked before they arrive: the
+            // panel is rebuilt with the counts by `_ensureApiFacets()`, on the first expand.
             // The embed preload reads the rendered cards, so it waits for the first page.
-            void this._loadApiFacets().then(() => {
-                this._buildFilterCheckboxes();
-                this._syncFilterToggleState();
-                if (this.isExpanded)
-                    return this._fetchPage(1).then(() => this._preloadEmbedLibraries());
-                return this._fetchPage(1);
-            });
+            if (this.isExpanded) {
+                void this._ensureApiFacets()
+                    .then(() => this._fetchPage(1))
+                    .then(() => this._preloadEmbedLibraries());
+                return;
+            }
+            this._buildFilterCheckboxes();
+            this._syncFilterToggleState();
+            void this._fetchPage(1);
             return;
         }
         this._buildFilterCheckboxes();
