@@ -235,7 +235,8 @@ export default class Timeline {
      * Sync the two visible spans of the custom select with the selected taxonomy.
      * The `<option>` text carries `label (N)` for screen readers and the native popup,
      * while the pill is split in two: the label crops with an ellipsis and the count
-     * never shrinks, so a long taxonomy still shows how many articles it holds.
+     * never shrinks (it wears the same pill style as `#remaining-count`), so a long
+     * taxonomy still shows how many articles it holds.
      */
     protected _syncTaxonomyLabel(): void;
     /** Plain label of the selected taxonomy ("Ver todo" when the whole pool is selected) */

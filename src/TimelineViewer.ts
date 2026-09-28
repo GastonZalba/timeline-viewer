@@ -616,6 +616,7 @@ export default class Timeline {
     select.selectedIndex = 0;
     select.disabled = groups.length === 1;
     row.hidden = false;
+    this.section.classList.add('has-taxonomy');
     this._syncTaxonomyLabel();
   }
 
@@ -623,13 +624,14 @@ export default class Timeline {
    * Sync the two visible spans of the custom select with the selected taxonomy.
    * The `<option>` text carries `label (N)` for screen readers and the native popup,
    * while the pill is split in two: the label crops with an ellipsis and the count
-   * never shrinks, so a long taxonomy still shows how many articles it holds.
+   * never shrinks (it wears the same pill style as `#remaining-count`), so a long
+   * taxonomy still shows how many articles it holds.
    */
   protected _syncTaxonomyLabel(): void {
     const label = this._currentLabel();
     const count = this._scopeCount();
     if (this.taxonomySelectLabel) this.taxonomySelectLabel.textContent = label;
-    if (this.taxonomySelectCount) this.taxonomySelectCount.textContent = `(${count})`;
+    if (this.taxonomySelectCount) this.taxonomySelectCount.textContent = String(count);
     if (!this.taxonomySelect) return;
     this.taxonomySelect.title = `${label} (${count})`;
     this.taxonomySelect.setAttribute('aria-label', label || 'Taxonomía');

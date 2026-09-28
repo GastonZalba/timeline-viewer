@@ -130,6 +130,9 @@
   }
 
   &.expanded {
+    &.has-taxonomy #remaining-text {
+      margin-left: 5px;
+    }
     .featured-row {
       gap: 0;
       border: none;
@@ -267,6 +270,13 @@
     border-radius: 20px;
     border: 1px solid var(--tv-accent);
     color: var(--tv-accent);
+  }
+
+  // Con taxonomías, el contador de la píldora pasa a ser el único visible: al abrir el
+  // timeline se oculta el del botón expandir/colapsar (que sigue siendo pulsable por el
+  // texto y el ícono) para no mostrar dos contadores a la vez.
+  &.has-taxonomy.expanded #remaining-count {
+    display: none;
   }
 
   .expand-icon {
@@ -874,6 +884,11 @@
     &:has(.taxonomy-select:hover:not(:disabled)) {
       background-color: var(--tv-accent);
       color: #fff;
+
+      .taxonomy-select-count {
+        border-color: var(--tv-text-on-primary);
+        color: var(--tv-text-on-primary);
+      }
     }
 
     &:has(.taxonomy-select:focus-visible) {
@@ -882,7 +897,6 @@
     }
 
     &:has(.taxonomy-select:disabled) {
-      opacity: 0.55;
       cursor: default;
       background-image: none;
       padding-right: 8px;
@@ -898,9 +912,23 @@
     pointer-events: none;
   }
 
+  // Mismo estilo de píldora que `#remaining-count` (el `min-width` en vez de `width`
+  // fijo deja respirar los conteos de tres dígitos).
   .taxonomy-select-count {
     flex: 0 0 auto;
-    opacity: 0.8;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    border-radius: 20px;
+    border: 1px solid #fff;
+    color: #fff;
+    pointer-events: none;
+    background: var(--tv-accent);
     pointer-events: none;
   }
 
@@ -2414,6 +2442,16 @@
       #remaining-count {
         height: 18px;
         width: 18px;
+        font-size: 0.6rem;
+      }
+    }
+
+    .taxonomy-select-wrap {
+      padding: 4px 24px 4px 8px;
+
+      .taxonomy-select-count {
+        height: 18px;
+        min-width: 18px;
         font-size: 0.6rem;
       }
     }

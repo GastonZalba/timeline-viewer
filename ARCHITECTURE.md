@@ -113,7 +113,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   ├── .featured-row
   │   ├── .noticias-top
   │   │   ├── button.expand-toggle (#expand-toggle)
-  │   │   │   ├── span.expand-text (contiene #remaining-count + #remaining-text)
+  │   │   │   ├── span.expand-text (contiene #remaining-count + #remaining-text; con taxonomías, #remaining-count se oculta al expandir)
   │   │   │   └── span.expand-icon (#expand-icon)
   │   │   ├── .filter-wrap
   │   │   │   ├── button.filter-toggle (#filter-toggle)
@@ -142,6 +142,12 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   └── .timeline-container (#timeline-container)
       └── .timeline-collapse-wrap
           ├── .timeline-line
+          ├── .taxonomy-row (solo con `content`; se elimina del DOM en legacy `items` y en modo API)
+          │   ├── .taxonomy-row-spacer
+          │   └── .taxonomy-select-wrap
+          │       ├── span.taxonomy-select-label (label de la taxonomía, crop con `...`)
+          │       ├── span.taxonomy-select-count (píldora con el total del scope activo)
+          │       └── select.taxonomy-select (nativo, transparente, superpuesto al wrap)
           └── .timeline-content
               ├── .timeline-cards (#timeline-cards)
               │   ├── .timeline-item × N (generados por _createTimelineItem)
@@ -333,6 +339,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | Clase | Elemento | Descripción |
 |-------|----------|-------------|
 | `.expanded` | `.publicaciones-section` | Timeline visible, featured oculto |
+| `.has-taxonomy` | `.publicaciones-section` | El selector de taxonomías está activo (`content` con grupos): con el timeline expandido oculta `#remaining-count` porque el contador pasa a verse en la píldora del selector |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
 | `.visible` | `.featured-card` | Tarjeta featured animada (entró en viewport) |
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |
