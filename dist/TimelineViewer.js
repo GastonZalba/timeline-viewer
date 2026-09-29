@@ -14,6 +14,8 @@ const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.ph
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 const ESTADO_FILTER_FIELDS = ['validado', 'capturado', 'descartado'];
+/** Window of `_schedulePageReload`: coalesces a burst of search/filter/sort changes into one request */
+const API_RELOAD_DEBOUNCE_MS = 300;
 /** Links shown per taxonomy group before the "Ver más" toggle appears (single mode) */
 const TAXONOMY_VISIBLE_LINKS = 3;
 /** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
@@ -88,6 +90,7 @@ export default class Timeline {
         this._apiSeq = 0;
         this._apiReloadTimer = 0;
         this._apiFacetsLoaded = false;
+        this._apiFacetsSettled = false;
         this._apiError = '';
         this._apiDetails = new Map();
         this._shareTimer = 0;
@@ -1493,7 +1496,7 @@ export default class Timeline {
     _toggleSort() {
         this.sortAscending = !this.sortAscending;
         this.sortToggle.classList.toggle('asc', this.sortAscending);
-        this._applyFilters();
+        this._applyFilters(true);
     }
     /** Apply the persisted work-notes visibility state to the section and toggle button */
     _applyWorkNotesState() {
@@ -1599,7 +1602,7 @@ export default class Timeline {
                 cb.addEventListener('change', () => {
                     if (ESTADO_FILTER_FIELDS.includes(f.field))
                         this._saveEstadoFilterState();
-                    this._applyFilters();
+                    this._applyFilters(true);
                 });
                 f.options.appendChild(label);
                 f.checkboxes.push(cb);
@@ -1614,7 +1617,14 @@ export default class Timeline {
         if (this.estadoWrap) {
             this.estadoWrap.style.display = '';
         }
-        this.filterToggle.style.display = anyFilterVisible ? '' : 'none';
+        // En modo API el botón se muestra desde el arranque aunque todavía no haya facets: sin ellos
+        // los grupos sin `fixedValues` no tienen valores, y esperar la respuesta deja el toolbar
+        // incompleto y lo ensancha de golpe (muy notorio al iniciar con `startExpanded`). El panel se
+        // arma con la respuesta, y hasta entonces el botón no tiene listener, así que no abre nada.
+        // Cuando el pedido termina manda `anyFilterVisible`: si no hay nada que filtrar, se oculta
+        // solo. En modo local los valores ya están, así que la condición queda como estaba.
+        const pendingFacets = !!this.api && !this._apiFacetsSettled;
+        this.filterToggle.style.display = anyFilterVisible || pendingFacets ? '' : 'none';
     }
     /** Load the persisted estado-interno filter state from localStorage */
     _loadEstadoFilterState() {
@@ -1742,7 +1752,13 @@ export default class Timeline {
             return Promise.resolve();
         if (!this._apiFacetsPromise) {
             this._apiFacetsPromise = this._loadApiFacets().then(() => {
+                // El pedido terminó, con facets o con fallo: a partir de acá la visibilidad del botón la
+                // decide `_buildFilterCheckboxes` sola, y se le puede colgar el listener porque el panel
+                // ya tiene los valores (o se confirmó que no hay).
+                this._apiFacetsSettled = true;
                 this._buildFilterCheckboxes();
+                if (this.api)
+                    this._bindFilterToggle();
                 this._syncFilterToggleState();
                 this._renderRelatedCount();
                 this._renderLastUpdated();
@@ -1768,12 +1784,20 @@ export default class Timeline {
             this._apiDetails.clear();
             this._adoptLegacyApiFacets(data);
             this._renderAll();
+            // Page 1 means the whole list was replaced by a search/filter/sort change: bring the
+            // timeline back to its first card. "Cargar más" (`_appendPageItems`) re-renders the same
+            // list with more cards and must keep the current position, so it never comes through here.
+            if (page === 1)
+                this.timelineCards.scrollTop = 0;
         }
         catch {
             if (seq !== this._apiSeq)
                 return;
             this._apiLoading = false;
             this._apiError = 'No se pudieron cargar los datos. Intente nuevamente.';
+            // No `_renderAll` here: the results in memory are the ones the panel no longer matches, so
+            // they stay out and the list is left empty with the error row.
+            this._clearApiLoading();
             this._renderStatus();
         }
     }
@@ -1836,17 +1860,138 @@ export default class Timeline {
             return null;
         }
     }
-    /** Debounce a full page reload triggered by filter/search/sort changes */
-    _schedulePageReload() {
-        if (this._apiReloadTimer)
-            window.clearTimeout(this._apiReloadTimer);
-        this._apiReloadTimer = window.setTimeout(() => {
+    /**
+     * Debounce a full page reload triggered by filter/search/sort changes.
+     *
+     * Two shapes, because the triggers are not alike:
+     * - `immediate` (a single discrete action: a checkbox, the sort toggle, Escape on the search
+     *   input) has no burst to coalesce, so waiting the whole window is pure added latency: the
+     *   request goes out on the leading edge and the window only swallows what comes next.
+     * - without it (typing in the search input) the classic trailing debounce applies, because a
+     *   leading request per keystroke would ask the server for every prefix of the term.
+     *
+     * A trigger that lands inside an open window always re-arms it with a request, so the last
+     * state of a burst is always the one that lands last.
+     */
+    _schedulePageReload(immediate = false) {
+        const reload = () => {
             this._apiReloadTimer = 0;
             void this._fetchPage(1);
-        }, 300);
+        };
+        if (this._apiReloadTimer) {
+            window.clearTimeout(this._apiReloadTimer);
+            this._apiReloadTimer = window.setTimeout(reload, API_RELOAD_DEBOUNCE_MS);
+            return;
+        }
+        if (immediate) {
+            void this._fetchPage(1);
+            this._apiReloadTimer = window.setTimeout(() => {
+                this._apiReloadTimer = 0;
+            }, API_RELOAD_DEBOUNCE_MS);
+            return;
+        }
+        this._apiReloadTimer = window.setTimeout(reload, API_RELOAD_DEBOUNCE_MS);
+    }
+    /**
+     * Replace the list (and the featured stack) with skeleton placeholders while an API list
+     * request is in flight.
+     *
+     * Two callers: the first page (`_init`) and the page-1 refetch that a search/filter/sort
+     * change schedules (`_applyFilters`). In both the results on screen are either missing or no
+     * longer match the panel, and `_renderAll` puts the real ones back when the response lands.
+     * "Cargar más" (`_appendPageItems`) does not come through here: it keeps the list the user is
+     * reading, which is what a request that only adds to it should do.
+     *
+     * Idempotent, because it runs on every keystroke: a burst of them shows the skeleton once.
+     * The state lives in the DOM (a placeholder element), which is also what `_renderStatus`
+     * checks to stay out of the way, so there is nothing to keep in sync when the render lands.
+     *
+     * The placeholders copy the silhouette of a real collapsed card (empty `.card-image-wrap` +
+     * title + summary lines) so the list keeps its size when the data lands; see the
+     * `.timeline-skeleton-item` rules for the sizes and for why the cards column has to grow.
+     *
+     * How many there are is not a constant: the list box is scrollable, so filling it with one
+     * placeholder per item of the page would bury most of them out of sight behind a scrollbar
+     * that is about to be replaced anyway. One placeholder is enough to measure the real stride,
+     * and `_getCardsHeightPx` gives the height to divide it by (the inline height of the resize
+     * handle, or the CSS `max-height`), so the count follows the box the user actually sees. The
+     * result is capped at `_apiPageSize`, because a skeleton past that would be promising cards
+     * the response does not carry.
+     */
+    _renderApiLoading() {
+        if (this.timelineCards.querySelector('.timeline-skeleton-item'))
+            return;
+        this._apiLoading = true;
+        this._apiError = '';
+        this.timelineCards.setAttribute('aria-busy', 'true');
+        this.timelineCards.innerHTML = '';
+        this.featuredContainer.innerHTML = '';
+        const markup = `
+        <div class="timeline-date-col">
+          <div class="skeleton-block skeleton-date"></div>
+          <div class="timeline-dot"></div>
+        </div>
+        <div class="timeline-card">
+          <div class="card-image-wrap"></div>
+          <div class="card-body">
+            <div class="skeleton-block skeleton-title-line skeleton-w-100"></div>
+            <div class="skeleton-block skeleton-title-line skeleton-w-80"></div>
+            <div class="skeleton-block skeleton-desc-line skeleton-w-100"></div>
+            <div class="skeleton-block skeleton-desc-line skeleton-w-100"></div>
+            <div class="skeleton-block skeleton-desc-line skeleton-w-60"></div>
+          </div>
+        </div>
+      `;
+        const first = this._appendTimelineSkeleton(markup);
+        const style = getComputedStyle(first);
+        const stride = first.offsetHeight + (parseFloat(style.marginBottom) || 0);
+        const total = Math.max(1, Math.min(this._apiPageSize(), Math.ceil(this._getCardsHeightPx() / stride)));
+        for (let i = 1; i < total; i++)
+            this._appendTimelineSkeleton(markup);
+        for (let i = 0; i < this.featured_count; i++) {
+            const el = document.createElement('div');
+            el.className = 'featured-card featured-skeleton visible';
+            el.setAttribute('aria-hidden', 'true');
+            el.innerHTML = `
+        <div class="card-image-wrap"></div>
+        <div class="card-body">
+          <div class="skeleton-block skeleton-desc-line skeleton-w-50"></div>
+          <div class="skeleton-block skeleton-title-line skeleton-w-100"></div>
+          <div class="skeleton-block skeleton-title-line skeleton-w-80"></div>
+        </div>
+      `;
+            this.featuredContainer.appendChild(el);
+        }
+    }
+    /**
+     * One timeline placeholder, so the count loop and the measuring placeholder share the markup.
+     * Returns the element because the caller measures the first one to size the rest.
+     */
+    _appendTimelineSkeleton(markup) {
+        const el = document.createElement('div');
+        el.className = 'timeline-item timeline-skeleton-item visible';
+        el.setAttribute('aria-hidden', 'true');
+        el.innerHTML = markup;
+        this.timelineCards.appendChild(el);
+        return el;
+    }
+    /**
+     * Take the loading state down without touching anything else, for the two paths where no
+     * `_renderAll` follows: a failed request (so the list is left empty with the error row) and
+     * the real render itself (which wipes both containers anyway, leaving only `aria-busy`).
+     */
+    _clearApiLoading() {
+        this.timelineCards.removeAttribute('aria-busy');
+        this.timelineCards.querySelectorAll('.timeline-skeleton-item').forEach((el) => el.remove());
+        this.featuredContainer.querySelectorAll('.featured-skeleton').forEach((el) => el.remove());
     }
     /** Render the API status row (loading / error / count) at the end of the timeline */
     _renderStatus() {
+        // The skeletons are the loading feedback while the list is being replaced, and their count
+        // already matches the page that is coming. Adding a row on top of them would only pile a
+        // second, wrong line ("Cargando más publicaciones...") under the placeholders.
+        if (this.timelineCards.querySelector('.timeline-skeleton-item'))
+            return;
         const prev = this.timelineCards.querySelector('.timeline-status-item');
         if (prev)
             prev.remove();
@@ -1884,11 +2029,19 @@ export default class Timeline {
             this.estadoToggle.classList.toggle('active', estadoActive);
         this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
     }
-    /** Apply active filters and re-render the full view (or reload from the API) */
-    _applyFilters() {
+    /**
+     * Apply active filters and re-render the full view (or reload from the API).
+     * `immediate` only means something in API mode: it asks for the leading edge of
+     * `_schedulePageReload`, for the discrete changes that have nothing to coalesce.
+     */
+    _applyFilters(immediate = false) {
         this._syncFilterToggleState();
         if (this.api) {
-            this._schedulePageReload();
+            // The results on screen no longer match the panel, so they go away right now instead of
+            // sitting there stale until the response: `_renderApiLoading` puts the skeletons in their
+            // place and `_fetchPage(1)` replaces them when the data lands.
+            this._renderApiLoading();
+            this._schedulePageReload(immediate);
             return;
         }
         const matches = (c) => this._matchesSearch(c) &&
@@ -1937,6 +2090,7 @@ export default class Timeline {
     /** Render featured cards, timeline, and load-more button if needed */
     _renderAll() {
         if (this.api) {
+            this._clearApiLoading();
             this._renderRelatedCount();
             this._renderFeatured(this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count));
             this._renderTimeline(this.allCards);
@@ -2146,8 +2300,7 @@ export default class Timeline {
         this._initResizeHandle();
         if (this.api) {
             this._bindBaseEvents();
-            this._apiLoading = true;
-            this._renderStatus();
+            this._renderApiLoading();
             // The checkboxes are built here, before the first page, so the default checks (estado
             // filters) travel in the initial query just like in local mode. With no facets yet the
             // non-estado groups stay hidden, so nothing can be checked before they arrive: the
@@ -2178,6 +2331,19 @@ export default class Timeline {
         });
         this._bindBaseEvents();
     }
+    /**
+     * Bind the click of the filter toggle. Split out of `_bindBaseEvents` because in API mode the
+     * button is on screen from the start but the panel has no values until the facets land: until
+     * then there is nothing to open, so the click does nothing. Called from `_bindBaseEvents` in
+     * local mode and from the `.then()` of `_ensureApiFacets` in API mode, which runs once.
+     */
+    _bindFilterToggle() {
+        this.filterToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.filterMenu.classList.toggle('open');
+            this.filterToggle.classList.toggle('open');
+        });
+    }
     /** Bind the header/global event listeners shared by both local and API modes */
     _bindBaseEvents() {
         this.expandToggle.addEventListener('click', () => this._toggleExpand());
@@ -2196,11 +2362,12 @@ export default class Timeline {
         this._applyWorkNotesState();
         if (this.workNotesToggle)
             this.workNotesToggle.addEventListener('click', () => this._toggleWorkNotes());
-        this.filterToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.filterMenu.classList.toggle('open');
-            this.filterToggle.classList.toggle('open');
-        });
+        // En modo API el botón aparece desde el arranque (ver `_buildFilterCheckboxes`), pero sin
+        // listener hasta que llegan los facets: antes de eso el panel no tiene nada que abrir. Por eso
+        // el bind se hace acá solo en modo local, y en API lo hace el `.then()` de `_ensureApiFacets()`,
+        // que es el único lugar que reconstruye el panel con valores. Corre una sola vez.
+        if (!this.api)
+            this._bindFilterToggle();
         if (this.estadoToggle) {
             this.estadoToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2218,6 +2385,8 @@ export default class Timeline {
         });
         this.searchInput.addEventListener('input', () => {
             this.searchTerm = this.searchInput.value;
+            // Not immediate, unlike the discrete changes: every keystroke is a prefix of the term, so
+            // the request has to wait for the typing to settle.
             this._applyFilters();
         });
         this.searchInput.addEventListener('keydown', (e) => {
@@ -2226,7 +2395,7 @@ export default class Timeline {
                 this.searchTerm = '';
                 this.searchWrap.classList.remove('open');
                 this.searchToggle.classList.remove('open');
-                this._applyFilters();
+                this._applyFilters(true);
             }
         });
         document.addEventListener('click', (e) => {

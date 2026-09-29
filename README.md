@@ -126,6 +126,8 @@ En este modo la lista viaja solo lo que la tarjeta colapsada muestra de inmediat
 
 Al iniciar se hacen **dos** requests, en paralelo: `GET {url}` (la primera página, que basta para el stack colapsado de destacadas) y `GET {url}/facets`, que trae los **valores estáticos de la colección** —los conteos de los filtros, el total y el `lastUpdated`— y por eso se piden una única vez: de ahí en adelante cada cambio de búsqueda, filtro u orden vuelve a pegarle solo a la lista, sin volver a pedir los facets y conservando el estado de los checkboxes.
 
+Mientras una respuesta de lista está en vuelo, el componente muestra **tarjetas fantasma con shimmer** en vez de los resultados anteriores: los que están en pantalla ya no corresponden a los filtros aplicados, así que se van en el acto y se reponen cuando llegan los datos, con la lista nuevamente arriba. Las acciones discretas (un checkbox, el botón de orden, `Esc` en el buscador) disparan su request **sin espera**; el texto del buscador espera 300 ms a que se termine de escribir, para no pedirle al servidor un request por tecla. "Cargar más" no hace nada de esto: deja las tarjetas que ya estás leyendo y solo agrega la línea "Cargando más publicaciones..." al pie. Si un request falla, la lista queda vacía con el mensaje de error.
+
 #### Endpoints
 
 | Endpoint          | Uso                                                                    | Respuesta                    |

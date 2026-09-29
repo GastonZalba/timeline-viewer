@@ -216,6 +216,12 @@ export default class Timeline {
     _apiSeq: number;
     _apiReloadTimer: number;
     _apiFacetsLoaded: boolean;
+    /**
+     * El pedido de facets ya terminó, con respuesta o con fallo. Distingue "todavía no sabemos si
+     * hay filtros que mostrar" de "ya sabemos que no hay": mientras es `false` el botón de filtros
+     * se muestra igual, sin listener, para que el toolbar no cambie de ancho a mitad de carga.
+     */
+    _apiFacetsSettled: boolean;
     _apiError: string;
     _apiDetails: Map<string, TimelineItem | null>;
     _shareTimer: number;
@@ -447,14 +453,68 @@ export default class Timeline {
     protected _appendPageItems(): Promise<void>;
     /** Fetch the full detail of a single item by id */
     protected _fetchDetail(id: string): Promise<TimelineItem | null>;
-    /** Debounce a full page reload triggered by filter/search/sort changes */
-    protected _schedulePageReload(): void;
+    /**
+     * Debounce a full page reload triggered by filter/search/sort changes.
+     *
+     * Two shapes, because the triggers are not alike:
+     * - `immediate` (a single discrete action: a checkbox, the sort toggle, Escape on the search
+     *   input) has no burst to coalesce, so waiting the whole window is pure added latency: the
+     *   request goes out on the leading edge and the window only swallows what comes next.
+     * - without it (typing in the search input) the classic trailing debounce applies, because a
+     *   leading request per keystroke would ask the server for every prefix of the term.
+     *
+     * A trigger that lands inside an open window always re-arms it with a request, so the last
+     * state of a burst is always the one that lands last.
+     */
+    protected _schedulePageReload(immediate?: boolean): void;
+    /**
+     * Replace the list (and the featured stack) with skeleton placeholders while an API list
+     * request is in flight.
+     *
+     * Two callers: the first page (`_init`) and the page-1 refetch that a search/filter/sort
+     * change schedules (`_applyFilters`). In both the results on screen are either missing or no
+     * longer match the panel, and `_renderAll` puts the real ones back when the response lands.
+     * "Cargar más" (`_appendPageItems`) does not come through here: it keeps the list the user is
+     * reading, which is what a request that only adds to it should do.
+     *
+     * Idempotent, because it runs on every keystroke: a burst of them shows the skeleton once.
+     * The state lives in the DOM (a placeholder element), which is also what `_renderStatus`
+     * checks to stay out of the way, so there is nothing to keep in sync when the render lands.
+     *
+     * The placeholders copy the silhouette of a real collapsed card (empty `.card-image-wrap` +
+     * title + summary lines) so the list keeps its size when the data lands; see the
+     * `.timeline-skeleton-item` rules for the sizes and for why the cards column has to grow.
+     *
+     * How many there are is not a constant: the list box is scrollable, so filling it with one
+     * placeholder per item of the page would bury most of them out of sight behind a scrollbar
+     * that is about to be replaced anyway. One placeholder is enough to measure the real stride,
+     * and `_getCardsHeightPx` gives the height to divide it by (the inline height of the resize
+     * handle, or the CSS `max-height`), so the count follows the box the user actually sees. The
+     * result is capped at `_apiPageSize`, because a skeleton past that would be promising cards
+     * the response does not carry.
+     */
+    protected _renderApiLoading(): void;
+    /**
+     * One timeline placeholder, so the count loop and the measuring placeholder share the markup.
+     * Returns the element because the caller measures the first one to size the rest.
+     */
+    protected _appendTimelineSkeleton(markup: string): HTMLElement;
+    /**
+     * Take the loading state down without touching anything else, for the two paths where no
+     * `_renderAll` follows: a failed request (so the list is left empty with the error row) and
+     * the real render itself (which wipes both containers anyway, leaving only `aria-busy`).
+     */
+    protected _clearApiLoading(): void;
     /** Render the API status row (loading / error / count) at the end of the timeline */
     protected _renderStatus(): void;
     /** Sync the active class on the search/filter/estado toggle buttons */
     protected _syncFilterToggleState(): void;
-    /** Apply active filters and re-render the full view (or reload from the API) */
-    protected _applyFilters(): void;
+    /**
+     * Apply active filters and re-render the full view (or reload from the API).
+     * `immediate` only means something in API mode: it asks for the leading edge of
+     * `_schedulePageReload`, for the discrete changes that have nothing to coalesce.
+     */
+    protected _applyFilters(immediate?: boolean): void;
     /** Label of the expand toggle; uses the custom function when provided, otherwise the Spanish singular/plural default */
     protected _relatedLabel(n: number): string;
     /** Write the expand toggle label into `#remaining-text`; the label is injected as HTML, so it may contain markup */
@@ -485,6 +545,13 @@ export default class Timeline {
     protected _renderSingleCard(): Promise<void>;
     /** Initialize the component: build layout, sort data, render, bind events */
     protected _init(): void;
+    /**
+     * Bind the click of the filter toggle. Split out of `_bindBaseEvents` because in API mode the
+     * button is on screen from the start but the panel has no values until the facets land: until
+     * then there is nothing to open, so the click does nothing. Called from `_bindBaseEvents` in
+     * local mode and from the `.then()` of `_ensureApiFacets` in API mode, which runs once.
+     */
+    protected _bindFilterToggle(): void;
     /** Bind the header/global event listeners shared by both local and API modes */
     protected _bindBaseEvents(): void;
 }

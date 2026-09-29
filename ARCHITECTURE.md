@@ -62,8 +62,11 @@ new Timeline({ container, items, ... })
 | `_renderFeatured(cards)` | 256 | Renderiza el stack de tarjetas superpuestas |
 | `_renderTimeline(cards)` | 537 | Renderiza la lista de tarjetas del timeline |
 | `_createTimelineItem(card, index)` | 285 | Crea una tarjeta individual con todos sus event listeners |
-| `_renderLoadMoreButton()` | 798 | Agrega el botón "Cargar más" al final del timeline |
-| `_insertBeforeFooter(el)` | 527 | Helper: inserta antes del footer o al final si no hay footer |
+| `_renderLoadMoreButton()` | 2373 | Agrega el botón "Cargar más" al final del timeline |
+| `_insertBeforeFooter(el)` | 1547 | Helper: inserta antes del footer o al final si no hay footer |
+| `_renderApiLoading()` | 2186 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
+| `_clearApiLoading()` | 2234 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
+| `_renderStatus()` | 2241 | Fila de status al pie de la lista: cargando / error / "Mostrando X de Y". Se abstiene mientras hay skeletons |
 | `_renderSingleCard()` | 2258 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
 | `_buildTaxonomies(taxonomias)` | 1217 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
 | `_appendTaxonomies(taxonomias)` | 1244 | Inserta el bloque de taxonomías al final de la `.publicaciones-section` en modo single. Sin datos: no se invoca (en el camino de "article not found" no hay ítem del cual leerlas) |
@@ -76,7 +79,7 @@ new Timeline({ container, items, ... })
 | `_scrollToSection()` | 712 | Smooth scroll para hacer visible el timeline |
 | `_toggleSort()` | 728 | Invierte orden ascendente/descendente por fecha |
 | `_buildFilterCheckboxes()` | 735 | Construye checkboxes desde valores únicos de los datos |
-| `_applyFilters()` | 761 | Filtra datos y re-renderiza todo |
+| `_applyFilters()` | 2283 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce |
 
 ### Embeds sociales
 
@@ -273,6 +276,23 @@ El sistema de paginación es **manual** (no infinito scroll):
 4. Al hacer click, se agregan los siguientes `itemsPerPage` items usando `_insertBeforeFooter()`
 5. Si `itemsPerPage === 0`, se muestran todos los items sin paginación
 
+En **modo API** el botón llama a `_appendPageItems()` en lugar de appendear en el DOM, pero el criterio es el mismo (`allCards.length < _apiTotal`, es decir el `total` de la respuesta de la lista). A diferencia del modo local, esa llamada pasa por `_renderAll()`, que **reconstruye la lista completa**: las tarjetas nuevas no se anexan al DOM existente. Por eso `_fetchPage(1)` devuelve la lista al scroll 0 después de renderizar y "Cargar más" conserva la posición solo si el navegador la re-ancla: en la práctica conviene tratarlo como un rebuild completo.
+
+## Estados de carga (modo API)
+
+Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** lo que hay en pantalla:
+
+| Camino | Qué muestra | Quién lo limpia |
+|--------|-------------|-----------------|
+| Primera página (`_init`) | skeletons | `_renderAll()` |
+| Cambio de búsqueda / filtro / orden (`_applyFilters`) | skeletons, en el acto | `_renderAll()` |
+| "Cargar más" (`_appendPageItems`) | las tarjetas que ya se están leyendo + la fila de status | `_renderAll()` |
+| Request fallido | lista vacía + la fila de error | — |
+
+- `_renderApiLoading()` es **idempotente**: se llama en cada tecla, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons.
+- `_schedulePageReload(immediate)` tiene dos formas porque los disparadores no son alike. Un trigger que cae dentro de una ventana abierta **siempre** rearma la ventana **con** request, así que el último estado de una ráfaga es siempre el último que llega. Con `immediate` (acciones discretas: checkbox, toggle de orden, Escape) el request sale en el acto y la ventana solo traga lo que venga; sin él (escribir en el buscador) es el debounce de cola clásico, porque un request por tecla le pediría al servidor todos los prefijos del término.
+- El skeleton no es texto: son elementos `.timeline-skeleton-item` / `.featured-skeleton` con `aria-hidden="true"` y `aria-busy="true"` en `#timeline-cards`, animados con el mismo `@keyframes shimmer` de `.card-iframe-shimmer`. Llevan la clase `visible` desde el markup, que es lo que evita que esperen al IntersectionObserver.
+
 ## Sistema de filtros
 
 Cinco filtros disponibles, generados dinámicamente desde los datos, distribuidos en dos columnas dentro del menú:
@@ -287,9 +307,11 @@ Cinco filtros disponibles, generados dinámicamente desde los datos, distribuido
 
 Flujo:
 1. `_buildFilterCheckboxes()` extrae valores únicos y crea checkboxes con conteo. En modo API los valores y los conteos salen de `GET {url}/facets`, que se pide una sola vez al iniciar, en paralelo con la primera página (conteos estáticos de la colección completa); los checkboxes se arman dos veces —sin conteos al iniciar, y otra vez con los conteos cuando llegan los facets—, nunca en cada página. La misma respuesta trae el `total` de la colección, que es lo que escribe el contador del botón de expandir en `_renderRelatedCount()`.
-2. Al cambiar un checkbox, `_applyFilters()` filtra `_originalCards` con AND entre filtros
+2. Al cambiar un checkbox, `_applyFilters(true)` filtra `_originalCards` con AND entre filtros
 3. `_renderAll()` re-renderiza con los datos filtrados
 4. El sort se re-aplica después del filtrado
+
+En modo API, el paso 2 no filtra nada local: `_applyFilters()` delega en `_schedulePageReload()` (ver [Estados de carga](#estados-de-carga-modo-api)), y el `true` pide que el request salga en el acto en vez de esperar la ventana de 300 ms. El `input` del buscador es el único trigger que no lo pasa, porque cada tecla es un prefijo del término.
 
 ## Animaciones de entrada
 
