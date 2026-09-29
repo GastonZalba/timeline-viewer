@@ -180,6 +180,17 @@ export interface TimelineOptions {
    * single mode (`singleId`), which always renders a single expanded card.
    */
   startExpanded?: boolean;
+  /**
+   * Fullpage mode (default: false): the timeline is always open and the page itself is
+   * what scrolls. It implies `startExpanded`, makes the timeline non-collapsible (the
+   * expand button keeps showing the related count but loses its chevron and its click),
+   * drops the height limit of the list so `#timeline-cards` is never a scroll box on
+   * its own, removes the resize handle, and pins the toolbar (counter, search, filters,
+   * sort and internal buttons) to the top of the viewport. The featured stack is not
+   * rendered at all, since it would never be seen, so `featuredCount` has no effect.
+   * Ignored in single mode (`singleId`), which already renders a single expanded card.
+   */
+  fullpage?: boolean;
   lastUpdated?: string;
   itemsPerPage?: number;
   inlineImages?: boolean;
@@ -235,6 +246,7 @@ export default class Timeline {
   inlineImages: boolean;
   inlineAdjuntos: boolean;
   internalButtons: boolean;
+  fullpage: boolean;
   relatedLabel: ((count: number) => string) | null;
   singleId: string | null;
   content: ContentGroup[];
@@ -309,6 +321,7 @@ export default class Timeline {
     this.inlineImages = config.inlineImages || false;
     this.inlineAdjuntos = config.inlineAdjuntos || false;
     this.internalButtons = config.internalButtons || false;
+    this.fullpage = config.fullpage === true;
     this.relatedLabel = config.relatedLabel || null;
     this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
     this.taxonomyRow = null as unknown as HTMLElement;
@@ -319,7 +332,8 @@ export default class Timeline {
     this._displayedCount = 0;
     this.allCards = [];
     this._featuredCards = [];
-    this.isExpanded = config.startExpanded === true;
+    // El modo fullpage implica abierto: siempre expandido y sin opción de colapsar.
+    this.isExpanded = this.fullpage || config.startExpanded === true;
     this.featuredContainer = null as unknown as HTMLElement;
     this.featuredRow = null as unknown as HTMLElement;
     this.timelineContainer = null as unknown as HTMLElement;
@@ -491,7 +505,7 @@ export default class Timeline {
             <div class="timeline-content">
               <div class="timeline-cards-col">
                 <div class="timeline-cards" id="timeline-cards"></div>
-                <div class="timeline-resize-handle" id="timeline-resize-handle" role="slider" tabindex="0" aria-orientation="vertical" title="Ajustar la altura de la lista."></div>
+                ${this.fullpage ? '' : '<div class="timeline-resize-handle" id="timeline-resize-handle" role="slider" tabindex="0" aria-orientation="vertical" title="Ajustar la altura de la lista."></div>'}
               </div>
             </div>
           </div>
@@ -525,6 +539,13 @@ export default class Timeline {
     this.taxonomySelectLabel = this.container.querySelector('#taxonomy-select-label') as HTMLElement | null;
     this.taxonomySelectCount = this.container.querySelector('#taxonomy-select-count') as HTMLElement | null;
     this.taxonomySelect = this.container.querySelector('#taxonomy-select') as HTMLSelectElement | null;
+    // La clase le dice al SCSS que reescriba el layout (barra sticky, sin límite de altura,
+    // sin ícono). El botón de expandir queda como contador: sin colapso posible, así que se
+    // marca deshabilitado en vez de bindear un click que no hace nada.
+    if (this.fullpage) {
+      this.section.classList.add('fullpage');
+      this.expandToggle.setAttribute('aria-disabled', 'true');
+    }
     this._buildTaxonomySelect();
     this.filters = [
       {
@@ -918,6 +939,11 @@ export default class Timeline {
 
   /** Render the featured (overlapping) cards row */
   protected _renderFeatured(cards: TimelineItem[]): void {
+    // En fullpage el stack nunca se ve (`expanded` lo colapsa a height: 0), así que no se
+    // construye. Es el único punto de corte: deja el contenedor vacío y todo lo demás que
+    // lo consulta —los rAF que agregan `.visible`, la limpieza de skeletons, el click— es un
+    // no-op natural sobre un `querySelectorAll` sin resultados.
+    if (this.fullpage) return;
     this.featuredContainer.innerHTML = '';
     cards.forEach((card, i) => {
       const el = document.createElement('div');
@@ -1560,6 +1586,24 @@ export default class Timeline {
     }
   }
 
+  /**
+   * Insert an element at the end of the cards, that is: before the first element of the
+   * trailing block (load-more button, status row, footer), which is what keeps the append
+   * order identical to the one `_renderTimeline` + `_renderLoadMoreButton` + `_renderStatus`
+   * build. `querySelector` returns the first match in document order, so the load-more button
+   * wins when it is there.
+   */
+  protected _insertBeforeTrailing(el: HTMLElement): void {
+    const anchor = this.timelineCards.querySelector(
+      '.timeline-load-more-item, .timeline-status-item, .timeline-footer-item'
+    );
+    if (anchor) {
+      this.timelineCards.insertBefore(el, anchor);
+    } else {
+      this.timelineCards.appendChild(el);
+    }
+  }
+
   /** Render the timeline cards list, including the last-updated footer */
   protected _renderTimeline(cards: TimelineItem[]): void {
     this.timelineCards.innerHTML = '';
@@ -1578,6 +1622,33 @@ export default class Timeline {
     }
 
     this._renderLastUpdated();
+  }
+
+  /**
+   * Add cards at the end of the list **without touching the ones already rendered**, and return
+   * the created nodes so the entrance animation can be observed on them alone.
+   *
+   * This is the counterpart of `_renderTimeline` for pagination: that one wipes
+   * `#timeline-cards` because its callers replaced the whole result set (page 1 after a
+   * search/filter/sort change, a taxonomy re-scope), and a rebuild is the honest thing to do
+   * when the articles on screen are no longer the ones in memory. "Cargar más" is not that:
+   * the cards already on screen are still correct, and a rebuild would make every one of them
+   * lose the `visible` class and replay its entrance transition (the whole list blinking on
+   * each page), drop the detail injected in the expanded ones, and reload every image.
+   */
+  protected _appendTimelineItems(items: TimelineItem[], startIndex: number): HTMLElement[] {
+    // `_renderTimeline` only writes the "nothing to show" placeholder when the list comes back
+    // empty. Appending cards makes it untrue, so it goes before the first real one lands.
+    if (items.length) {
+      this.timelineCards.querySelectorAll('.timeline-empty-item').forEach((el) => el.remove());
+    }
+    const added: HTMLElement[] = [];
+    items.forEach((card, i) => {
+      const el = this._createTimelineItem(card, startIndex + i);
+      this._insertBeforeTrailing(el);
+      added.push(el);
+    });
+    return added;
   }
 
   /**
@@ -1622,8 +1693,14 @@ export default class Timeline {
     observer.observe(this.section);
   }
 
-  /** Set up IntersectionObserver for the timeline items entrance animation */
-  protected _setupTimelineObserver(): void {
+  /**
+   * Set up IntersectionObserver for the timeline items entrance animation.
+   *
+   * `items` narrows what gets observed, which is what pagination needs: after an append the
+   * cards already on screen are visible and their own observer has already done its job, so
+   * there is nothing to re-observe. Default is every `.timeline-item` in the container.
+   */
+  protected _setupTimelineObserver(items?: ArrayLike<Element>): void {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -1636,7 +1713,8 @@ export default class Timeline {
       { threshold: 0.1, rootMargin: '0px 0px 100px 0px' }
     );
 
-    this.container.querySelectorAll('.timeline-item').forEach((item) => {
+    const targets = items ?? this.container.querySelectorAll('.timeline-item');
+    Array.from(targets).forEach((item) => {
       observer.observe(item);
     });
   }
@@ -1750,6 +1828,10 @@ export default class Timeline {
 
   /** Toggle between expanded (timeline visible) and collapsed state */
   protected _toggleExpand(scrollTo = false): void {
+    // En fullpage el timeline no se colapsa nunca. El click del botón ya no se bindea, pero
+    // esta guarda también cubre los otros dos caminos que llegan acá (#featured-cards y la
+    // fila de arriba) sin tener que repetir la condición en cada listener.
+    if (this.fullpage) return;
     this.isExpanded = !this.isExpanded;
 
     if (this.isExpanded) {
@@ -2086,8 +2168,8 @@ export default class Timeline {
       this._adoptLegacyApiFacets(data);
       this._renderAll();
       // Page 1 means the whole list was replaced by a search/filter/sort change: bring the
-      // timeline back to its first card. "Cargar más" (`_appendPageItems`) re-renders the same
-      // list with more cards and must keep the current position, so it never comes through here.
+      // timeline back to its first card. "Cargar más" (`_appendPageItems`) appends instead of
+      // re-rendering, so it never comes through here and the position survives on its own.
       if (page === 1) this.timelineCards.scrollTop = 0;
     } catch {
       if (seq !== this._apiSeq) return;
@@ -2125,9 +2207,23 @@ export default class Timeline {
       this._apiTotal = typeof data.total === 'number' ? data.total : this._apiTotal;
       this._apiPage = nextPage;
       this._apiLoading = false;
-      this.allCards.push(...((data.items || []) as unknown as TimelineItem[]));
+      const start = this.allCards.length;
+      const fresh = (data.items || []) as unknown as TimelineItem[];
+      this.allCards.push(...fresh);
       this._displayedCount = this.allCards.length;
-      this._renderAll();
+      // Only the new cards are added; `_renderAll` would rebuild the whole list and make every
+      // card on screen replay its entrance animation. See `_appendTimelineItems`.
+      const added = this._appendTimelineItems(fresh, start);
+      // The load-more button is kept between pages (its handler reads `this._apiPage` live, so
+      // one node serves every page) and only goes away when there is nothing left to ask for.
+      if (!this._hasMorePages()) {
+        this.timelineCards.querySelectorAll('.timeline-load-more-item').forEach((el) => el.remove());
+      }
+      this._renderRelatedCount();
+      this._renderStatus();
+      if (this.isExpanded) {
+        requestAnimationFrame(() => this._setupTimelineObserver(added));
+      }
     } catch {
       if (seq !== this._apiSeq) return;
       this._apiLoading = false;
@@ -2242,6 +2338,8 @@ export default class Timeline {
     const stride = first.offsetHeight + (parseFloat(style.marginBottom) || 0);
     const total = Math.max(1, Math.min(this._apiPageSize(), Math.ceil(this._getCardsHeightPx() / stride)));
     for (let i = 1; i < total; i++) this._appendTimelineSkeleton(markup);
+    // Ídem con los featured: en fullpage no se renderizan en ningún momento (ver `_renderFeatured`).
+    if (this.fullpage) return;
     for (let i = 0; i < this.featured_count; i++) {
       const el = document.createElement('div');
       el.className = 'featured-card featured-skeleton visible';
@@ -2456,6 +2554,10 @@ export default class Timeline {
 
   /** Read the current effective max-height of the timeline-cards in px */
   protected _getCardsHeightPx(): number {
+    // En fullpage no hay caja con scroll: el `max-height` del SCSS es `none` y parsearlo
+    // daría NaN -> el mínimo del resize handle, o sea un solo skeleton. Lo que el usuario ve
+    // es el viewport (la página scrollea), así que se mide contra eso.
+    if (this.fullpage) return window.innerHeight;
     const inline = this.timelineCards.style.maxHeight;
     const px = inline && inline.endsWith('px') ? parseFloat(inline) : NaN;
     if (Number.isFinite(px)) return px;
@@ -2590,7 +2692,9 @@ export default class Timeline {
     // (guarded by isExpanded), and it must find the container already open, otherwise
     // the items would intersect a collapsed (max-height: 0) container and never show.
     if (this.isExpanded) this._applyExpandState();
-    this._initResizeHandle();
+    // En fullpage la lista no tiene scroll propio, así que no hay nada que ajustar: tampoco se
+    // lee el alto persistido, que escribiría un `max-height` inline sobre el `none` del SCSS.
+    if (!this.fullpage) this._initResizeHandle();
     if (this.api) {
       this._bindBaseEvents();
       this._renderApiLoading();
@@ -2640,7 +2744,8 @@ export default class Timeline {
 
   /** Bind the header/global event listeners shared by both local and API modes */
   protected _bindBaseEvents(): void {
-    this.expandToggle.addEventListener('click', () => this._toggleExpand());
+    // En fullpage el botón de expandir es solo el contador: no se le bindea el colapso.
+    if (!this.fullpage) this.expandToggle.addEventListener('click', () => this._toggleExpand());
     this.featuredContainer.addEventListener('click', () => this._toggleExpand());
     this.featuredRow.addEventListener('click', (e: Event) => {
       if (this.isExpanded) return;

@@ -1,7 +1,7 @@
-@use 'sass:list';
+@use "sass:list";
 
 @property --tv-row-angle {
-  syntax: '<angle>';
+  syntax: "<angle>";
   inherits: false;
   initial-value: 0deg;
 }
@@ -28,6 +28,9 @@
   --tv-tone-neutral: #94a3b8;
   --tv-shadow-card: rgba(0, 0, 0, 0.541);
   --tv-date-col-width: 110px;
+  // Offset de la barra de herramientas pegada del modo fullpage. Sube este valor si la página
+  // del consumidor ya tiene un header propio fijo, para que la barra no quede debajo.
+  --tv-sticky-top: 0px;
 }
 
 .publicaciones-section {
@@ -69,7 +72,7 @@
     }
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       inset: -1px;
       border-radius: inherit;
@@ -137,6 +140,7 @@
       gap: 0;
       border: none;
       background: none;
+      max-width: 640px;
 
       &:hover {
         cursor: default;
@@ -171,7 +175,6 @@
     .noticias-top {
       width: 100%;
       gap: 16px;
-      max-width: 580px;
     }
 
     .expand-toggle {
@@ -211,6 +214,79 @@
       height: 0;
       overflow: hidden;
       width: 0;
+    }
+  }
+
+  // Modo fullpage (`fullpage: true`): el timeline está siempre abierto, la página entera
+  // scrollea y la barra de herramientas queda pegada arriba. Va DESPUÉS del bloque
+  // `&.expanded` porque comparte especificidad con él (`.publicaciones-section.fullpage
+  // .featured-row` vs `.publicaciones-section.expanded .featured-row`): en los
+  // empates gana el orden en el fuente, y lo que se necesita pisar es justamente
+  // `min-height`, `background` y `border` de la fila de arriba.
+  &.fullpage {
+    .featured-row {
+      position: sticky;
+      top: var(--tv-sticky-top);
+      // El z-index 15 deja el desplegable de filtros (z-index 20) por encima de las
+      // tarjetas, que es lo único que se abre desde acá y ahora queda flotando sobre
+      // una barra inmóvil.
+      z-index: 15;
+      // Sin featured cards visibles el `min-height: 140px` collapsed solo dejaría una
+      // franja muerta de la que la barra pegada colgaría.
+      min-height: 0;
+      // Fondo opaco: en expanded la fila es transparente, y una barra pegada
+      // transparente deja pasar las tarjetas por debajo.
+      background: var(--tv-bg-primary);
+      border-radius: 0;
+      border: none;
+      border-bottom: 1px solid var(--tv-accent-light);
+    }
+
+    // El `margin-top: -50px` está calibrado contra el `min-height: 140px` de la fila
+    // (deja la lista 1px arriba del final de la barra). Sin featured, la fila hugs a la
+    // toolbar, así que la lista arranca justo debajo.
+    .timeline-container {
+      margin-top: 0;
+      max-height: none;
+    }
+
+    // La lista deja de ser una caja con scroll propio: esto es lo que hace que el scroll
+    // sea el de la página.
+    .timeline-cards {
+      max-height: none;
+      overflow: visible;
+    }
+
+    .expand-toggle {
+      cursor: default;
+      border: 0;
+      background: none !important;
+      font-size: 0.8em;
+      pointer-events: none;
+      .expand-icon {
+        display: none;
+      }
+      .expand-text {
+        gap: 10px;
+      }
+      #remaining-count {
+        width: 28px;
+        height: 28px;
+        padding: 0 4px;
+        font-size: 0.8rem;
+      }
+    }
+
+    @media (max-width: 600px) {
+      // Los menús pasan a `position: fixed` en móvil, y el `container-type` de la
+      // section los hace posicionarse respecto de ella (no del viewport), o sea
+      // desde el borde superior de la barra. El 62px es el alto real de la barra pegada
+      // (10px de padding * 2 + la píldora de 42px).
+      .filter-menu,
+      .estado-menu {
+        top: calc(var(--tv-sticky-top) + 62px);
+        max-height: calc(100vh - var(--tv-sticky-top) - 80px);
+      }
     }
   }
 
@@ -364,7 +440,7 @@
     }
 
     &.active::after {
-      content: '';
+      content: "";
       position: absolute;
       top: -2px;
       right: -2px;
@@ -402,7 +478,7 @@
     }
 
     &.active::after {
-      content: '';
+      content: "";
       position: absolute;
       top: -2px;
       right: 0;
@@ -442,7 +518,7 @@
     }
 
     &.active::after {
-      content: '';
+      content: "";
       position: absolute;
       top: -2px;
       right: 0;
@@ -480,7 +556,7 @@
     }
 
     &::-webkit-search-cancel-button {
-      filter: #{'invert(0.6)'};
+      filter: #{"invert(0.6)"};
       cursor: pointer;
     }
   }
@@ -588,7 +664,7 @@
       background: rgba(255, 255, 255, 0.05);
     }
 
-    input[type='checkbox'] {
+    input[type="checkbox"] {
       accent-color: var(--tv-accent);
       width: 12px;
       height: 12px;
@@ -667,7 +743,7 @@
     border: 1px solid var(--tv-border-card);
 
     &::after {
-      content: '';
+      content: "";
       position: absolute;
       inset: 0;
       background: #161c21;
@@ -729,7 +805,7 @@
       text-transform: uppercase;
 
       &::before {
-        content: '';
+        content: "";
         width: 7px;
         height: 7px;
         background: var(--tv-accent-light);
@@ -1008,7 +1084,7 @@
     outline: none;
 
     &::before {
-      content: '';
+      content: "";
       width: 4px;
       height: 4px;
       border-radius: 50%;
@@ -1329,7 +1405,7 @@
       margin-bottom: 6px;
 
       &::before {
-        content: '';
+        content: "";
         width: 7px;
         height: 7px;
         background: var(--tv-accent-light);
@@ -1665,7 +1741,7 @@
         }
 
         &::before {
-          content: '';
+          content: "";
           position: absolute;
           inset: 0;
           background: linear-gradient(
@@ -1787,7 +1863,7 @@
     pointer-events: none;
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       width: 12px;
       height: 2px;
@@ -1990,7 +2066,7 @@
     border-radius: 8px 8px 0 0;
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       inset: 0;
       background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
@@ -1999,7 +2075,7 @@
     }
 
     &::after {
-      content: '';
+      content: "";
       position: absolute;
       inset: 0;
       background: linear-gradient(to top, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.38) 45%, transparent 70%);
@@ -2342,7 +2418,7 @@
     transition: all 0.3s ease;
 
     &::before {
-      content: '';
+      content: "";
       position: absolute;
       inset: -2px;
       border-radius: inherit;

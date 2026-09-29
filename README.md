@@ -67,6 +67,7 @@ The `Timeline` constructor accepts a single config object:
 | `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}`, the static collection values (filter counts, total, `lastUpdated`) from `{url}/facets` (**once, at startup**) and the lazy detail of each card from `{url}/:id`. When set, `content` and `items` are ignored, **no taxonomy selector is rendered**, and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
 | `startExpanded` | `boolean`                      | `false`    | When `true`, the timeline starts **already expanded** instead of collapsed on the featured stack. It only sets the initial state: the expand toggle keeps working and the choice is **not persisted**, so every page load starts from this value. Ignored in single mode (`singleId`), which always renders a single expanded card. |
+| `fullpage`    | `boolean`                      | `false`    | When `true`, renders in **fullpage mode**: the timeline is always open and the **page itself is what scrolls**. It implies `startExpanded`, makes the timeline non-collapsible (the expand button keeps showing the related count but loses its chevron and its click), removes the height limit of the list (so `#timeline-cards` is never a scroll box on its own), removes the **resize handle**, and **pins the toolbar** (counter, search, filters, sort and internal buttons) to the top of the viewport. The featured stack is not rendered at all, since it would never be seen, so `featuredCount` has no effect. Ignored in single mode (`singleId`), which already renders a single expanded card. See [Fullpage mode](#fullpage-mode) |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
@@ -315,6 +316,38 @@ The block is **not a constructor option**: it comes from the data, so every arti
 - Groups with no `label`, with an empty `items` array, or with items missing `content`/`link` are skipped. If nothing is renderable, no markup is added at all.
 - When the field is absent, or when the detail request fails and the card is not found, **no block is rendered at all**: there are no links to show.
 
+### Fullpage mode
+
+`fullpage: true` turns the section into a full-height list: the timeline is always open, the **page itself does the scrolling**, and the toolbar stays visible at the top while you read.
+
+```js
+new Timeline({
+  container: '#noticias-container',
+  content: [/* ContentGroup[] */],
+  fullpage: true
+});
+```
+
+What changes:
+
+- **Always open, never collapsible.** The timeline starts expanded and the expand button loses its chevron and its click — it becomes a plain counter pill, marked `aria-disabled="true"`. Clicking the toolbar, the featured area or the button does nothing.
+- **The page scrolls, not the list.** `#timeline-cards` loses its `max-height: 650px` and its `overflow-y: auto`, so the cards flow with the rest of the page instead of living in a fixed-height box with its own scrollbar.
+- **The resize handle is gone** — and not just hidden: the element is never emitted, so the persisted height in `localStorage` is not read either and no inline `max-height` is written.
+- **The toolbar sticks to the top.** `.featured-row` becomes `position: sticky` with an opaque `--tv-bg-primary` background (it is transparent while expanded, which would let the cards show through as they pass underneath). The filter dropdown keeps its `z-index: 20` and opens above the cards, so it is fully usable while the bar is stuck.
+- **The featured stack is not rendered at all.** It would only ever be invisible, so the DOM is never built and `featuredCount` has no effect.
+
+Everything else is unchanged: filters, search, sort, taxonomy selector, pagination ("Cargar más"), the card detail embeds and the entrance animations all work as usual. The taxonomy selector is **not** sticky, so it scrolls away with the list.
+
+If the host page already has a fixed header of its own, raise the sticky offset so the toolbar lands below it:
+
+```css
+:root {
+  --tv-sticky-top: 56px;
+}
+```
+
+Sticky positioning needs no scroll container between the section and the page, and no ancestor with `overflow: hidden` — if the toolbar does not stick, check that first.
+
 ## Build
 
 ```bash
@@ -353,6 +386,7 @@ Query flags of the demo page:
 | *(none)* | Local mode with `content`: 3 taxonomies, so the selector and the "Ver todo" option are visible |
 | `?flat` | Local mode with the legacy `items` alias: verifies that no taxonomy selector is rendered and the layout is unchanged |
 | `?expanded` | Starts the timeline expanded (`startExpanded: true`) instead of collapsed. Combinable with the other flags |
+| `?full` | Fullpage mode (`fullpage: true`): always expanded, no resize handle, the page does the scrolling and the toolbar sticks to the top. Subsumes `?expanded`. Combinable with the other flags |
 | `?api` | API mode against the mock server (`example/server.js`): no taxonomy selector, server-side filters |
 | `?id=FUE-00001` | Single mode: renders just that card, already expanded, with the navigation block from the item's `taxonomias` (FUE-00001 has the three groups, one of them with 7 links to exercise the "Ver más (4)" toggle; FUE-00002 exercises the incomplete-group filtering, FUE-00005 a single column, the rest have no `taxonomias` and render no block) |
 

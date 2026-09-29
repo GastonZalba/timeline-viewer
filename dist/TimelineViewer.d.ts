@@ -123,6 +123,17 @@ export interface TimelineOptions {
      * single mode (`singleId`), which always renders a single expanded card.
      */
     startExpanded?: boolean;
+    /**
+     * Fullpage mode (default: false): the timeline is always open and the page itself is
+     * what scrolls. It implies `startExpanded`, makes the timeline non-collapsible (the
+     * expand button keeps showing the related count but loses its chevron and its click),
+     * drops the height limit of the list so `#timeline-cards` is never a scroll box on
+     * its own, removes the resize handle, and pins the toolbar (counter, search, filters,
+     * sort and internal buttons) to the top of the viewport. The featured stack is not
+     * rendered at all, since it would never be seen, so `featuredCount` has no effect.
+     * Ignored in single mode (`singleId`), which already renders a single expanded card.
+     */
+    fullpage?: boolean;
     lastUpdated?: string;
     itemsPerPage?: number;
     inlineImages?: boolean;
@@ -166,6 +177,7 @@ export default class Timeline {
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
+    fullpage: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
     content: ContentGroup[];
@@ -373,8 +385,29 @@ export default class Timeline {
     protected _processCardEmbeds(cardEl: HTMLElement): void;
     /** Insert an element before the timeline footer, or append if no footer */
     protected _insertBeforeFooter(el: HTMLElement): void;
+    /**
+     * Insert an element at the end of the cards, that is: before the first element of the
+     * trailing block (load-more button, status row, footer), which is what keeps the append
+     * order identical to the one `_renderTimeline` + `_renderLoadMoreButton` + `_renderStatus`
+     * build. `querySelector` returns the first match in document order, so the load-more button
+     * wins when it is there.
+     */
+    protected _insertBeforeTrailing(el: HTMLElement): void;
     /** Render the timeline cards list, including the last-updated footer */
     protected _renderTimeline(cards: TimelineItem[]): void;
+    /**
+     * Add cards at the end of the list **without touching the ones already rendered**, and return
+     * the created nodes so the entrance animation can be observed on them alone.
+     *
+     * This is the counterpart of `_renderTimeline` for pagination: that one wipes
+     * `#timeline-cards` because its callers replaced the whole result set (page 1 after a
+     * search/filter/sort change, a taxonomy re-scope), and a rebuild is the honest thing to do
+     * when the articles on screen are no longer the ones in memory. "Cargar más" is not that:
+     * the cards already on screen are still correct, and a rebuild would make every one of them
+     * lose the `visible` class and replay its entrance transition (the whole list blinking on
+     * each page), drop the detail injected in the expanded ones, and reload every image.
+     */
+    protected _appendTimelineItems(items: TimelineItem[], startIndex: number): HTMLElement[];
     /**
      * Write (or rewrite) the last-updated footer at the end of the timeline. Extracted from
      * `_renderTimeline` because in API mode `lastUpdated` arrives with the facets response,
@@ -384,8 +417,14 @@ export default class Timeline {
     protected _renderLastUpdated(): void;
     /** Set up IntersectionObserver for the featured cards entrance animation */
     protected _setupObserver(): void;
-    /** Set up IntersectionObserver for the timeline items entrance animation */
-    protected _setupTimelineObserver(): void;
+    /**
+     * Set up IntersectionObserver for the timeline items entrance animation.
+     *
+     * `items` narrows what gets observed, which is what pagination needs: after an append the
+     * cards already on screen are visible and their own observer has already done its job, so
+     * there is nothing to re-observe. Default is every `.timeline-item` in the container.
+     */
+    protected _setupTimelineObserver(items?: ArrayLike<Element>): void;
     /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
     protected _preloadEmbedLibraries(): void;
     /**

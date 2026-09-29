@@ -57,17 +57,20 @@ new Timeline({ container, items, ... })
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_buildLayout()` | 131 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
-| `_renderAll()` | 776 | Renderiza featured + timeline + load-more. Método principal de "refresh" |
-| `_renderFeatured(cards)` | 256 | Renderiza el stack de tarjetas superpuestas |
-| `_renderTimeline(cards)` | 537 | Renderiza la lista de tarjetas del timeline |
-| `_createTimelineItem(card, index)` | 285 | Crea una tarjeta individual con todos sus event listeners |
-| `_renderLoadMoreButton()` | 2373 | Agrega el botón "Cargar más" al final del timeline |
-| `_insertBeforeFooter(el)` | 1547 | Helper: inserta antes del footer o al final si no hay footer |
-| `_renderApiLoading()` | 2186 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
-| `_clearApiLoading()` | 2234 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
-| `_renderStatus()` | 2241 | Fila de status al pie de la lista: cargando / error / "Mostrando X de Y". Se abstiene mientras hay skeletons |
-| `_renderSingleCard()` | 2258 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
+| `_buildLayout()` | 426 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
+| `_renderAll()` | 2476 | Renderiza featured + timeline + load-more. Método principal de "refresh" (rebuild completo) |
+| `_renderFeatured(cards)` | 941 | Renderiza el stack de tarjetas superpuestas |
+| `_renderTimeline(cards)` | 1608 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`) |
+| `_appendTimelineItems(items, startIndex)` | 1639 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
+| `_createTimelineItem(card, index)` | 971 | Crea una tarjeta individual con todos sus event listeners |
+| `_renderLoadMoreButton()` | 2511 | Agrega el botón "Cargar más" al final del timeline |
+| `_insertBeforeFooter(el)` | 1580 | Helper: inserta antes del footer o al final si no hay footer |
+| `_insertBeforeTrailing(el)` | 1596 | Helper: inserta al final de las tarjetas, antes del bloque final (load-more / status / footer) |
+| `_appendPageItems()` | 2193 | Modo API: pide la página siguiente y **agrega** las tarjetas nuevas, sin rebuild. Saca el botón de "Cargar más" si `_hasMorePages()` pasa a `false` |
+| `_renderApiLoading()` | 2308 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
+| `_clearApiLoading()` | 2372 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
+| `_renderStatus()` | 2379 | Fila de status al pie de la lista: cargando / error / "Mostrando X de Y". Se abstiene mientras hay skeletons |
+| `_renderSingleCard()` | 2639 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
 | `_buildTaxonomies(taxonomias)` | 1217 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
 | `_appendTaxonomies(taxonomias)` | 1244 | Inserta el bloque de taxonomías al final de la `.publicaciones-section` en modo single. Sin datos: no se invoca (en el camino de "article not found" no hay ítem del cual leerlas) |
 
@@ -105,7 +108,7 @@ new Timeline({ container, items, ... })
 | Método | Línea | Descripción |
 |--------|-------|-------------|
 | `_setupObserver()` | 570 | IntersectionObserver para animación de entrada de featured cards |
-| `_setupTimelineObserver()` | 587 | IntersectionObserver para animación de entrada de timeline items |
+| `_setupTimelineObserver(items?)` | 1698 | IntersectionObserver para animación de entrada de timeline items. `items` acota qué se observa (la paginación pasa solo las tarjetas nuevas); por defecto observa todas las `.timeline-item` del container |
 
 ## Estructura DOM
 
@@ -276,7 +279,16 @@ El sistema de paginación es **manual** (no infinito scroll):
 4. Al hacer click, se agregan los siguientes `itemsPerPage` items usando `_insertBeforeFooter()`
 5. Si `itemsPerPage === 0`, se muestran todos los items sin paginación
 
-En **modo API** el botón llama a `_appendPageItems()` en lugar de appendear en el DOM, pero el criterio es el mismo (`allCards.length < _apiTotal`, es decir el `total` de la respuesta de la lista). A diferencia del modo local, esa llamada pasa por `_renderAll()`, que **reconstruye la lista completa**: las tarjetas nuevas no se anexan al DOM existente. Por eso `_fetchPage(1)` devuelve la lista al scroll 0 después de renderizar y "Cargar más" conserva la posición solo si el navegador la re-ancla: en la práctica conviene tratarlo como un rebuild completo.
+En **modo API** el botón llama a `_appendPageItems()` en lugar de appendear en el DOM, pero el criterio es el mismo (`allCards.length < _apiTotal`, es decir el `total` de la respuesta de la lista). Esa llamada **solo agrega** las tarjetas nuevas: usa `_appendTimelineItems()` — el hermano de `_renderTimeline()` sin el `innerHTML = ''` — y **no** pasa por `_renderAll()`, que reconstruye la lista completa.
+
+El rebuild es lo correcto cuando lo que hay en pantalla ya no son los artículos en memoria: `_fetchPage(1)` tras una búsqueda/filtro/orden y el re-scope de una taxonomía reemplazan el conjunto, y ahí `_renderTimeline()` hace falta. "Cargar más" es el caso contrario —las tarjetas visibles siguen siendo correctas— y un rebuild en cada página se notaba: `.timeline-item` nace en `opacity: 0` y solo aparece con `.visible`, así que al recrear los nodos **toda** la lista repetía su animación de entrada (el flash), se perdía el detalle ya inyectado en las expandidas y se recargaban todas las imágenes.
+
+Detalles del append:
+
+- El orden del DOM queda igual que con `_renderAll()`: `[tarjetas…, nuevas…, loadMore, status, footer]`. Para eso `_insertBeforeTrailing()` inserta antes del **primer** elemento del bloque final (`.timeline-load-more-item`, `.timeline-status-item` o `.timeline-footer-item`), mientras que `_insertBeforeFooter()` —usado por la fila de status y por el botón— solo mira el footer.
+- El botón de "Cargar más" **se conserva** entre páginas: su handler lee `this._apiPage` y `this._apiLoading` en el momento del click, no por closure, así que un solo nodo sirve para todas. Solo se elimina cuando `_hasMorePages()` pasa a `false`. (En modo local sí hay que re-crearlo, porque ahí el handler captura `start`/`end`.)
+- Las tarjetas nuevas se pasan solas a `_setupTimelineObserver(added)`, que acepta un scope opcional: las viejas ya están `visible` y las observable su propio observer, así que no hay que re-observarlas.
+- El stack de featured **no** se re-renderiza: solo se ve con el timeline colapsado, y el botón "Cargar más" vive adentro del timeline (`max-height: 0` + `overflow: hidden` cuando está colapsado), así que es inalcanzable en ese estado. Además el stack debería reflejar la página 1, no la última.
 
 ## Estados de carga (modo API)
 
@@ -286,7 +298,7 @@ Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** 
 |--------|-------------|-----------------|
 | Primera página (`_init`) | skeletons | `_renderAll()` |
 | Cambio de búsqueda / filtro / orden (`_applyFilters`) | skeletons, en el acto | `_renderAll()` |
-| "Cargar más" (`_appendPageItems`) | las tarjetas que ya se están leyendo + la fila de status | `_renderAll()` |
+| "Cargar más" (`_appendPageItems`) | las tarjetas que ya se están leyendo + la fila de status | `_appendTimelineItems` + `_renderStatus` |
 | Request fallido | lista vacía + la fila de error | — |
 
 - `_renderApiLoading()` es **idempotente**: se llama en cada tecla, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons.
@@ -336,6 +348,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `inlineImages` | `boolean` | Muestra thumbnails de `imagenes` inline en la tarjeta expandida (opción del constructor) |
 | `inlineAdjuntos` | `boolean` | Muestra `adjuntos` inline en la tarjeta expandida (nombre + icono por tipo) (opción del constructor) |
 | `singleId` | `string \| null` | Cuando está seteado, renderiza una única tarjeta ya expandida (modo single) |
+| `fullpage` | `boolean` | Modo fullpage (opción del constructor): fuerza `isExpanded`, bloquea el colapso, no emite el resize handle y no renderiza las featured cards |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |
@@ -360,6 +373,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 |-------|----------|-------------|
 | `.expanded` | `.publicaciones-section` | Timeline visible, featured oculto |
 | `.has-taxonomy` | `.publicaciones-section` | El selector de taxonomías está activo (`content` con grupos): con el timeline expandido oculta `#remaining-count` porque el contador pasa a verse en la píldora del selector |
+| `.fullpage` | `.publicaciones-section` | Modo fullpage (`fullpage: true`): timeline siempre abierto y sin colapsar, sin handle de resize, sin scroll interno en `#timeline-cards` y con `.featured-row` pegada al top. Lo agrega `_buildLayout()` |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
 | `.visible` | `.featured-card` | Tarjeta featured animada (entró en viewport) |
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |
