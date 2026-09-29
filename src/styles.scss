@@ -243,6 +243,7 @@
     align-items: center;
     gap: 14px;
     white-space: nowrap;
+    height: 42px;
 
     .expand-text {
       display: flex;
@@ -821,6 +822,7 @@
     display: flex;
     align-items: flex-start;
     gap: 30px;
+    padding-top: 10px;
   }
 
   .timeline-line {
