@@ -70,9 +70,16 @@ export interface TimelineApiPageResponse {
      */
     facets?: Record<string, Record<string, number>>;
 }
-/** Respuesta de `GET {url}/facets`: conteos de la colección completa, sin `q` ni filtros */
+/** Respuesta de `GET {url}/facets`: valores estáticos de la colección completa, sin `q` ni filtros */
 export interface TimelineApiFacetsResponse {
     facets: Record<string, Record<string, number>>;
+    /**
+     * Total de la colección completa, sin `q` ni filtros: alimenta el contador y el label del
+     * botón de expandir (mismo rol que `_allItems().length` en modo local). Es un valor estático,
+     * por eso viaja acá y no en la lista, que cambia con la búsqueda y los filtros.
+     * Si el endpoint no lo manda, el contador queda en 0.
+     */
+    total?: number;
     lastUpdated?: string;
 }
 export interface SingleTaxonomyItem {
@@ -199,7 +206,10 @@ export default class Timeline {
     _lgContainer: HTMLElement | null;
     api: TimelineApiConfig | null;
     _apiPage: number;
+    /** Total filtrado de la última página pedida (`total` de la lista): paginación y status */
     _apiTotal: number;
+    /** Total de la colección sin `q` ni filtros (`total` de `/facets`): contador del botón de expandir */
+    _apiCollectionTotal: number;
     _apiFacets: Record<string, Record<string, number>>;
     _apiFacetsPromise: Promise<void> | null;
     _apiLoading: boolean;
@@ -410,18 +420,20 @@ export default class Timeline {
     protected _buildQueryParams(page: number): Record<string, string>;
     /**
      * Fetch the filter facets (`GET {url}/facets`), at most once per instance.
-     * They are static counts over the whole collection, so they never need to be re-requested.
-     * On failure the filter panel is still built (with empty counts) and `_fetchPage` falls back
-     * to the legacy `facets` of the list response when the server sends them: that is why a
-     * failed request must not clear facets that `_adoptLegacyApiFacets` already took.
+     * They are static values over the whole collection (counts, total and lastUpdated), so they
+     * never need to be re-requested. On failure the filter panel is still built (with empty
+     * counts) and `_fetchPage` falls back to the legacy `facets` of the list response when the
+     * server sends them: that is why a failed request must not clear facets that
+     * `_adoptLegacyApiFacets` already took.
      */
     protected _loadApiFacets(): Promise<void>;
     /**
-     * Lazy wrapper around `_loadApiFacets`: the facets are only needed by the filter panel, so
-     * they are requested the first time the timeline expands (see `_toggleExpand`) instead of at
-     * startup. The promise is cached, so collapsing and expanding again never re-requests them.
-     * It also brings the `lastUpdated` of the facets response, the only place it comes from in
-     * API mode, so the last-updated footer can be written without re-rendering the timeline.
+     * Wrapper around `_loadApiFacets`: requested at startup in API mode (see `_init`), in parallel
+     * with the first page. The promise is cached, so it is requested only once per instance even
+     * if `_toggleExpand` calls it again on the first expand.
+     * It also brings the static values that only the facets response carries: the `lastUpdated`
+     * of the footer and the collection `total` of the expand button counter, so both can be
+     * written without re-rendering the timeline.
      */
     protected _ensureApiFacets(): Promise<void>;
     /** Fetch a page of items from the API and (re)build the whole view */
@@ -447,6 +459,14 @@ export default class Timeline {
     protected _relatedLabel(n: number): string;
     /** Write the expand toggle label into `#remaining-text`; the label is injected as HTML, so it may contain markup */
     protected _setRelatedLabel(n: number): void;
+    /**
+     * Write the expand toggle counter and its label. Both count the **whole pool**, never the
+     * filtered one: in local mode `_allItems().length`, in API mode the static `total` of
+     * `/facets` (0 until that response lands, or forever if the endpoint doesn't send it).
+     * Extracted from `_renderAll` so the facets response can patch the counter when it arrives
+     * without re-rendering the timeline.
+     */
+    protected _renderRelatedCount(): void;
     /** Render featured cards, timeline, and load-more button if needed */
     protected _renderAll(): void;
     /** Render the "load more" button and wire its click handler */

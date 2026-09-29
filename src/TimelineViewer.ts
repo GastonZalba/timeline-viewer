@@ -120,9 +120,16 @@ export interface TimelineApiPageResponse {
   facets?: Record<string, Record<string, number>>;
 }
 
-/** Respuesta de `GET {url}/facets`: conteos de la colección completa, sin `q` ni filtros */
+/** Respuesta de `GET {url}/facets`: valores estáticos de la colección completa, sin `q` ni filtros */
 export interface TimelineApiFacetsResponse {
   facets: Record<string, Record<string, number>>;
+  /**
+   * Total de la colección completa, sin `q` ni filtros: alimenta el contador y el label del
+   * botón de expandir (mismo rol que `_allItems().length` en modo local). Es un valor estático,
+   * por eso viaja acá y no en la lista, que cambia con la búsqueda y los filtros.
+   * Si el endpoint no lo manda, el contador queda en 0.
+   */
+  total?: number;
   lastUpdated?: string;
 }
 
@@ -265,7 +272,10 @@ export default class Timeline {
   _lgContainer: HTMLElement | null;
   api: TimelineApiConfig | null;
   _apiPage: number;
+  /** Total filtrado de la última página pedida (`total` de la lista): paginación y status */
   _apiTotal: number;
+  /** Total de la colección sin `q` ni filtros (`total` de `/facets`): contador del botón de expandir */
+  _apiCollectionTotal: number;
   _apiFacets: Record<string, Record<string, number>>;
   _apiFacetsPromise: Promise<void> | null;
   _apiLoading: boolean;
@@ -327,6 +337,7 @@ export default class Timeline {
     this.api = config.api || null;
     this._apiPage = 1;
     this._apiTotal = 0;
+    this._apiCollectionTotal = 0;
     this._apiFacets = {};
     this._apiFacetsPromise = null;
     this._apiLoading = false;
@@ -1736,8 +1747,8 @@ export default class Timeline {
       requestAnimationFrame(() => {
         this._setupTimelineObserver();
       });
-      // The filter panel is the only consumer of the facets, so they are requested here
-      // (first expand) instead of at startup. Cached, so expanding again is free.
+      // The facets (counts, collection total, lastUpdated) are already loaded at startup; this
+      // is a cache hit that also covers the case where that request failed: no re-request.
       if (this.api) void this._ensureApiFacets();
       this._preloadEmbedLibraries();
     } else {
@@ -1994,10 +2005,11 @@ export default class Timeline {
 
   /**
    * Fetch the filter facets (`GET {url}/facets`), at most once per instance.
-   * They are static counts over the whole collection, so they never need to be re-requested.
-   * On failure the filter panel is still built (with empty counts) and `_fetchPage` falls back
-   * to the legacy `facets` of the list response when the server sends them: that is why a
-   * failed request must not clear facets that `_adoptLegacyApiFacets` already took.
+   * They are static values over the whole collection (counts, total and lastUpdated), so they
+   * never need to be re-requested. On failure the filter panel is still built (with empty
+   * counts) and `_fetchPage` falls back to the legacy `facets` of the list response when the
+   * server sends them: that is why a failed request must not clear facets that
+   * `_adoptLegacyApiFacets` already took.
    */
   protected async _loadApiFacets(): Promise<void> {
     try {
@@ -2006,6 +2018,7 @@ export default class Timeline {
         this._apiFacets = data.facets;
         this._apiFacetsLoaded = true;
       }
+      if (data && typeof data.total === 'number') this._apiCollectionTotal = data.total;
       if (data && data.lastUpdated && !this.lastUpdated) this.lastUpdated = data.lastUpdated;
     } catch {
       if (!this._apiFacetsLoaded) this._apiFacets = {};
@@ -2013,11 +2026,12 @@ export default class Timeline {
   }
 
   /**
-   * Lazy wrapper around `_loadApiFacets`: the facets are only needed by the filter panel, so
-   * they are requested the first time the timeline expands (see `_toggleExpand`) instead of at
-   * startup. The promise is cached, so collapsing and expanding again never re-requests them.
-   * It also brings the `lastUpdated` of the facets response, the only place it comes from in
-   * API mode, so the last-updated footer can be written without re-rendering the timeline.
+   * Wrapper around `_loadApiFacets`: requested at startup in API mode (see `_init`), in parallel
+   * with the first page. The promise is cached, so it is requested only once per instance even
+   * if `_toggleExpand` calls it again on the first expand.
+   * It also brings the static values that only the facets response carries: the `lastUpdated`
+   * of the footer and the collection `total` of the expand button counter, so both can be
+   * written without re-rendering the timeline.
    */
   protected _ensureApiFacets(): Promise<void> {
     if (!this.api) return Promise.resolve();
@@ -2025,6 +2039,7 @@ export default class Timeline {
       this._apiFacetsPromise = this._loadApiFacets().then(() => {
         this._buildFilterCheckboxes();
         this._syncFilterToggleState();
+        this._renderRelatedCount();
         this._renderLastUpdated();
       });
     }
@@ -2192,12 +2207,23 @@ export default class Timeline {
     if (el) el.innerHTML = this._relatedLabel(n);
   }
 
+  /**
+   * Write the expand toggle counter and its label. Both count the **whole pool**, never the
+   * filtered one: in local mode `_allItems().length`, in API mode the static `total` of
+   * `/facets` (0 until that response lands, or forever if the endpoint doesn't send it).
+   * Extracted from `_renderAll` so the facets response can patch the counter when it arrives
+   * without re-rendering the timeline.
+   */
+  protected _renderRelatedCount(): void {
+    const n = this.api ? this._apiCollectionTotal : this._allItems().length;
+    this.remainingCount.textContent = String(n);
+    this._setRelatedLabel(n);
+  }
+
   /** Render featured cards, timeline, and load-more button if needed */
   protected _renderAll(): void {
     if (this.api) {
-      const n = this._apiTotal;
-      this.remainingCount.textContent = String(n);
-      this._setRelatedLabel(n);
+      this._renderRelatedCount();
       this._renderFeatured(this.allCards.filter((c) => c.capturado !== false).slice(0, this.featured_count));
       this._renderTimeline(this.allCards);
       if (this._hasMorePages()) {
@@ -2213,9 +2239,7 @@ export default class Timeline {
       return;
     }
     const featured = this._featuredCards.filter((c) => c.capturado !== false).slice(0, this.featured_count);
-    const total = this._allItems().length;
-    this.remainingCount.textContent = String(total);
-    this._setRelatedLabel(total);
+    this._renderRelatedCount();
     this._renderFeatured(featured);
     const displayCards = this.itemsPerPage > 0 ? this.allCards.slice(0, this._displayedCount) : this.allCards;
     this._renderTimeline(displayCards);
@@ -2414,17 +2438,18 @@ export default class Timeline {
       // The checkboxes are built here, before the first page, so the default checks (estado
       // filters) travel in the initial query just like in local mode. With no facets yet the
       // non-estado groups stay hidden, so nothing can be checked before they arrive: the
-      // panel is rebuilt with the counts by `_ensureApiFacets()`, on the first expand.
-      // The embed preload reads the rendered cards, so it waits for the first page.
-      if (this.isExpanded) {
-        void this._ensureApiFacets()
-          .then(() => this._fetchPage(1))
-          .then(() => this._preloadEmbedLibraries());
-        return;
-      }
+      // panel is rebuilt with the counts by `_ensureApiFacets()`.
       this._buildFilterCheckboxes();
       this._syncFilterToggleState();
-      void this._fetchPage(1);
+      // The facets travel the static values of the collection (counts, total, lastUpdated) and
+      // the expand toggle shows two of them before the user interacts, so they are requested
+      // here, in parallel with the first page, and not on the first expand. Waiting would gain
+      // nothing: the estado defaults of the checkboxes above do not depend on the facets.
+      void this._ensureApiFacets();
+      // The embed preload reads the rendered cards, so it waits for the first page.
+      void this._fetchPage(1).then(() => {
+        if (this.isExpanded) this._preloadEmbedLibraries();
+      });
       return;
     }
     this._buildFilterCheckboxes();

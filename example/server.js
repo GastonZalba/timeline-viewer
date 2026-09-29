@@ -102,8 +102,11 @@ function buildFacets(pool) {
  * The mock dataset never changes at runtime, so the facets are counted once at startup over
  * the whole collection: they don't depend on `q` nor on the active filters, which is what lets
  * the client ask for them a single time (`GET /api/facets`) instead of on every page request.
+ * `STATIC_TOTAL` is the same idea for the count: the collection size for the expand button,
+ * which never moves with the search, the filters or the page.
  */
 const STATIC_FACETS = buildFacets(mockData.items);
+const STATIC_TOTAL = mockData.items.length;
 
 /** Non-destructive sorted copy of the filtered items */
 function sortItems(items, sortAsc) {
@@ -141,7 +144,12 @@ function toSummary(item) {
   return summary;
 }
 
-/** GET /api — paginated list with search, filters and sort (no `lastUpdated`: that travels with the facets) */
+/**
+ * GET /api — paginated list with search, filters and sort.
+ * `total` is the count of what the current query matches (it drives the "Cargar más" button and
+ * the status row). The values that don't change with the query — the collection `total` and
+ * `lastUpdated` — travel with the facets instead.
+ */
 function handleItems(url, res) {
   const params = Object.fromEntries(url.searchParams.entries());
   const q = normalize(params.q || '');
@@ -164,12 +172,13 @@ function handleItems(url, res) {
   );
 }
 
-/** GET /api/facets — static facet counts of the whole collection (requested once by the client) */
+/** GET /api/facets — static values of the whole collection (requested once, at startup) */
 function handleFacets(res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(
     JSON.stringify({
       facets: STATIC_FACETS,
+      total: STATIC_TOTAL,
       lastUpdated: mockData.lastUpdated
     })
   );
