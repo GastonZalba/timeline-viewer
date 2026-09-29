@@ -108,11 +108,16 @@ function buildFacets(pool) {
 const STATIC_FACETS = buildFacets(mockData.items);
 const STATIC_TOTAL = mockData.items.length;
 
-/** Non-destructive sorted copy of the filtered items */
+/**
+ * Non-destructive sorted copy of the filtered items. The undated ones are part of the direction
+ * and not a fixed bucket: `desc` (the default) leaves them last, `asc` brings them first. That is
+ * what the client does in local mode — it reverses the descending array — so flipping only the
+ * dated comparison would make the two modes disagree on where the undated land.
+ */
 function sortItems(items, sortAsc) {
   return [...items].sort((a, b) => {
-    if (!a.fecha_publicacion) return 1;
-    if (!b.fecha_publicacion) return -1;
+    if (!a.fecha_publicacion) return !b.fecha_publicacion ? 0 : sortAsc ? -1 : 1;
+    if (!b.fecha_publicacion) return sortAsc ? 1 : -1;
     const diff = new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
     return sortAsc ? -diff : diff;
   });
@@ -146,6 +151,8 @@ function toSummary(item) {
 
 /**
  * GET /api — paginated list with search, filters and sort.
+ * `sort` is the only ordering param and it carries the direction only (`asc` / `desc`), never a
+ * field name: the field is `fecha_publicacion`. Anything other than `asc` falls back to `desc`.
  * `total` is the count of what the current query matches (it drives the "Cargar más" button and
  * the status row). The values that don't change with the query — the collection `total` and
  * `lastUpdated` — travel with the facets instead.

@@ -18,6 +18,11 @@ const ESTADO_FILTER_FIELDS = ['validado', 'capturado', 'descartado'];
 const API_RELOAD_DEBOUNCE_MS = 300;
 /** Links shown per taxonomy group before the "Ver más" toggle appears (single mode) */
 const TAXONOMY_VISIBLE_LINKS = 3;
+/**
+ * Values shown per filter group before the "Ver más (N)" toggle appears, when the option
+ * `filtersMaxVisible` does not say otherwise. Below 2 the group is never collapsed.
+ */
+const DEFAULT_FILTER_MAX_VISIBLE = 5;
 /** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
 const ALL_TAXONOMIES_LABEL = 'Ver todo';
 /** `_contentIndex` value that means "every taxonomy" instead of a single group */
@@ -47,6 +52,8 @@ export default class Timeline {
         this.inlineAdjuntos = config.inlineAdjuntos || false;
         this.internalButtons = config.internalButtons || false;
         this.fullpage = config.fullpage === true;
+        this.filtersMaxVisible = config.filtersMaxVisible ?? DEFAULT_FILTER_MAX_VISIBLE;
+        this._filterExpanded = new Set();
         this.relatedLabel = config.relatedLabel || null;
         this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
         this.taxonomyRow = null;
@@ -171,7 +178,7 @@ export default class Timeline {
         <div class="featured-row">
           <div class="noticias-top">
             <button class="expand-toggle" id="expand-toggle" aria-expanded="false" aria-controls="timeline-container">
-              <span class="expand-text"><span id="remaining-count">0</span> <span id="remaining-text">${this._relatedLabel(0)}</span></span>
+              <span class="expand-text"><span id="remaining-count"></span> <span id="remaining-text">${this._relatedLabel(0)}</span></span>
               <span class="expand-icon" id="expand-icon"></span>
             </button>
             <div class="search-wrap" id="search-wrap">
@@ -1599,6 +1606,18 @@ export default class Timeline {
             /* localStorage unavailable */
         }
     }
+    /**
+     * How many values the group of `field` shows before the "Ver más (N)" toggle appears:
+     * the per-field entry of `filtersMaxVisible` when the option is a record, its number
+     * when it is a plain one, and the default otherwise. Below 2 no group collapses.
+     */
+    _filterMaxVisible(field) {
+        const cfg = this.filtersMaxVisible;
+        if (typeof cfg === 'number')
+            return cfg;
+        const perField = cfg[field];
+        return typeof perField === 'number' ? perField : DEFAULT_FILTER_MAX_VISIBLE;
+    }
     /** Build filter checkboxes from the available filter values (local data or the one-time API facets) */
     _buildFilterCheckboxes() {
         const savedEstado = this._loadEstadoFilterState();
@@ -1643,11 +1662,23 @@ export default class Timeline {
                 anyFilterVisible = true;
             if (f.sortValues)
                 values.sort(f.sortValues);
+            // A group longer than its cut shows the values that filter the most, and hides the rest
+            // behind a "Ver más (N)" toggle. `sort` is stable, so ties keep the order they had. A
+            // group that declares its own order (`sortValues`: newest year first, "Descartado"
+            // first) keeps it and is only truncated, because that order is the meaningful one.
+            const limit = this._filterMaxVisible(f.field);
+            const overflow = limit >= 2 ? Math.max(0, values.length - limit) : 0;
+            if (overflow)
+                values.sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
             f.options.innerHTML = '';
+            f.options.classList.remove('expanded');
             f.checkboxes = [];
-            values.forEach((val) => {
+            values.forEach((val, i) => {
+                const isExtra = overflow > 0 && i >= values.length - overflow;
                 const label = document.createElement('label');
-                label.className = 'filter-option';
+                label.className = isExtra ? 'filter-option filter-option-extra' : 'filter-option';
+                // Kept in sync with the class below for the case where the stylesheet is not loaded.
+                label.hidden = isExtra;
                 const cb = document.createElement('input');
                 cb.type = 'checkbox';
                 cb.value = val;
@@ -1676,6 +1707,8 @@ export default class Timeline {
                 f.options.appendChild(label);
                 f.checkboxes.push(cb);
             });
+            if (overflow)
+                this._buildFilterMore(f, overflow);
         });
         this.container.querySelectorAll('.filter-section').forEach((sectionEl) => {
             const section = sectionEl;
@@ -1694,6 +1727,47 @@ export default class Timeline {
         // solo. En modo local los valores ya están, así que la condición queda como estaba.
         const pendingFacets = !!this.api && !this._apiFacetsSettled;
         this.filterToggle.style.display = anyFilterVisible || pendingFacets ? '' : 'none';
+    }
+    /**
+     * Add the "Ver más (N)" toggle at the end of a collapsed filter group and put the group in
+     * its initial state. The hidden values are the `overflow` labels at the tail of
+     * `f.options`, already marked `filter-option-extra`; what this decides is only whether
+     * they show.
+     *
+     * A group with a checked value opens itself: a filter applied from a value the user can no
+     * longer see is worse than a group one line longer, and the rebuilds (the API facets, a
+     * taxonomy re-scope) always land on the visible state.
+     *
+     * The class is what the component CSS keys on, the `hidden` attribute is kept in sync for
+     * the case where the stylesheet is not loaded, and the whole thing lives in the DOM: the
+     * toggle is not a filter, so it does not call `_applyFilters` and the timeline does not
+     * re-render.
+     */
+    _buildFilterMore(f, overflow) {
+        const expanded = this._filterExpanded.has(f.field) || f.checkboxes.some((cb) => cb.checked);
+        const more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'filter-more';
+        more.setAttribute('aria-expanded', String(expanded));
+        more.textContent = expanded ? 'Ver menos' : `Ver más (${overflow})`;
+        more.addEventListener('click', () => {
+            const open = more.getAttribute('aria-expanded') === 'true';
+            if (open)
+                this._filterExpanded.delete(f.field);
+            else
+                this._filterExpanded.add(f.field);
+            f.options.classList.toggle('expanded', !open);
+            f.options.querySelectorAll('.filter-option-extra').forEach((extra) => {
+                extra.hidden = open;
+            });
+            more.setAttribute('aria-expanded', String(!open));
+            more.textContent = open ? `Ver más (${overflow})` : 'Ver menos';
+        });
+        f.options.classList.toggle('expanded', expanded);
+        f.options.querySelectorAll('.filter-option-extra').forEach((extra) => {
+            extra.hidden = !expanded;
+        });
+        f.options.appendChild(more);
     }
     /** Load the persisted estado-interno filter state from localStorage */
     _loadEstadoFilterState() {

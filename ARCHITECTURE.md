@@ -81,7 +81,8 @@ new Timeline({ container, items, ... })
 | `_toggleExpand(scrollTo?)` | 678 | Alterna entre vista featured (colapsada) y timeline (expandida) |
 | `_scrollToSection()` | 712 | Smooth scroll para hacer visible el timeline |
 | `_toggleSort()` | 728 | Invierte orden ascendente/descendente por fecha |
-| `_buildFilterCheckboxes()` | 735 | Construye checkboxes desde valores únicos de los datos |
+| `_buildFilterCheckboxes()` | 1966 | Construye checkboxes desde valores únicos de los datos, y colapsa los grupos largos detrás de un "Ver más (N)" |
+| `_buildFilterMore(f, overflow)` | 2086 | Agrega el `button.filter-more` al final de un grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
 | `_applyFilters()` | 2283 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce |
 
 ### Embeds sociales
@@ -325,6 +326,17 @@ Flujo:
 
 En modo API, el paso 2 no filtra nada local: `_applyFilters()` delega en `_schedulePageReload()` (ver [Estados de carga](#estados-de-carga-modo-api)), y el `true` pide que el request salga en el acto en vez de esperar la ventana de 300 ms. El `input` del buscador es el único trigger que no lo pasa, porque cada tecla es un prefijo del término.
 
+### Grupos largos: el toggle "Ver más (N)"
+
+Un grupo con lista abierta (`tonos_sociales`, `tipo_fuente`, `contenido`) puede tener más valores de los que entran cómodo en el menú, así que `_buildFilterCheckboxes()` los recorta con el corte de la opción `filtersMaxVisible` (default `DEFAULT_FILTER_MAX_VISIBLE = 5`, resuelto por `_filterMaxVisible(field)`, que también acepta el override por campo):
+
+- El corte solo se aplica cuando el grupo lo supera. **Los visibles son los de mayor conteo** (`counts[b] - counts[a]`; `sort` es estable, así que los empates conservan el orden previo), salvo los grupos con `sortValues` —`fecha_publicacion` (año más nuevo primero) y `descartado` ("Descartado" primero)—, cuyo orden es intencional y solo se trunca.
+- La cola se marca `label.filter-option.filter-option-extra` + `hidden`, y `_buildFilterMore()` agrega al final del `.filter-options` el `button.filter-more` ("Ver más (N)" ⇄ "Ver menos", con `aria-expanded`).
+- **La visibilidad la manda el SCSS**, no el atributo `hidden`: `.filter-menu .filter-option` tiene `display: flex` de autor, que le gana a la regla `[hidden]` de la UA (mismo motivo que obliga a `.taxonomy-row[hidden]`), así que hacen falta las reglas `.filter-option-extra { display: none }` y `.filter-options.expanded .filter-option-extra { display: flex }` al mismo peso. El `hidden` se mantiene igualado.
+- **Un grupo con algún checkbox tildado nunca queda colapsado** (`f.checkboxes.some(cb => cb.checked)`): un filtro aplicado desde un valor invisible es peor que un grupo una línea más largo. También se reabre solo en los rebuilds.
+- El estado de apertura vive en `_filterExpanded: Set<FilterField>`, no en el DOM, porque los checkboxes se reconstruyen (facets de API, re-scope de taxonomía) y el estado tiene que sobrevivir, igual que los toggles de taxonomías.
+- El click **no llama a `_applyFilters()`**: no es un filtro, es UI, y no debe re-renderizar el timeline.
+
 ## Animaciones de entrada
 
 Usan `IntersectionObserver` (sin librerías externas):
@@ -352,7 +364,9 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |
+| `filtersMaxVisible` | `number \| Partial<Record<FilterField, number>>` | Corte de valores por grupo de filtros: número global o override por campo (opción del constructor, default 5) |
 | `filters` | `FilterDef[]` | Estado de los filtros |
+| `_filterExpanded` | `Set<FilterField>` | Grupos de filtros con el "Ver más" abierto (sobrevive a los rebuilds de los checkboxes) |
 | `section` | `HTMLElement` | `.publicaciones-section` |
 | `featuredContainer` | `HTMLElement` | `#featured-cards` |
 | `timelineContainer` | `HTMLElement` | `#timeline-container` |
@@ -381,6 +395,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `.loaded` | `.card-inline-thumb` | Thumbnail inline cargado (quita shimmer) |
 | `.loaded` | `.card-iframe-wrap` | Iframe/embed cargado |
 | `.open` | `.filter-menu` | Menú de filtros abierto |
+| `.expanded` | `.filter-options` | Grupo de filtros con el "Ver más" abierto: muestra los `label.filter-option-extra` (la visibilidad la decide esta clase, no el atributo `hidden`) |
 | `.open` | `.card-info-menu` | Menú de info de tarjeta abierto |
 | `tv-share-toast` | `.card-share-toast` | Animación del cartelito "Copiado al portapapeles!" (fade in/out, 1.5s) |
 | `.active` | `.filter-toggle` | Filtros activos (al menos uno seleccionado) |

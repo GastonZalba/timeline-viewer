@@ -1,7 +1,7 @@
-@use "sass:list";
+@use 'sass:list';
 
 @property --tv-row-angle {
-  syntax: "<angle>";
+  syntax: '<angle>';
   inherits: false;
   initial-value: 0deg;
 }
@@ -72,7 +72,7 @@
     }
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       inset: -1px;
       border-radius: inherit;
@@ -440,7 +440,7 @@
     }
 
     &.active::after {
-      content: "";
+      content: '';
       position: absolute;
       top: -2px;
       right: -2px;
@@ -478,7 +478,7 @@
     }
 
     &.active::after {
-      content: "";
+      content: '';
       position: absolute;
       top: -2px;
       right: 0;
@@ -518,7 +518,7 @@
     }
 
     &.active::after {
-      content: "";
+      content: '';
       position: absolute;
       top: -2px;
       right: 0;
@@ -556,7 +556,7 @@
     }
 
     &::-webkit-search-cancel-button {
-      filter: #{"invert(0.6)"};
+      filter: #{'invert(0.6)'};
       cursor: pointer;
     }
   }
@@ -664,10 +664,51 @@
       background: rgba(255, 255, 255, 0.05);
     }
 
-    input[type="checkbox"] {
+    input[type='checkbox'] {
       accent-color: var(--tv-accent);
       width: 12px;
       height: 12px;
+    }
+  }
+
+  // Valores que quedan detrás del "Ver más (N)" de un grupo de filtros. El estado visible
+  // lo manda el CSS del componente y no el atributo `hidden`, por la misma razón que
+  // `.taxonomy-row[hidden]`: la regla `[hidden]` de la UA cede ante el `display` de autor de
+  // `.filter-menu .filter-option`, así que hace falta una regla con su mismo peso. El
+  // atributo se mantiene igualado en el TS para cuando no haya stylesheet.
+  .filter-menu .filter-option-extra,
+  .estado-menu .filter-option-extra {
+    display: none;
+  }
+
+  .filter-menu .filter-options.expanded .filter-option-extra,
+  .estado-menu .filter-options.expanded .filter-option-extra {
+    display: flex;
+  }
+
+  .filter-more {
+    display: block;
+    width: 100%;
+    padding: 2px 6px;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    font-size: 0.65rem;
+    font-style: italic;
+    color: var(--tv-text-muted);
+    text-align: left;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--tv-accent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--tv-accent);
+      outline-offset: 2px;
+      border-radius: 2px;
     }
   }
 
@@ -743,7 +784,7 @@
     border: 1px solid var(--tv-border-card);
 
     &::after {
-      content: "";
+      content: '';
       position: absolute;
       inset: 0;
       background: #161c21;
@@ -805,7 +846,7 @@
       text-transform: uppercase;
 
       &::before {
-        content: "";
+        content: '';
         width: 7px;
         height: 7px;
         background: var(--tv-accent-light);
@@ -1084,7 +1125,7 @@
     outline: none;
 
     &::before {
-      content: "";
+      content: '';
       width: 4px;
       height: 4px;
       border-radius: 50%;
@@ -1405,7 +1446,7 @@
       margin-bottom: 6px;
 
       &::before {
-        content: "";
+        content: '';
         width: 7px;
         height: 7px;
         background: var(--tv-accent-light);
@@ -1741,7 +1782,7 @@
         }
 
         &::before {
-          content: "";
+          content: '';
           position: absolute;
           inset: 0;
           background: linear-gradient(
@@ -1863,7 +1904,7 @@
     pointer-events: none;
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       width: 12px;
       height: 2px;
@@ -2066,7 +2107,7 @@
     border-radius: 8px 8px 0 0;
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       inset: 0;
       background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
@@ -2075,7 +2116,7 @@
     }
 
     &::after {
-      content: "";
+      content: '';
       position: absolute;
       inset: 0;
       background: linear-gradient(to top, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.38) 45%, transparent 70%);
@@ -2418,7 +2459,7 @@
     transition: all 0.3s ease;
 
     &::before {
-      content: "";
+      content: '';
       position: absolute;
       inset: -2px;
       border-radius: inherit;

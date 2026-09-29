@@ -134,6 +134,17 @@ export interface TimelineOptions {
      * Ignored in single mode (`singleId`), which already renders a single expanded card.
      */
     fullpage?: boolean;
+    /**
+     * Values a filter group shows before collapsing the rest behind a "Ver más (N)" toggle
+     * (default: 5). A number applies to every group; a record tunes single ones and the
+     * groups left out keep the default, e.g. `{ tipo_fuente: 8 }`. `0` (or any value below
+     * 2) shows every value and renders no toggle.
+     *
+     * Which values stay visible: the ones with the most results, except in the groups with
+     * an explicit order (Año publicación, Descartado), which keep it and are just truncated.
+     * A group with a checked value never collapses, so an active filter is never hidden.
+     */
+    filtersMaxVisible?: number | Partial<Record<FilterField, number>>;
     lastUpdated?: string;
     itemsPerPage?: number;
     inlineImages?: boolean;
@@ -157,8 +168,10 @@ interface LinkInfo {
     url: string;
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
+/** Field names that the filter panel knows how to build a group for */
+export type FilterField = 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'capturado' | 'descartado';
 interface FilterDef {
-    field: 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'capturado' | 'descartado';
+    field: FilterField;
     label: string;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];
@@ -178,6 +191,7 @@ export default class Timeline {
     inlineAdjuntos: boolean;
     internalButtons: boolean;
     fullpage: boolean;
+    filtersMaxVisible: number | Partial<Record<FilterField, number>>;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
     content: ContentGroup[];
@@ -210,6 +224,12 @@ export default class Timeline {
     estadoToggle: HTMLElement;
     estadoMenu: HTMLElement;
     filters: FilterDef[];
+    /**
+     * Filter groups whose "Ver más" the user opened. Kept out of the DOM on purpose: the
+     * checkboxes are rebuilt (once more when the API facets land, and on every taxonomy
+     * re-scope), and the state should survive that the way the taxonomy toggles do.
+     */
+    _filterExpanded: Set<FilterField>;
     searchWrap: HTMLElement;
     searchToggle: HTMLElement;
     searchInput: HTMLInputElement;
@@ -445,8 +465,30 @@ export default class Timeline {
     protected _applyWorkNotesState(): void;
     /** Toggle work-notes visibility and persist the state to localStorage */
     protected _toggleWorkNotes(): void;
+    /**
+     * How many values the group of `field` shows before the "Ver más (N)" toggle appears:
+     * the per-field entry of `filtersMaxVisible` when the option is a record, its number
+     * when it is a plain one, and the default otherwise. Below 2 no group collapses.
+     */
+    protected _filterMaxVisible(field: FilterField): number;
     /** Build filter checkboxes from the available filter values (local data or the one-time API facets) */
     protected _buildFilterCheckboxes(): void;
+    /**
+     * Add the "Ver más (N)" toggle at the end of a collapsed filter group and put the group in
+     * its initial state. The hidden values are the `overflow` labels at the tail of
+     * `f.options`, already marked `filter-option-extra`; what this decides is only whether
+     * they show.
+     *
+     * A group with a checked value opens itself: a filter applied from a value the user can no
+     * longer see is worse than a group one line longer, and the rebuilds (the API facets, a
+     * taxonomy re-scope) always land on the visible state.
+     *
+     * The class is what the component CSS keys on, the `hidden` attribute is kept in sync for
+     * the case where the stylesheet is not loaded, and the whole thing lives in the DOM: the
+     * toggle is not a filter, so it does not call `_applyFilters` and the timeline does not
+     * re-render.
+     */
+    protected _buildFilterMore(f: FilterDef, overflow: number): void;
     /** Load the persisted estado-interno filter state from localStorage */
     protected _loadEstadoFilterState(): Record<string, string[]>;
     /** Persist the current estado-interno filter state to localStorage */

@@ -68,6 +68,7 @@ The `Timeline` constructor accepts a single config object:
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
 | `startExpanded` | `boolean`                      | `false`    | When `true`, the timeline starts **already expanded** instead of collapsed on the featured stack. It only sets the initial state: the expand toggle keeps working and the choice is **not persisted**, so every page load starts from this value. Ignored in single mode (`singleId`), which always renders a single expanded card. |
 | `fullpage`    | `boolean`                      | `false`    | When `true`, renders in **fullpage mode**: the timeline is always open and the **page itself is what scrolls**. It implies `startExpanded`, makes the timeline non-collapsible (the expand button keeps showing the related count but loses its chevron and its click), removes the height limit of the list (so `#timeline-cards` is never a scroll box on its own), removes the **resize handle**, and **pins the toolbar** (counter, search, filters, sort and internal buttons) to the top of the viewport. The featured stack is not rendered at all, since it would never be seen, so `featuredCount` has no effect. Ignored in single mode (`singleId`), which already renders a single expanded card. See [Fullpage mode](#fullpage-mode) |
+| `filtersMaxVisible` | `number` \| `Partial<Record<FilterField, number>>` | `5` | Values a filter group shows before collapsing the rest behind a **"Ver más (N)"** toggle. A number applies to every group; a record tunes single ones (`{ tipo_fuente: 8 }`) and the groups left out keep the default. `0` (or any value below 2) shows every value and renders no toggle. The visible ones are those with **the most results**, except in the groups with an explicit order (`fecha_publicacion`, `descartado`), which keep it and are just truncated. A group with a checked value never collapses. See [Filter "Ver más"](#filter-ver-más) |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
@@ -147,7 +148,7 @@ Mientras una respuesta de lista está en vuelo, el componente muestra **tarjetas
 |--------------------|-----------|--------------------------------------------------------------------------|
 | `page`             | `number`  | Página solicitada, 1-indexed (default `1`)                               |
 | `pageSize`         | `number`  | Ítems por página (default `10`)                                          |
-| `sort`             | `asc`/`desc` | Orden por `fecha_publicacion`. `desc` (reciente primero) es el default |
+| `sort`             | `asc`/`desc` | Orden por `fecha_publicacion` (el campo es fijo, el parámetro solo lleva la dirección). `desc` (reciente primero) es el default; cualquier valor distinto de `asc` cae a `desc`. Los ítems **sin fecha van al final en `desc` y al principio en `asc`**, que es lo que hace el componente en modo local |
 | `q`                | `string`  | Texto libre. Coincide con `id`, `nombre_fuente`, `fuente_institucional` y `actores_principales`, sin distinguir acentos ni mayúsculas |
 | `tonos_sociales`   | `string`  | CSV de tonos (`Positivo`, `Negativo`, `Neutro`) — OR dentro del campo    |
 | `tipo_fuente`      | `string`  | CSV de tipos (`sin-tipo` para los que no declaran tipo)                  |
@@ -157,6 +158,8 @@ Mientras una respuesta de lista está en vuelo, el componente muestra **tarjetas
 | `es_oficial`       | `string`  | `oficial`, `no-oficial`                                                  |
 | `fecha_publicacion`| `string`  | CSV de años (`2026`) o `sin-fecha`                                       |
 | `contenido`        | `string`  | CSV de `adjuntos`, `video`, `imagenes`                                   |
+
+> **Dónde caen los ítems sin fecha.** El bucket de los que no tienen `fecha_publicacion` **es parte de la dirección**, no un grupo fijo: en `desc` quedan al final y en `asc` quedan al principio. No alcanza con invertir la comparación de fechas, hay que invertir también ese caso. Es el comportamiento del modo local, que ordena descendente y después da vuelta el array (`_sortByDateDesc()` + `reverse()` en `_applyFilters()`), así que un backend que lo haga de otra forma muestra los sin fecha en un lado en un modo y en el otro en el otro, y el componente no tiene forma de corregirlo: en modo API nunca ordena del lado del cliente, renderiza la página tal cual la devuelve el servidor.
 
 #### Respuesta de `GET {url}`
 
@@ -268,7 +271,7 @@ Behaviour:
 - **The first taxonomy is selected by default** and the select displays its label.
 - **With two or more taxonomies a trailing "Ver todo" option is added** (last in the list, never the default). Selecting it shows every article of every taxonomy at once — the same set the collapsed featured stack draws from. Internally the "all" state is `_contentIndex === -1`, and `_scopeItems()` falls back to the whole pool.
 - **With a single taxonomy the label is still shown**, but the select is rendered **disabled** (muted, no dropdown arrow) and **no "Ver todo" option is added** — there is nothing to aggregate.
-- **Selecting a taxonomy re-scopes the timeline**: the cards, the filter checkboxes and their `(N)` counts and the pagination are all computed over the items of the selected group only. The estado interno filters keep their `localStorage` state, the rest fall back to each filter's defaults. Both sets are sorted by date descending (undated last) and honour the sort toggle.
+- **Selecting a taxonomy re-scopes the timeline**: the cards, the filter checkboxes and their `(N)` counts and the pagination are all computed over the items of the selected group only. The estado interno filters keep their `localStorage` state, the rest fall back to each filter's defaults. Both sets are sorted by date and honour the sort toggle: descending leaves the **undated last**, ascending puts them **first** (the toggle reverses the descending array rather than re-sorting). The same placement applies in API mode, where the direction travels to the server in the `sort` param.
 - **The number in the expand button never changes with the taxonomy**: it always shows the total of every group, and `relatedLabel(count)` receives that same total, so the singular/plural always matches. Narrowing a taxonomy changes *what* the timeline lists, not *how many* publications the section has.
 - The selector is **not rendered at all** when: `content` is not set, every group is invalid, the legacy `items` alias is used, or the component runs in API mode. In those cases the layout is byte-for-byte the previous one.
 - Group `label`s are plain text (no HTML). A label longer than the pill crops with a real ellipsis (`...`) while its **`(N)` count always stays visible**, because the pill is a flex row where only the label shrinks. The pill is capped at `max-width: 240px` and its full width is `shrink-to-content`, so it narrows on short labels. Hovering shows the complete `label (N)` in a tooltip.
@@ -348,6 +351,38 @@ If the host page already has a fixed header of its own, raise the sticky offset 
 
 Sticky positioning needs no scroll container between the section and the page, and no ancestor with `overflow: hidden` — if the toolbar does not stick, check that first.
 
+### Filter "Ver más"
+
+Filter groups with an open value list (`tipo_fuente`, `tonos_sociales`, `contenido`...) can get long. By default each group shows the **5 values that filter the most** and hides the rest behind a "Ver más (N)" toggle that swaps to "Ver menos":
+
+```js
+new Timeline({
+  container: '#noticias-container',
+  content: [/* ContentGroup[] */]
+}); // tipo_fuente with 7 values -> 5 shown, "Ver más (2)"
+```
+
+```js
+new Timeline({
+  container: '#noticias-container',
+  content: [/* ContentGroup[] */],
+  filtersMaxVisible: 0 // every value, no toggle
+});
+
+new Timeline({
+  container: '#noticias-container',
+  content: [/* ContentGroup[] */],
+  filtersMaxVisible: { tipo_fuente: 8, tonos_sociales: 3 } // per group, default 5 for the rest
+});
+```
+
+Details worth knowing:
+
+- **Which values stay visible** is by result count, which works in both modes: in local mode the counts come from the items in the selected taxonomy, in API mode from `GET {url}/facets`. Groups with a **deliberate order** — `fecha_publicacion` (newest year first) and `descartado` ("Descartado" first) — keep it and are only truncated, so the year list never leads with the year that happens to have the most articles.
+- **A group with a checked value never collapses**, so a filter you applied is never hidden behind the toggle. It also reopens by itself on the rebuilds (when the API facets land, and when you switch taxonomy).
+- **The toggle is not a filter**: it does not touch the results and does not re-render the timeline, so opening and closing it is instant. Whether the group is open is kept in memory for the session (not in `localStorage`; the only persisted filters are the internal-state ones, validado / capturado / descartado).
+- Groups with one or zero values are hidden entirely, as before, and the groups of the internal-state buttons (`validado`, `capturado`, `descartado`) have a fixed two values, so in practice they never collapse.
+
 ## Build
 
 ```bash
@@ -383,7 +418,7 @@ Query flags of the demo page:
 
 | Flag | Effect |
 |------|--------|
-| *(none)* | Local mode with `content`: 3 taxonomies, so the selector and the "Ver todo" option are visible |
+| *(none)* | Local mode with `content`: 3 taxonomies, so the selector and the "Ver todo" option are visible. The **Tipo de fuente** group has 7 values, so it shows the 5 with the most results plus a "Ver más (2)" toggle |
 | `?flat` | Local mode with the legacy `items` alias: verifies that no taxonomy selector is rendered and the layout is unchanged |
 | `?expanded` | Starts the timeline expanded (`startExpanded: true`) instead of collapsed. Combinable with the other flags |
 | `?full` | Fullpage mode (`fullpage: true`): always expanded, no resize handle, the page does the scrolling and the toolbar sticks to the top. Subsumes `?expanded`. Combinable with the other flags |
