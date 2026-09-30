@@ -2062,14 +2062,22 @@ export default class Timeline {
         }
         return this._apiFacetsPromise;
     }
-    /** Fetch a page of items from the API and (re)build the whole view */
+    /**
+     * Fetch a page of items from the API and (re)build the whole view.
+     *
+     * This is the one call behind every request that **replaces** the list — the first page, the
+     * refetch a search/filter/sort change schedules and the page change of the numeric paginator —
+     * so it is also where the skeletons go up: what is on screen is never what is being asked for,
+     * and leaving it there under a "Cargando..." line would only show the previous answer longer.
+     */
     async _fetchPage(page) {
         const seq = ++this._apiSeq;
         const prevPage = this._apiPage;
         this._apiPage = page;
-        this._apiLoading = true;
-        this._apiError = '';
-        this._renderStatus();
+        // The single trigger of `_renderApiLoading`: idempotent, so `_init` and `_applyFilters` can
+        // show the placeholders earlier and get a no-op here, and synchronous, so the DOM is already
+        // swapped by the time the caller yields.
+        this._renderApiLoading();
         try {
             const data = await this._apiFetch('', this._buildQueryParams(page));
             if (seq !== this._apiSeq)
@@ -2094,12 +2102,13 @@ export default class Timeline {
                 return;
             this._apiLoading = false;
             this._apiError = 'No se pudieron cargar los datos. Intente nuevamente.';
-            // The list on screen is still the one of the previous page, so the cursor goes back with
-            // it. Without this the paginator would count from a page that never rendered and every
-            // retry would skip one.
+            // The page that was on screen is gone (its cards left with the skeletons), so the cursor
+            // goes back to the one that was there. Without this the paginator would count from a page
+            // that never rendered and every retry would skip one.
             this._apiPage = prevPage;
-            // No `_renderAll` here: the results in memory are the ones the panel no longer matches, so
-            // they stay out and the list is left empty with the error row.
+            // No `_renderAll` here: the skeletons are what is on screen, and whatever is in memory is
+            // either what the panel no longer matches (search/filter/sort) or the page the user just left,
+            // so neither is rendered and the list is left empty with the error row.
             this._clearApiLoading();
             this._renderStatus();
         }
@@ -2213,15 +2222,19 @@ export default class Timeline {
      * Replace the list (and the featured stack) with skeleton placeholders while an API list
      * request is in flight.
      *
-     * Two callers: the first page (`_init`) and the page-1 refetch that a search/filter/sort
-     * change schedules (`_applyFilters`). In both the results on screen are either missing or no
-     * longer match the panel, and `_renderAll` puts the real ones back when the response lands.
-     * "Cargar más" (`_appendPageItems`) does not come through here: it keeps the list the user is
-     * reading, which is what a request that only adds to it should do.
+     * One trigger, one meaning: every API request that **replaces** the list. `_fetchPage` owns it —
+     * the first page, the refetch a search/filter/sort change schedules and the page change of the
+     * numeric paginator — so what is on screen is always missing or stale, and `_renderAll` puts the
+     * real results back when the response lands. The two direct callers above it are conveniences,
+     * not a second rule: `_init` shows them before the first page goes out, and `_applyFilters` does
+     * it at the click so the placeholders are already up while the debounce window is open (and so
+     * they survive into the fetch). "Cargar más" (`_appendPageItems`) does not come through here: it
+     * keeps the list the user is reading, which is what a request that only adds to it should do.
      *
-     * Idempotent, because it runs on every keystroke: a burst of them shows the skeleton once.
-     * The state lives in the DOM (a placeholder element), which is also what `_renderStatus`
-     * checks to stay out of the way, so there is nothing to keep in sync when the render lands.
+     * Idempotent, which is what lets those callers exist: a burst of keystrokes, or a `_fetchPage`
+     * that lands on top of an already-showing one, shows the skeleton once. The state lives in the DOM
+     * (a placeholder element), which is also what `_renderStatus` checks to stay out of the way, so
+     * there is nothing to keep in sync when the render lands.
      *
      * The placeholders copy the silhouette of a real collapsed card (empty `.card-image-wrap` +
      * title + summary lines) so the list keeps its size when the data lands; see the
@@ -2266,6 +2279,8 @@ export default class Timeline {
         for (let i = 1; i < total; i++)
             this._appendTimelineSkeleton(markup);
         // Ídem con los featured: en fullpage no se renderizan en ningún momento (ver `_renderFeatured`).
+        // Con el paginador el stack está congelado en la página 1 (`_apiFeatured`), pero se reconstruye
+        // desde ahí cuando llegan los datos, así que también puede placearse en un cambio de página.
         if (this.fullpage)
             return;
         for (let i = 0; i < this.featured_count; i++) {
@@ -2308,10 +2323,11 @@ export default class Timeline {
     /**
      * Render the API status row (error / loading / count) at the end of the timeline.
      *
-     * With the numeric paginator the row is only half used: the error and loading lines stay,
-     * because the request can still fail and there is no other feedback, but the count line goes
-     * away — "Mostrando 10 de 87" counts the page on screen, not everything the user went
-     * through, and the paginator already says which page it is and how many there are.
+     * With the numeric paginator only the **error** can reach this row: the request that changes the
+     * page is one of the replacing ones (`_fetchPage`), so it shows the skeletons instead, which
+     * also keeps `_renderStatus` out of the way. The count line is gone for a second reason —
+     * "Mostrando 10 de 87" counts the page on screen, not everything the user went through, and the
+     * paginator already says which page it is and how many there are.
      */
     _renderStatus() {
         // The skeletons are the loading feedback while the list is being replaced, and their count
@@ -2327,10 +2343,10 @@ export default class Timeline {
             text = this._apiError;
         else if (this._apiLoading && this.allCards.length === 0)
             text = 'Cargando publicaciones...';
-        // With the paginator the page being fetched is a different one, not "more" of the current,
-        // and the count row below would read "Mostrando 10 de 87" while page 3 is on screen.
+        // Only "Cargar más" (`_appendPageItems`) gets here with cards on screen, and it only exists
+        // without the paginator: there the page being fetched is genuinely "more" of the current one.
         else if (this._apiLoading && this.allCards.length > 0)
-            text = this.pagination ? `Cargando página ${this._apiPage}...` : 'Cargando más publicaciones...';
+            text = 'Cargando más publicaciones...';
         else if (!this.pagination && this._apiTotal > 0)
             text = `Mostrando ${this.allCards.length} de ${this._apiTotal} publicaciones`;
         if (!text)
@@ -2579,7 +2595,9 @@ export default class Timeline {
      * más": what is on screen after the change is not what was there before, so keeping the old
      * cards would be a lie. The API branch therefore reuses `_fetchPage`, the very same call the
      * search, the filters and the sort already make, and the local branch re-renders from
-     * `allCards`, which always holds the whole filtered pool.
+     * `allCards`, which always holds the whole filtered pool. Being a replacement, the API branch
+     * also swaps the list for the skeletons on the click (inside `_fetchPage`), instead of leaving
+     * the page being left on screen under a "Cargando página N..." line.
      *
      * Out-of-range pages are clamped rather than rejected, so a shorter result set (the filters
      * changed underneath, say) lands on the last page instead of an empty one.
@@ -2592,7 +2610,13 @@ export default class Timeline {
         if (this.api) {
             // `_fetchPage` bumps `_apiSeq`, so a page still in flight is dropped: the one that lands
             // last is the one on screen, and the paginator is re-rendered by its own `_renderAll`.
-            await this._fetchPage(target);
+            const pending = this._fetchPage(target);
+            // It puts the skeletons up before its first await, so the list is already the new (empty)
+            // one here: scrolling now lands on the top of it instead of waiting for the response, which
+            // matters in fullpage, where the page scrolls and `timelineCards.scrollTop` does nothing.
+            // `_fetchPage` re-aligns when the data lands, so this is not the only chance.
+            this._scrollToTimelineTop();
+            await pending;
             return;
         }
         this._page = target;

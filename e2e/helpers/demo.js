@@ -8,6 +8,9 @@ const DEMO = '/index.html';
  *
  * `?expanded` (or `?full`) is what makes the paginator reachable: the control lives inside
  * `#timeline-cards`, which in the default mode is collapsed to `max-height: 0`.
+ *
+ * In API mode the wait below can be satisfied by the loading placeholders (they are
+ * `.timeline-card` too), so tests that need the real list have to wait for it themselves.
  */
 export async function openDemo(page, flags = '') {
   await useOfflineNetwork(page);
@@ -24,17 +27,19 @@ export const sel = {
   next: '.timeline-paginator-next',
   paginatorText: '.timeline-paginator-text',
   loadMore: '.timeline-load-more-item',
-  status: '.timeline-status-item'
+  status: '.timeline-status-item',
+  skeleton: '.timeline-skeleton-item'
 };
 
 /**
  * Ids of the articles currently rendered, in DOM order.
  *
- * The trailing rows (paginator, status, "Cargar más" and the footer) are also `.timeline-item` —
- * the source builds every row as `'timeline-item timeline-<x>-item'` — so they have to be excluded
- * or they get counted as articles.
+ * The trailing rows (paginator, status, "Cargar más" and the footer) and the loading placeholders
+ * are also `.timeline-item` — the source builds every row as `'timeline-item timeline-<x>-item'`,
+ * and `_renderApiLoading` makes its skeletons `'timeline-item timeline-skeleton-item'` — so they
+ * have to be excluded or they get counted as articles (the skeletons as `null`).
  */
-export const ARTICLE_ROWS = `${sel.cards} > .timeline-item:not(.timeline-paginator-item):not(.timeline-status-item):not(.timeline-load-more-item):not(.timeline-footer-item)`;
+export const ARTICLE_ROWS = `${sel.cards} > .timeline-item:not(.timeline-paginator-item):not(.timeline-status-item):not(.timeline-load-more-item):not(.timeline-footer-item):not(.timeline-skeleton-item)`;
 
 export function articleIds(page) {
   return page.$$eval(ARTICLE_ROWS, (rows) =>

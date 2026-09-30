@@ -277,7 +277,7 @@ El sistema de paginación es **manual** (no infinito scroll):
 
 En **modo API** el botón llama a `_appendPageItems()` en lugar de appendear en el DOM, pero el criterio es el mismo (`allCards.length < _apiTotal`, es decir el `total` de la respuesta de la lista). Esa llamada **solo agrega** las tarjetas nuevas: usa `_appendTimelineItems()` — el hermano de `_renderTimeline()` sin el `innerHTML = ''` — y **no** pasa por `_renderAll()`, que reconstruye la lista completa.
 
-El rebuild es lo correcto cuando lo que hay en pantalla ya no son los artículos en memoria: `_fetchPage(1)` tras una búsqueda/filtro/orden y el re-scope de una taxonomía reemplazan el conjunto, y ahí `_renderTimeline()` hace falta. "Cargar más" es el caso contrario —las tarjetas visibles siguen siendo correctas— y un rebuild en cada página se notaba: `.timeline-item` nace en `opacity: 0` y solo aparece con `.visible`, así que al recrear los nodos **toda** la lista repetía su animación de entrada (el flash), se perdía el detalle ya inyectado en las expandidas y se recargaban todas las imágenes.
+El rebuild es lo correcto cuando lo que hay en pantalla ya no son los artículos en memoria: `_fetchPage(1)` tras una búsqueda/filtro/orden, el re-scope de una taxonomía y el salto de página del paginador numérico (`_goToPage()` → `_fetchPage(page)`, porque las páginas son disjuntas) reemplazan el conjunto, y ahí `_renderTimeline()` hace falta. "Cargar más" es el caso contrario —las tarjetas visibles siguen siendo correctas— y un rebuild en cada página se notaba: `.timeline-item` nace en `opacity: 0` y solo aparece con `.visible`, así que al recrear los nodos **toda** la lista repetía su animación de entrada (el flash), se perdía el detalle ya inyectado en las expandidas y se recargaban todas las imágenes.
 
 Detalles del append:
 
@@ -294,10 +294,12 @@ Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** 
 |--------|-------------|-----------------|
 | Primera página (`_init`) | skeletons | `_renderAll()` |
 | Cambio de búsqueda / filtro / orden (`_applyFilters`) | skeletons, en el acto | `_renderAll()` |
+| Cambio de página del paginador (`_goToPage` → `_fetchPage`) | skeletons, en el acto | `_renderAll()` |
 | "Cargar más" (`_appendPageItems`) | las tarjetas que ya se están leyendo + la fila de status | `_appendTimelineItems` + `_renderStatus` |
 | Request fallido | lista vacía + la fila de error | — |
 
-- `_renderApiLoading()` es **idempotente**: se llama en cada tecla, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons.
+- Un solo trigger: `_renderApiLoading()` se llama desde `_fetchPage()`, o sea en **todo** request que reemplaza la lista. `_init()` y `_applyFilters()` también la llaman, pero por comodidad: para que los placeholders ya estén en pantalla antes de que el request salga (el primero) y antes de que abra la ventana de debounce (el segundo).
+- `_renderApiLoading()` es **idempotente**: se llama en cada tecla y varias veces sobre la misma carga, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons. Con `pagination: true` esto también elimina la fila de carga del cambio de página (el "Cargando página N..." que se veía al pie con las cartas de la página anterior todavía en pantalla): los skeletons la reemplazan, así que `_renderStatus()` ya solo puede emitir el error.
 - `_schedulePageReload(immediate)` tiene dos formas porque los disparadores no son alike. Un trigger que cae dentro de una ventana abierta **siempre** rearma la ventana **con** request, así que el último estado de una ráfaga es siempre el último que llega. Con `immediate` (acciones discretas: checkbox, toggle de orden, Escape) el request sale en el acto y la ventana solo traga lo que venga; sin él (escribir en el buscador) es el debounce de cola clásico, porque un request por tecla le pediría al servidor todos los prefijos del término.
 - El skeleton no es texto: son elementos `.timeline-skeleton-item` / `.featured-skeleton` con `aria-hidden="true"` y `aria-busy="true"` en `#timeline-cards`, animados con el mismo `@keyframes shimmer` de `.card-iframe-shimmer`. Llevan la clase `visible` desde el markup, que es lo que evita que esperen al IntersectionObserver.
 

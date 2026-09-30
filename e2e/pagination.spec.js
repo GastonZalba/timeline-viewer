@@ -109,3 +109,67 @@ test.describe('paginador numerico en el navegador', () => {
     await expect.poll(() => paginatorText(page)).toBe('Página 1 de 2');
   });
 });
+
+test.describe('paginador en modo API: el estado de carga', () => {
+  /**
+   * Delay the list requests.
+   *
+   * Registered *after* `openDemo`, so page 1 has already landed (it would otherwise be delayed too,
+   * and the wait for the paginator would be a race). Playwright matches routes in reverse
+   * registration order, so this one wins over the catch-all of the offline network, which is the one
+   * that lets the request through with `continue()`.
+   */
+  const delayList = (page, ms = 400) =>
+    page.route(
+      (url) => url.pathname === '/api',
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        await route.continue();
+      }
+    );
+
+  test('cambiar de pagina borra las cartas y las reemplaza por skeletons', async ({ page }) => {
+    await openDemo(page, 'api&pagination&expanded');
+    // The paginator only exists once the real list is rendered, so this is also the wait for
+    // page 1 — before which the delay must not be installed.
+    await expect(page.locator(sel.paginator)).toBeVisible();
+    const first = await articleIds(page);
+    expect(first.length).toBeGreaterThan(0);
+
+    await delayList(page);
+    await page.click(sel.next);
+
+    // A page change replaces the list, so the page being left has to go: keeping it under a
+    // "Cargando página 2..." line would show the previous answer as if it were the new one.
+    await expect(page.locator(sel.skeleton).first()).toBeVisible();
+    expect(await articleIds(page)).toEqual([]);
+    await expect(page.locator(sel.status)).toHaveCount(0);
+
+    await expect.poll(() => paginatorText(page)).toBe('Página 2 de 2');
+    await expect(page.locator(sel.skeleton)).toHaveCount(0);
+    const second = await articleIds(page);
+    expect(second.length).toBeGreaterThan(0);
+    expect(second).not.toEqual(first);
+    // And the count row is still not there: with the paginator only the error reaches that row.
+    await expect(page.locator(sel.status)).toHaveCount(0);
+  });
+
+  test('si el request de la pagina falla, la lista queda vacia con el error', async ({ page }) => {
+    await openDemo(page, 'api&pagination&expanded');
+    await expect(page.locator(sel.paginator)).toBeVisible();
+
+    // Registered after `openDemo` so only the page-2 request fails, and page 1 rendered normally.
+    await page.route(
+      (url) => url.pathname === '/api' && url.searchParams.get('page') === '2',
+      (route) => route.abort()
+    );
+    await page.click(sel.next);
+
+    await expect(page.locator(sel.skeleton)).toHaveCount(0);
+    expect(await articleIds(page)).toEqual([]);
+    // Same contract as a failed search/filter: nothing stale is put back, only the error row.
+    await expect(page.locator(sel.status)).toHaveCount(1);
+    await expect(page.locator(sel.status)).toContainText('No se pudieron cargar los datos');
+    await expect(page.locator(sel.paginator)).toHaveCount(0);
+  });
+});
