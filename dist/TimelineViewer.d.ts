@@ -137,14 +137,29 @@ export interface TimelineOptions {
     /**
      * Values a filter group shows before collapsing the rest behind a "Ver más (N)" toggle
      * (default: 5). A number applies to every group; a record tunes single ones and the
-     * groups left out keep the default, e.g. `{ tipo_fuente: 8 }`. `0` (or any value below
-     * 2) shows every value and renders no toggle.
+     * groups left out keep the default, e.g. `{ tipo_fuente: 8 }`. A group can also carry its
+     * own `maxVisible`, which wins over both. `0` (or any value below 2) shows every value
+     * and renders no toggle.
      *
      * Which values stay visible: the ones with the most results, except in the groups with
-     * an explicit order (Año publicación, Descartado), which keep it and are just truncated.
+     * an explicit order (`sortValues`), which keep it and are just truncated.
      * A group with a checked value never collapses, so an active filter is never hidden.
      */
-    filtersMaxVisible?: number | Partial<Record<FilterField, number>>;
+    filtersMaxVisible?: number | Partial<Record<string, number>>;
+    /**
+     * Filter groups of the panel, in display order. **Without this option the component has no
+     * filters at all**: no panel, no filter button and no filter params in API mode. Nothing is
+     * hardcoded, so a new filter is added here —or sent by a backend through `GET {url}/facets`—
+     * without rebuilding the library.
+     *
+     * Each entry needs a `field` and a `label`; `type` only accepts `'checkboxes'` today and
+     * defaults to it. In local mode the values are derived from the items of the selected taxonomy
+     * (distinct values of `field`, counted, arrays expanded); in API mode they are the ones the
+     * server sends in `GET {url}/facets` under the same `field`, which is also the query param the
+     * active values travel in. See [TimelineFilter](#timelinefilter) and
+     * [Filtros configurables](#filtros-configurables).
+     */
+    filters?: TimelineFilter[];
     lastUpdated?: string;
     /**
      * Items shown per page. `0` disables the batch pagination: every matching item is rendered
@@ -184,18 +199,74 @@ interface LinkInfo {
     url: string;
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
-/** Field names that the filter panel knows how to build a group for */
-export type FilterField = 'tonos_sociales' | 'tipo_fuente' | 'validado' | 'fecha_publicacion' | 'contenido' | 'es_oficial' | 'capturado' | 'descartado';
-interface FilterDef {
-    field: FilterField;
+/** Controls a filter group can be rendered with. Only checkboxes are supported today. */
+export type FilterType = 'checkboxes';
+/** Where a filter group is rendered: a column of the panel, or the internal-state flyout */
+export type FilterGroup = 'menu' | 'estado';
+/**
+ * One filter group of the panel, as declared by the `filters` option of the constructor.
+ * See [TimelineOptions.filters](#timelineoptions) for how the values are resolved in each mode.
+ */
+export interface TimelineFilter {
+    /**
+     * Name of the field the group filters by. In local mode it is a field of `TimelineItem` (or a
+     * synthetic name when `extract` is given); in API mode it is the key the server uses in
+     * `GET {url}/facets`, which is also the query param the active values are sent in.
+     */
+    field: string;
+    /** Header of the group. Escaped before being injected into the markup. */
     label: string;
+    /** Control of the group. Defaults to `'checkboxes'`; any other value drops the group. */
+    type?: FilterType;
+    /**
+     * `'menu'` (default) renders the group in a column of the panel, `'estado'` renders it in the
+     * internal-state flyout, which is part of the internal toolbar and therefore needs
+     * `internalButtons: true`. An `'estado'` group without it is not rendered.
+     */
+    group?: FilterGroup;
+    /**
+     * Fixed values of the group. When given, the group exists even if no item (or no facet)
+     * carries a value for it, which is how a group of fixed choices stays visible with an
+     * empty collection. It is also the order the values are rendered in, unless `sortValues` says
+     * otherwise.
+     */
+    values?: string[];
+    /** Values checked when the group is built. They travel in the first request in API mode. */
+    defaultChecked?: string[];
+    /**
+     * Persist the checked values of the group in `localStorage` (default: false), so they survive
+     * the rebuilds of the checkboxes (the API facets, a taxonomy re-scope) and the page loads.
+     */
+    persist?: boolean;
+    /** Values shown before the "Ver más (N)" toggle appears, over `filtersMaxVisible`. */
+    maxVisible?: number;
+    /**
+     * Values of the group carried by an item. Defaults to reading `item[field]`: arrays are
+     * expanded and `null` / `undefined` count as no value at all. Use it for fields that need a
+     * canonical value (a boolean split in two, a date reduced to its year) or for synthetic
+     * fields that are not a property of the item.
+     */
+    extract?: (item: TimelineItem) => string | string[];
+    /**
+     * Label shown for a value. Defaults to the value itself, except `true` → "Sí" and
+     * `false` → "No" so a boolean field does not read as raw `true` / `false`.
+     */
+    formatLabel?: (val: string) => string;
+    /**
+     * Explicit order of the values. A group that declares one keeps it when the long list is
+     * truncated (instead of leading with the values that filter the most).
+     */
+    sortValues?: (a: string, b: string) => number;
+}
+/** A `TimelineFilter` normalized for rendering: defaults resolved and the DOM slot attached */
+interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'values'> {
+    group: FilterGroup;
+    persist: boolean;
+    /** Column of the panel the group is rendered in. `0` for the `'estado'` flyout, ignored there. */
+    column: number;
     options: HTMLElement;
     checkboxes: HTMLInputElement[];
-    extract?: (item: TimelineItem) => string | string[];
-    formatLabel?: (val: string) => string;
-    sortValues?: (a: string, b: string) => number;
-    defaultChecked?: string[];
-    fixedValues?: string[];
+    values?: string[];
 }
 export default class Timeline {
     container: HTMLElement;
@@ -208,7 +279,7 @@ export default class Timeline {
     inlineAdjuntos: boolean;
     internalButtons: boolean;
     fullpage: boolean;
-    filtersMaxVisible: number | Partial<Record<FilterField, number>>;
+    filtersMaxVisible: number | Partial<Record<string, number>>;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
     content: ContentGroup[];
@@ -247,8 +318,10 @@ export default class Timeline {
     sortToggle: HTMLElement;
     sortAscending: boolean;
     workNotesToggle: HTMLElement;
-    filterToggle: HTMLElement;
-    filterMenu: HTMLElement;
+    /** Null when the `filters` option declares no group, in which case the panel is not rendered */
+    filterToggle: HTMLElement | null;
+    filterMenu: HTMLElement | null;
+    /** Null when `internalButtons` is off or no group is declared for the `estado` flyout */
     estadoWrap: HTMLElement;
     estadoToggle: HTMLElement;
     estadoMenu: HTMLElement;
@@ -258,7 +331,7 @@ export default class Timeline {
      * checkboxes are rebuilt (once more when the API facets land, and on every taxonomy
      * re-scope), and the state should survive that the way the taxonomy toggles do.
      */
-    _filterExpanded: Set<FilterField>;
+    _filterExpanded: Set<string>;
     searchWrap: HTMLElement;
     searchToggle: HTMLElement;
     searchInput: HTMLInputElement;
@@ -292,6 +365,22 @@ export default class Timeline {
      * An empty result means the component falls back to the legacy flat `items` list.
      */
     protected _normalizeContent(content: ContentGroup[] | undefined): ContentGroup[];
+    /**
+     * Normalize the `filters` option into the groups the panel renders.
+     *
+     * Nothing is hardcoded, so an absent or invalid option simply yields no groups: the panel and
+     * its button are not rendered at all, and in API mode no filter param is sent. Entries that
+     * cannot be rendered —no `field`, no `label`, a `type` that is not supported yet, or a `field`
+     * already declared— are dropped with a warning instead of breaking the mount, because a group
+     * that renders nothing is far harder to notice than a line in the console.
+     *
+     * The `'menu'` groups are then dealt out to the columns of the panel: the first half goes to
+     * the first column and the rest to the second, which reads a declaration top to bottom down
+     * the first column and then along the second.
+     */
+    protected _normalizeFilters(filters: TimelineFilter[] | undefined): FilterDef[];
+    /** Report a group of the `filters` option that was dropped, so a typo does not go unnoticed */
+    protected _warnFilter(index: number, reason: string): void;
     /** Every item of every taxonomy, used by the featured stack, the counter and single mode */
     protected _allItems(): TimelineItem[];
     /**
@@ -307,8 +396,45 @@ export default class Timeline {
      * (or of the whole pool for "Ver todo") and never reacts to the checkboxes.
      */
     protected _scopeCount(): number;
+    /**
+     * Markup of a group of the `filters` option: an empty `.filter-options` box the checkboxes
+     * are built into, tagged with the field it belongs to.
+     *
+     * The `id` is only a handle for debugging: the component looks the box up by the
+     * `data-filter-field` attribute, so a `field` with characters that are not valid in a CSS
+     * selector cannot break the wiring. `data-filter-field` is also the stable hook for a
+     * consumer's own tests.
+     *
+     * A `'menu'` group is a section with its header inside the panel; a `'estado'` one is a bare
+     * box, because the flyout has no headers of its own.
+     */
+    protected _buildFilterOptionsHtml(f: FilterDef): string;
+    /**
+     * Markup of the filter panel, or an empty string when no group is declared for it: with no
+     * `filters` option the component has no filter UI at all, not a hidden one.
+     * The columns come from the `column` that `_normalizeFilters` dealt out, in the order the
+     * groups were declared, so the declaration reads down the first column and then along the
+     * second.
+     */
+    protected _buildFilterMenuHtml(): string;
+    /**
+     * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
+     * declared for it, the `estado` flyout. Without the latter the button would open an empty
+     * menu, so both of them are conditional on the `filters` option as well.
+     */
+    protected _buildInternalButtonsHtml(): string;
     /** Build the main DOM layout and cache element references */
     protected _buildLayout(): void;
+    /**
+     * Point every group of the `filters` option at the box `_buildLayout` rendered for it.
+     * The lookup goes through the `data-filter-field` attribute rather than the id, so a `field`
+     * that is not a valid CSS selector identifier still finds its box.
+     *
+     * A group with no box is one whose container was not rendered: a `'estado'` group without
+     * `internalButtons`, for instance. It keeps its configuration (so a later `_buildFilterCheckboxes`
+     * just skips it) but has nowhere to draw, exactly as when the flyout did not exist before.
+     */
+    protected _attachFilterOptions(): void;
     /**
      * Populate the taxonomy selector with the labels of the `content` groups.
      * Nothing is rendered when there are no groups (legacy `items` option) or in API mode,
@@ -526,12 +652,31 @@ export default class Timeline {
     /** Toggle work-notes visibility and persist the state to localStorage */
     protected _toggleWorkNotes(): void;
     /**
-     * How many values the group of `field` shows before the "Ver más (N)" toggle appears:
-     * the per-field entry of `filtersMaxVisible` when the option is a record, its number
-     * when it is a plain one, and the default otherwise. Below 2 no group collapses.
+     * How many values the group `f` shows before the "Ver más (N)" toggle appears: its own
+     * `maxVisible` first, then the per-field entry of `filtersMaxVisible` when the option is a
+     * record, its number when it is a plain one, and the default otherwise.
+     * Below 2 no group collapses.
      */
-    protected _filterMaxVisible(field: FilterField): number;
-    /** Build filter checkboxes from the available filter values (local data or the one-time API facets) */
+    protected _filterMaxVisible(f: FilterDef): number;
+    /**
+     * Values a group carries for a single item, as the array the code filters on:
+     * what `extract` returns, or the `field` of the item itself (arrays expanded, everything
+     * stringified). A `null` / `undefined` is no value at all, so the item belongs to none of
+     * the checkboxes — which is what makes a boolean field need an `extract` of its own if
+     * "no value" has to be a value too.
+     */
+    protected _filterValuesOf(f: FilterDef, item: TimelineItem): string[];
+    /**
+     * Label shown for a value: what `formatLabel` returns, or the value itself — except the
+     * booleans, that would otherwise read as raw `true` / `false`.
+     */
+    protected _filterLabelOf(f: FilterDef, value: string): string;
+    /**
+     * Build the checkboxes of every group of the `filters` option out of the values it has:
+     * the ones derived from the items of the active scope in local mode, the ones the server sent
+     * in `GET {url}/facets` in API mode. A group with no container to draw in is skipped, and so
+     * is the whole method when no group was declared at all (nothing to build, nothing to show).
+     */
     protected _buildFilterCheckboxes(): void;
     /**
      * Add the "Ver más (N)" toggle at the end of a collapsed filter group and put the group in
@@ -549,10 +694,14 @@ export default class Timeline {
      * re-render.
      */
     protected _buildFilterMore(f: FilterDef, overflow: number): void;
-    /** Load the persisted estado-interno filter state from localStorage */
-    protected _loadEstadoFilterState(): Record<string, string[]>;
-    /** Persist the current estado-interno filter state to localStorage */
-    protected _saveEstadoFilterState(): void;
+    /**
+     * Load the state of the filters marked `persist` from localStorage, keyed by `field`.
+     * A group that declares no `persist` never reads it, which is what makes the rebuilds (the API
+     * facets, a taxonomy re-scope) start over on those instead of silently keeping a value.
+     */
+    protected _loadPersistedFilterState(): Record<string, string[]>;
+    /** Persist the checked values of every group marked `persist` to localStorage */
+    protected _savePersistedFilterState(): void;
     /** Normalize a string for accent- and case-insensitive search matching */
     protected _normalizeSearch(value: string | null | undefined): string;
     /** Check whether a card matches the current search term */
@@ -668,7 +817,11 @@ export default class Timeline {
      * through, and the paginator already says which page it is and how many there are.
      */
     protected _renderStatus(): void;
-    /** Sync the active class on the search/filter/estado toggle buttons */
+    /**
+     * Sync the active class on the search/filter/estado toggle buttons.
+     * Each button is lit by the groups **it** holds, not by any active filter: the `estado` groups
+     * live in the flyout, so they only light the flyout button and never the one of the panel.
+     */
     protected _syncFilterToggleState(): void;
     /**
      * Apply active filters and re-render the full view (or reload from the API).

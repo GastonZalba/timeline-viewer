@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mockData from './mock-data.js';
+import filters from './filters.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,9 +32,16 @@ function normalize(value) {
     .toLowerCase();
 }
 
-/** Canonical filter values per field (mirrors TimelineViewer._buildFilterCheckboxes extracts) */
+/**
+ * Canonical filter values per field, for the fields that need them.
+ *
+ * A field is only listed here when the value it stores is not the value the client filters by: a
+ * boolean split into two named buckets, a date reduced to its year, a synthetic field that is not
+ * a property of the item. Everything else (`tipo_fuente`, `tonos_sociales`, or any field a
+ * consumer adds later) is read by `readField` below, which is the generic counterpart: the client
+ * declares the group in its `filters` option and the server just has to count and compare.
+ */
 const FIELD_EXTRACT = {
-  tonos_sociales: (item) => item.tonos_sociales || [],
   tipo_fuente: (item) => (item.tipo_fuente ? [item.tipo_fuente] : ['sin-tipo']),
   validado: (item) => (item.validado === true ? ['validado'] : ['no-validado']),
   capturado: (item) => (item.capturado !== true ? ['no-capturado'] : ['capturado']),
@@ -49,6 +57,31 @@ const FIELD_EXTRACT = {
   }
 };
 
+/**
+ * The fields this backend exposes facets for: the ones the demo UI declares in its `filters`
+ * option (see `example/filters.js`). That is the whole contract between the two halves — the
+ * client says which groups it has, the server answers with the values of each one — so a filter
+ * added to the demo needs no change here to show up with its values and its counts.
+ */
+const FACET_FIELDS = filters.map((f) => f.field);
+
+/** Query params that are not filters: the ones that drive the page, the search and the order. */
+const RESERVED_PARAMS = new Set(['page', 'pageSize', 'sort', 'q']);
+
+/**
+ * Values an item carries for a field, in the shape the client filters on: always a list of
+ * strings, with arrays expanded and `null` / `undefined` counting as no value at all. It falls
+ * back to reading the field itself, so a group declared by the client for a field with no
+ * canonical extractor still filters (and counts) correctly.
+ */
+function readField(item, field) {
+  const extract = FIELD_EXTRACT[field];
+  if (extract) return extract(item);
+  const value = item[field];
+  if (value == null) return [];
+  return (Array.isArray(value) ? value : [value]).map((v) => String(v)).filter(Boolean);
+}
+
 /** Check a single item against the full-text search term */
 function matchesSearch(item, q) {
   if (!q) return true;
@@ -63,33 +96,40 @@ function matchesSearch(item, q) {
 
 /** Check whether an item matches the active values of a single filter field */
 function matchesField(item, field, active) {
-  return FIELD_EXTRACT[field](item).some((v) => active.includes(v));
+  return readField(item, field).some((v) => active.includes(v));
 }
 
-/** Build { field: [active values] } from the query params */
+/**
+ * Build { field: [active values] } from the query params. Every param that is not one of the
+ * reserved ones is a filter, so the client can declare a group for a field this backend never
+ * heard of and still get it applied (only its counts would be missing, since the facets only
+ * cover the fields the client declared).
+ */
 function parseFilters(params) {
   const filters = {};
-  Object.keys(FIELD_EXTRACT).forEach((field) => {
-    if (params[field]) filters[field] = params[field].split(',').filter(Boolean);
+  Object.keys(params).forEach((field) => {
+    if (RESERVED_PARAMS.has(field)) return;
+    const active = params[field].split(',').filter(Boolean);
+    if (active.length) filters[field] = active;
   });
   return filters;
 }
 
 /** Filter the mock dataset by search + filters */
-function poolItems(q, filters) {
+function poolItems(q, activeFilters) {
   return mockData.items.filter((item) => {
     if (!matchesSearch(item, q)) return false;
-    return Object.keys(filters).every((field) => matchesField(item, field, filters[field]));
+    return Object.keys(activeFilters).every((field) => matchesField(item, field, activeFilters[field]));
   });
 }
 
-/** Compute the facet counts per field over a pool of items */
+/** Compute the facet counts of every declared field over a pool of items */
 function buildFacets(pool) {
   const facets = {};
-  Object.keys(FIELD_EXTRACT).forEach((field) => {
+  FACET_FIELDS.forEach((field) => {
     const counts = {};
     pool.forEach((item) => {
-      FIELD_EXTRACT[field](item).forEach((v) => {
+      readField(item, field).forEach((v) => {
         counts[v] = (counts[v] || 0) + 1;
       });
     });
@@ -102,8 +142,9 @@ function buildFacets(pool) {
  * The mock dataset never changes at runtime, so the facets are counted once at startup over
  * the whole collection: they don't depend on `q` nor on the active filters, which is what lets
  * the client ask for them a single time (`GET /api/facets`) instead of on every page request.
- * `STATIC_TOTAL` is the same idea for the count: the collection size for the expand button,
- * which never moves with the search, the filters or the page.
+ * The fields counted are the ones the demo UI declares in its `filters` option. `STATIC_TOTAL` is
+ * the same idea for the count: the collection size for the expand button, which never moves with
+ * the search, the filters or the page.
  */
 const STATIC_FACETS = buildFacets(mockData.items);
 const STATIC_TOTAL = mockData.items.length;

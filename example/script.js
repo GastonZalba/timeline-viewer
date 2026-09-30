@@ -1,5 +1,6 @@
 import Timeline from '../dist/TimelineViewer.js';
 import mockData from './mock-data.js';
+import filters from './filters.js';
 
 // Uso: abrir index.html con ?api para probar el modo API contra el mock.
 // ?id=FUE-0001 (opcional) renderiza solo esa tarjeta, ya expandida.
@@ -37,6 +38,10 @@ const baseOptions = {
   // Con ?full la página entera scrollea y la barra de filtros queda siempre visible.
   fullpage: useFull,
   relatedLabel: (count) => (count === 1 ? 'publicación relacionada' : 'publicaciones relacionadas'),
+  // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
+  // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos
+  // grupos se llenan con los valores que devuelve `GET /api/facets`.
+  filters,
   singleId
 };
 

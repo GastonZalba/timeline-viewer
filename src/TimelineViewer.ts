@@ -27,8 +27,6 @@ const FACEBOOK_OTHER_REGEX =
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
-const ESTADO_FILTER_FIELDS: string[] = ['validado', 'capturado', 'descartado'];
-
 /** Window of `_schedulePageReload`: coalesces a burst of search/filter/sort changes into one request */
 const API_RELOAD_DEBOUNCE_MS = 300;
 
@@ -44,9 +42,13 @@ const TAXONOMY_VISIBLE_LINKS = 3;
 
 /**
  * Values shown per filter group before the "Ver más (N)" toggle appears, when the option
- * `filtersMaxVisible` does not say otherwise. Below 2 the group is never collapsed.
+ * `filtersMaxVisible` (or the `maxVisible` of the group itself) does not say otherwise.
+ * Below 2 the group is never collapsed.
  */
 const DEFAULT_FILTER_MAX_VISIBLE = 5;
+
+/** Control types a filter group can declare. Checkboxes are the only one implemented so far. */
+const SUPPORTED_FILTER_TYPES: FilterType[] = ['checkboxes'];
 
 /** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
 const ALL_TAXONOMIES_LABEL = 'Ver todo';
@@ -58,7 +60,13 @@ const RESIZE_MAX_HEIGHT = 1200;
 const RESIZE_STEP = 24;
 const RESIZE_STORAGE_KEY = 'tv-timeline-cards-height';
 const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
-const ESTADO_FILTER_STORAGE_KEY = 'tv-estado-filters';
+/**
+ * `localStorage` key of the state of the filters marked `persist`. The record inside is keyed by
+ * `field`, not by a fixed list, so a filter declared later by the consumer persists like the ones
+ * that were always there. The key keeps its historical name (`tv-estado-filters`, from when
+ * persisting only meant the internal-state groups) so the state already saved survives the change.
+ */
+const PERSISTED_FILTER_STORAGE_KEY = 'tv-estado-filters';
 
 const TONE_LABEL: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
 
@@ -207,14 +215,29 @@ export interface TimelineOptions {
   /**
    * Values a filter group shows before collapsing the rest behind a "Ver más (N)" toggle
    * (default: 5). A number applies to every group; a record tunes single ones and the
-   * groups left out keep the default, e.g. `{ tipo_fuente: 8 }`. `0` (or any value below
-   * 2) shows every value and renders no toggle.
+   * groups left out keep the default, e.g. `{ tipo_fuente: 8 }`. A group can also carry its
+   * own `maxVisible`, which wins over both. `0` (or any value below 2) shows every value
+   * and renders no toggle.
    *
    * Which values stay visible: the ones with the most results, except in the groups with
-   * an explicit order (Año publicación, Descartado), which keep it and are just truncated.
+   * an explicit order (`sortValues`), which keep it and are just truncated.
    * A group with a checked value never collapses, so an active filter is never hidden.
    */
-  filtersMaxVisible?: number | Partial<Record<FilterField, number>>;
+  filtersMaxVisible?: number | Partial<Record<string, number>>;
+  /**
+   * Filter groups of the panel, in display order. **Without this option the component has no
+   * filters at all**: no panel, no filter button and no filter params in API mode. Nothing is
+   * hardcoded, so a new filter is added here —or sent by a backend through `GET {url}/facets`—
+   * without rebuilding the library.
+   *
+   * Each entry needs a `field` and a `label`; `type` only accepts `'checkboxes'` today and
+   * defaults to it. In local mode the values are derived from the items of the selected taxonomy
+   * (distinct values of `field`, counted, arrays expanded); in API mode they are the ones the
+   * server sends in `GET {url}/facets` under the same `field`, which is also the query param the
+   * active values travel in. See [TimelineFilter](#timelinefilter) and
+   * [Filtros configurables](#filtros-configurables).
+   */
+  filters?: TimelineFilter[];
   lastUpdated?: string;
   /**
    * Items shown per page. `0` disables the batch pagination: every matching item is rendered
@@ -257,27 +280,77 @@ interface LinkInfo {
   type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 
-/** Field names that the filter panel knows how to build a group for */
-export type FilterField =
-  | 'tonos_sociales'
-  | 'tipo_fuente'
-  | 'validado'
-  | 'fecha_publicacion'
-  | 'contenido'
-  | 'es_oficial'
-  | 'capturado'
-  | 'descartado';
+/** Controls a filter group can be rendered with. Only checkboxes are supported today. */
+export type FilterType = 'checkboxes';
 
-interface FilterDef {
-  field: FilterField;
+/** Where a filter group is rendered: a column of the panel, or the internal-state flyout */
+export type FilterGroup = 'menu' | 'estado';
+
+/**
+ * One filter group of the panel, as declared by the `filters` option of the constructor.
+ * See [TimelineOptions.filters](#timelineoptions) for how the values are resolved in each mode.
+ */
+export interface TimelineFilter {
+  /**
+   * Name of the field the group filters by. In local mode it is a field of `TimelineItem` (or a
+   * synthetic name when `extract` is given); in API mode it is the key the server uses in
+   * `GET {url}/facets`, which is also the query param the active values are sent in.
+   */
+  field: string;
+  /** Header of the group. Escaped before being injected into the markup. */
   label: string;
+  /** Control of the group. Defaults to `'checkboxes'`; any other value drops the group. */
+  type?: FilterType;
+  /**
+   * `'menu'` (default) renders the group in a column of the panel, `'estado'` renders it in the
+   * internal-state flyout, which is part of the internal toolbar and therefore needs
+   * `internalButtons: true`. An `'estado'` group without it is not rendered.
+   */
+  group?: FilterGroup;
+  /**
+   * Fixed values of the group. When given, the group exists even if no item (or no facet)
+   * carries a value for it, which is how a group of fixed choices stays visible with an
+   * empty collection. It is also the order the values are rendered in, unless `sortValues` says
+   * otherwise.
+   */
+  values?: string[];
+  /** Values checked when the group is built. They travel in the first request in API mode. */
+  defaultChecked?: string[];
+  /**
+   * Persist the checked values of the group in `localStorage` (default: false), so they survive
+   * the rebuilds of the checkboxes (the API facets, a taxonomy re-scope) and the page loads.
+   */
+  persist?: boolean;
+  /** Values shown before the "Ver más (N)" toggle appears, over `filtersMaxVisible`. */
+  maxVisible?: number;
+  /**
+   * Values of the group carried by an item. Defaults to reading `item[field]`: arrays are
+   * expanded and `null` / `undefined` count as no value at all. Use it for fields that need a
+   * canonical value (a boolean split in two, a date reduced to its year) or for synthetic
+   * fields that are not a property of the item.
+   */
+  extract?: (item: TimelineItem) => string | string[];
+  /**
+   * Label shown for a value. Defaults to the value itself, except `true` → "Sí" and
+   * `false` → "No" so a boolean field does not read as raw `true` / `false`.
+   */
+  formatLabel?: (val: string) => string;
+  /**
+   * Explicit order of the values. A group that declares one keeps it when the long list is
+   * truncated (instead of leading with the values that filter the most).
+   */
+  sortValues?: (a: string, b: string) => number;
+}
+
+/** A `TimelineFilter` normalized for rendering: defaults resolved and the DOM slot attached */
+interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'values'> {
+  group: FilterGroup;
+  persist: boolean;
+  /** Column of the panel the group is rendered in. `0` for the `'estado'` flyout, ignored there. */
+  column: number;
   options: HTMLElement;
   checkboxes: HTMLInputElement[];
-  extract?: (item: TimelineItem) => string | string[];
-  formatLabel?: (val: string) => string;
-  sortValues?: (a: string, b: string) => number;
-  defaultChecked?: string[];
-  fixedValues?: string[];
+  values?: string[];
 }
 
 export default class Timeline {
@@ -291,7 +364,7 @@ export default class Timeline {
   inlineAdjuntos: boolean;
   internalButtons: boolean;
   fullpage: boolean;
-  filtersMaxVisible: number | Partial<Record<FilterField, number>>;
+  filtersMaxVisible: number | Partial<Record<string, number>>;
   relatedLabel: ((count: number) => string) | null;
   singleId: string | null;
   content: ContentGroup[];
@@ -330,8 +403,10 @@ export default class Timeline {
   sortToggle: HTMLElement;
   sortAscending: boolean = false;
   workNotesToggle: HTMLElement;
-  filterToggle: HTMLElement;
-  filterMenu: HTMLElement;
+  /** Null when the `filters` option declares no group, in which case the panel is not rendered */
+  filterToggle: HTMLElement | null;
+  filterMenu: HTMLElement | null;
+  /** Null when `internalButtons` is off or no group is declared for the `estado` flyout */
   estadoWrap: HTMLElement;
   estadoToggle: HTMLElement;
   estadoMenu: HTMLElement;
@@ -341,7 +416,7 @@ export default class Timeline {
    * checkboxes are rebuilt (once more when the API facets land, and on every taxonomy
    * re-scope), and the state should survive that the way the taxonomy toggles do.
    */
-  _filterExpanded: Set<FilterField>;
+  _filterExpanded: Set<string>;
   searchWrap: HTMLElement;
   searchToggle: HTMLElement;
   searchInput: HTMLInputElement;
@@ -387,7 +462,8 @@ export default class Timeline {
     this.internalButtons = config.internalButtons || false;
     this.fullpage = config.fullpage === true;
     this.filtersMaxVisible = config.filtersMaxVisible ?? DEFAULT_FILTER_MAX_VISIBLE;
-    this._filterExpanded = new Set<FilterField>();
+    this.filters = this._normalizeFilters(config.filters);
+    this._filterExpanded = new Set<string>();
     this.relatedLabel = config.relatedLabel || null;
     this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
     this.taxonomyRow = null as unknown as HTMLElement;
@@ -412,13 +488,12 @@ export default class Timeline {
     this.expandIcon = null as unknown as HTMLElement;
     this.sortToggle = null as unknown as HTMLElement;
     this.workNotesToggle = null as unknown as HTMLElement;
-    this.filterToggle = null as unknown as HTMLElement;
-    this.filterMenu = null as unknown as HTMLElement;
+    this.filterToggle = null;
+    this.filterMenu = null;
     this.estadoWrap = null as unknown as HTMLElement;
     this.estadoToggle = null as unknown as HTMLElement;
     this.estadoMenu = null as unknown as HTMLElement;
     this.section = null as unknown as HTMLElement;
-    this.filters = [];
     this.searchWrap = null as unknown as HTMLElement;
     this.searchToggle = null as unknown as HTMLElement;
     this.searchInput = null as unknown as HTMLInputElement;
@@ -452,6 +527,77 @@ export default class Timeline {
       .filter((g): g is ContentGroup => !!g && typeof g.label === 'string' && g.label.trim() !== '')
       .map((g) => ({ label: g.label.trim(), items: Array.isArray(g.items) ? g.items : [] }))
       .filter((g) => g.items.length > 0);
+  }
+
+  /**
+   * Normalize the `filters` option into the groups the panel renders.
+   *
+   * Nothing is hardcoded, so an absent or invalid option simply yields no groups: the panel and
+   * its button are not rendered at all, and in API mode no filter param is sent. Entries that
+   * cannot be rendered —no `field`, no `label`, a `type` that is not supported yet, or a `field`
+   * already declared— are dropped with a warning instead of breaking the mount, because a group
+   * that renders nothing is far harder to notice than a line in the console.
+   *
+   * The `'menu'` groups are then dealt out to the columns of the panel: the first half goes to
+   * the first column and the rest to the second, which reads a declaration top to bottom down
+   * the first column and then along the second.
+   */
+  protected _normalizeFilters(filters: TimelineFilter[] | undefined): FilterDef[] {
+    if (!Array.isArray(filters) || filters.length === 0) return [];
+    const declared = new Set<string>();
+    const defs: FilterDef[] = [];
+    filters.forEach((f, i) => {
+      if (!f || typeof f !== 'object') {
+        this._warnFilter(i, 'no es un objeto');
+        return;
+      }
+      if (typeof f.field !== 'string' || f.field.trim() === '') {
+        this._warnFilter(i, 'no tiene `field`');
+        return;
+      }
+      if (typeof f.label !== 'string' || f.label.trim() === '') {
+        this._warnFilter(i, `"${f.field}" no tiene \`label\``);
+        return;
+      }
+      if (f.type !== undefined && !SUPPORTED_FILTER_TYPES.includes(f.type)) {
+        this._warnFilter(
+          i,
+          `"${f.field}" declara type "${String(f.type)}", que no está soportado (soportado: ${SUPPORTED_FILTER_TYPES.join(', ')})`
+        );
+        return;
+      }
+      if (declared.has(f.field)) {
+        this._warnFilter(i, `"${f.field}" ya está declarado en otro grupo`);
+        return;
+      }
+      declared.add(f.field);
+      defs.push({
+        field: f.field.trim(),
+        label: f.label.trim(),
+        group: f.group === 'estado' ? 'estado' : 'menu',
+        persist: f.persist === true,
+        column: 0,
+        extract: f.extract,
+        formatLabel: f.formatLabel,
+        sortValues: f.sortValues,
+        defaultChecked: f.defaultChecked,
+        values: f.values,
+        maxVisible: typeof f.maxVisible === 'number' ? f.maxVisible : undefined,
+        options: null as unknown as HTMLElement,
+        checkboxes: []
+      });
+    });
+    const menuGroups = defs.filter((f) => f.group === 'menu');
+    const half = Math.ceil(menuGroups.length / 2);
+    menuGroups.forEach((f, i) => {
+      f.column = i < half ? 0 : 1;
+    });
+    return defs;
+  }
+
+  /** Report a group of the `filters` option that was dropped, so a typo does not go unnoticed */
+  protected _warnFilter(index: number, reason: string): void {
+    console.warn(`TimelineViewer: filtro #${index} de la opción "filters" descartado: ${reason}.`);
   }
 
   /** Every item of every taxonomy, used by the featured stack, the counter and single mode */
@@ -490,23 +636,75 @@ export default class Timeline {
     return this.content[this._contentIndex]?.items.length || 0;
   }
 
-  /** Build the main DOM layout and cache element references */
-  protected _buildLayout() {
-    const internalButtonsHtml = this.internalButtons
-      ? `<button class="work-notes-toggle" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
+  /**
+   * Markup of a group of the `filters` option: an empty `.filter-options` box the checkboxes
+   * are built into, tagged with the field it belongs to.
+   *
+   * The `id` is only a handle for debugging: the component looks the box up by the
+   * `data-filter-field` attribute, so a `field` with characters that are not valid in a CSS
+   * selector cannot break the wiring. `data-filter-field` is also the stable hook for a
+   * consumer's own tests.
+   *
+   * A `'menu'` group is a section with its header inside the panel; a `'estado'` one is a bare
+   * box, because the flyout has no headers of its own.
+   */
+  protected _buildFilterOptionsHtml(f: FilterDef): string {
+    const slot = `<div class="filter-options" id="filter-options-${this._escapeHtml(f.field)}" data-filter-field="${this._escapeHtml(f.field)}"></div>`;
+    if (f.group === 'estado') return slot;
+    return `<div class="filter-section">
+              <div class="filter-header">${this._escapeHtml(f.label)}</div>
+              ${slot}
+            </div>`;
+  }
+
+  /**
+   * Markup of the filter panel, or an empty string when no group is declared for it: with no
+   * `filters` option the component has no filter UI at all, not a hidden one.
+   * The columns come from the `column` that `_normalizeFilters` dealt out, in the order the
+   * groups were declared, so the declaration reads down the first column and then along the
+   * second.
+   */
+  protected _buildFilterMenuHtml(): string {
+    const columns = this.filters.filter((f) => f.group === 'menu');
+    if (columns.length === 0) return '';
+    const groups = [0, 1]
+      .map((column) => columns.filter((f) => f.column === column).map((f) => this._buildFilterOptionsHtml(f)))
+      .filter((sections) => sections.length > 0);
+    return `<div class="filter-wrap">
+              <button class="filter-toggle" id="filter-toggle" title="Filtrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              </button>
+              <div class="filter-menu" id="filter-menu">
+                ${groups.map((sections) => `<div class="filter-column">${sections.join('')}</div>`).join('')}
+              </div>
+            </div>`;
+  }
+
+  /**
+   * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
+   * declared for it, the `estado` flyout. Without the latter the button would open an empty
+   * menu, so both of them are conditional on the `filters` option as well.
+   */
+  protected _buildInternalButtonsHtml(): string {
+    if (!this.internalButtons) return '';
+    const workNotesButton = `<button class="work-notes-toggle" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
-            </button>
+            </button>`;
+    const estadoGroups = this.filters.filter((f) => f.group === 'estado');
+    if (estadoGroups.length === 0) return workNotesButton;
+    return `${workNotesButton}
             <div class="estado-wrap" id="estado-wrap">
               <button class="estado-toggle" id="estado-toggle" title="Estado interno">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
-              <div class="estado-menu" id="estado-menu">
-                <div class="filter-options" id="filter-options-validado"></div>
-                <div class="filter-options" id="filter-options-capturado"></div>
-                <div class="filter-options" id="filter-options-descartado"></div>
-              </div>
-            </div>`
-      : '';
+              <div class="estado-menu" id="estado-menu">${estadoGroups.map((f) => this._buildFilterOptionsHtml(f)).join('')}</div>
+            </div>`;
+  }
+
+  /** Build the main DOM layout and cache element references */
+  protected _buildLayout() {
+    const internalButtonsHtml = this._buildInternalButtonsHtml();
+    const filterMenuHtml = this._buildFilterMenuHtml();
     this.container.innerHTML = `
       <section class="publicaciones-section" id="publicaciones-section">
         <div class="featured-row">
@@ -521,37 +719,7 @@ export default class Timeline {
               </button>
               <input class="search-input" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
             </div>
-            <div class="filter-wrap">
-              <button class="filter-toggle" id="filter-toggle" title="Filtrar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-              </button>
-              <div class="filter-menu" id="filter-menu">
-                <div class="filter-column">
-                  <div class="filter-section">
-                    <div class="filter-header">Tono social</div>
-                    <div class="filter-options" id="filter-options-tone"></div>
-                  </div>
-                  <div class="filter-section">
-                    <div class="filter-header">Año publicación</div>
-                    <div class="filter-options" id="filter-options-year"></div>
-                  </div>
-                  <div class="filter-section">
-                    <div class="filter-header">Contenido</div>
-                    <div class="filter-options" id="filter-options-content"></div>
-                  </div>
-                </div>
-                <div class="filter-column">
-                  <div class="filter-section">
-                    <div class="filter-header">Tipo de fuente</div>
-                    <div class="filter-options" id="filter-options-source"></div>
-                  </div>
-                  <div class="filter-section">
-                    <div class="filter-header">Fuente oficial</div>
-                    <div class="filter-options" id="filter-options-oficial"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            ${filterMenuHtml}
             <button class="sort-toggle" id="sort-toggle" title="Invertir orden">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="17,9 12,4 7,9" fill="currentColor"/><polygon points="17,15 12,20 7,15" fill="none" stroke-width="1.5"/></svg>
             </button>
@@ -594,8 +762,8 @@ export default class Timeline {
     this.expandIcon = this.container.querySelector('#expand-icon') as HTMLElement;
     this.sortToggle = this.container.querySelector('#sort-toggle') as HTMLElement;
     this.workNotesToggle = this.container.querySelector('#work-notes-toggle') as HTMLElement;
-    this.filterToggle = this.container.querySelector('#filter-toggle') as HTMLElement;
-    this.filterMenu = this.container.querySelector('#filter-menu') as HTMLElement;
+    this.filterToggle = this.container.querySelector('#filter-toggle');
+    this.filterMenu = this.container.querySelector('#filter-menu');
     this.estadoWrap = this.container.querySelector('#estado-wrap') as HTMLElement;
     this.estadoToggle = this.container.querySelector('#estado-toggle') as HTMLElement;
     this.estadoMenu = this.container.querySelector('#estado-menu') as HTMLElement;
@@ -615,88 +783,27 @@ export default class Timeline {
       this.expandToggle.setAttribute('aria-disabled', 'true');
     }
     this._buildTaxonomySelect();
-    this.filters = [
-      {
-        field: 'tonos_sociales',
-        label: 'Tono social',
-        options: this.container.querySelector('#filter-options-tone') as HTMLElement,
-        checkboxes: []
-      },
-      {
-        field: 'tipo_fuente',
-        label: 'Tipo de fuente',
-        options: this.container.querySelector('#filter-options-source') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => (item.tipo_fuente ? item.tipo_fuente : 'sin-tipo'),
-        formatLabel: (val) => (val === 'sin-tipo' ? 'Sin tipo' : val)
-      },
-      {
-        field: 'validado',
-        label: 'Validado',
-        options: this.container.querySelector('#filter-options-validado') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => (item.validado === true ? 'validado' : 'no-validado'),
-        formatLabel: (val) => (val === 'validado' ? 'Validado' : 'Sin validar'),
-        defaultChecked: ['validado', 'no-validado'],
-        fixedValues: ['validado', 'no-validado']
-      },
-      {
-        field: 'capturado',
-        label: 'Capturado',
-        options: this.container.querySelector('#filter-options-capturado') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => (item.capturado !== true ? 'no-capturado' : 'capturado'),
-        formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
-        defaultChecked: ['capturado'],
-        fixedValues: ['capturado', 'no-capturado']
-      },
-      {
-        field: 'descartado',
-        label: 'Descartado',
-        options: this.container.querySelector('#filter-options-descartado') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => (item.descartado === true ? 'descartado' : 'no-descartado'),
-        formatLabel: (val) => (val === 'descartado' ? 'Descartado' : 'Sin descartar'),
-        sortValues: (a, b) => (a === 'descartado' ? -1 : b === 'descartado' ? 1 : 0),
-        defaultChecked: ['no-descartado'],
-        fixedValues: ['descartado', 'no-descartado']
-      },
-      {
-        field: 'es_oficial',
-        label: 'Fuente oficial',
-        options: this.container.querySelector('#filter-options-oficial') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => (item.es_oficial ? 'oficial' : 'no-oficial'),
-        formatLabel: (val) => (val === 'oficial' ? 'Sí' : 'No')
-      },
-      {
-        field: 'fecha_publicacion',
-        label: 'Año publicación',
-        options: this.container.querySelector('#filter-options-year') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => (item.fecha_publicacion ? item.fecha_publicacion.slice(0, 4) : 'sin-fecha'),
-        formatLabel: (val) => (val === 'sin-fecha' ? 'Sin fecha' : val),
-        sortValues: (a, b) => {
-          if (a === 'sin-fecha') return 1;
-          if (b === 'sin-fecha') return -1;
-          return Number(b) - Number(a);
-        }
-      },
-      {
-        field: 'contenido',
-        label: 'Contenido',
-        options: this.container.querySelector('#filter-options-content') as HTMLElement,
-        checkboxes: [],
-        extract: (item) => {
-          const types: string[] = [];
-          if ((item.adjuntos || []).length > 0) types.push('adjuntos');
-          if (item.has_video) types.push('video');
-          if ((item.imagenes || []).length > 0) types.push('imagenes');
-          return types;
-        },
-        formatLabel: (val) => (val === 'adjuntos' ? 'Con adjuntos' : val === 'video' ? 'Con video' : 'Con imágenes')
-      }
-    ];
+    this._attachFilterOptions();
+  }
+
+  /**
+   * Point every group of the `filters` option at the box `_buildLayout` rendered for it.
+   * The lookup goes through the `data-filter-field` attribute rather than the id, so a `field`
+   * that is not a valid CSS selector identifier still finds its box.
+   *
+   * A group with no box is one whose container was not rendered: a `'estado'` group without
+   * `internalButtons`, for instance. It keeps its configuration (so a later `_buildFilterCheckboxes`
+   * just skips it) but has nowhere to draw, exactly as when the flyout did not exist before.
+   */
+  protected _attachFilterOptions(): void {
+    const slots = new Map<string, HTMLElement>();
+    this.container.querySelectorAll<HTMLElement>('.filter-options[data-filter-field]').forEach((el) => {
+      const field = el.dataset.filterField;
+      if (field) slots.set(field, el);
+    });
+    this.filters.forEach((f) => {
+      f.options = slots.get(f.field) as HTMLElement;
+    });
   }
 
   /**
@@ -2047,64 +2154,85 @@ export default class Timeline {
   }
 
   /**
-   * How many values the group of `field` shows before the "Ver más (N)" toggle appears:
-   * the per-field entry of `filtersMaxVisible` when the option is a record, its number
-   * when it is a plain one, and the default otherwise. Below 2 no group collapses.
+   * How many values the group `f` shows before the "Ver más (N)" toggle appears: its own
+   * `maxVisible` first, then the per-field entry of `filtersMaxVisible` when the option is a
+   * record, its number when it is a plain one, and the default otherwise.
+   * Below 2 no group collapses.
    */
-  protected _filterMaxVisible(field: FilterField): number {
+  protected _filterMaxVisible(f: FilterDef): number {
+    if (typeof f.maxVisible === 'number') return f.maxVisible;
     const cfg = this.filtersMaxVisible;
     if (typeof cfg === 'number') return cfg;
-    const perField = cfg[field];
+    const perField = cfg[f.field];
     return typeof perField === 'number' ? perField : DEFAULT_FILTER_MAX_VISIBLE;
   }
 
-  /** Build filter checkboxes from the available filter values (local data or the one-time API facets) */
+  /**
+   * Values a group carries for a single item, as the array the code filters on:
+   * what `extract` returns, or the `field` of the item itself (arrays expanded, everything
+   * stringified). A `null` / `undefined` is no value at all, so the item belongs to none of
+   * the checkboxes — which is what makes a boolean field need an `extract` of its own if
+   * "no value" has to be a value too.
+   */
+  protected _filterValuesOf(f: FilterDef, item: TimelineItem): string[] {
+    const v = f.extract ? f.extract(item) : (item as unknown as Record<string, unknown>)[f.field];
+    if (v == null) return [];
+    return (Array.isArray(v) ? v : [v]).map((x) => String(x)).filter(Boolean);
+  }
+
+  /**
+   * Label shown for a value: what `formatLabel` returns, or the value itself — except the
+   * booleans, that would otherwise read as raw `true` / `false`.
+   */
+  protected _filterLabelOf(f: FilterDef, value: string): string {
+    if (f.formatLabel) return f.formatLabel(value);
+    if (value === 'true') return 'Sí';
+    if (value === 'false') return 'No';
+    return value;
+  }
+
+  /**
+   * Build the checkboxes of every group of the `filters` option out of the values it has:
+   * the ones derived from the items of the active scope in local mode, the ones the server sent
+   * in `GET {url}/facets` in API mode. A group with no container to draw in is skipped, and so
+   * is the whole method when no group was declared at all (nothing to build, nothing to show).
+   */
   protected _buildFilterCheckboxes(): void {
-    const savedEstado = this._loadEstadoFilterState();
+    if (this.filters.length === 0) return;
+    const savedState = this._loadPersistedFilterState();
+    const scope = this._scopeItems();
     let anyFilterVisible = false;
     this.filters.forEach((f) => {
       if (!f.options) return;
-      const isEstado = ESTADO_FILTER_FIELDS.includes(f.field);
+      const inEstado = f.group === 'estado';
       let values: string[];
       let counts: Record<string, number>;
       if (this.api) {
         const facetCounts = this._apiFacets[f.field] || {};
-        values = f.fixedValues ? [...f.fixedValues] : Object.keys(facetCounts).filter((v) => (facetCounts[v] || 0) > 0);
+        values = f.values ? [...f.values] : Object.keys(facetCounts).filter((v) => (facetCounts[v] || 0) > 0);
         counts = facetCounts;
       } else {
-        values = f.fixedValues
-          ? [...f.fixedValues]
-          : [
-              ...new Set(
-                this._scopeItems().flatMap((c) => {
-                  const v = f.extract ? f.extract(c) : c[f.field];
-                  const arr = v == null ? [] : Array.isArray(v) ? v : [v];
-                  return arr.map((x) => String(x)).filter(Boolean);
-                })
-              )
-            ];
+        values = f.values ? [...f.values] : [...new Set(scope.flatMap((c) => this._filterValuesOf(f, c)))];
         counts = {};
         values.forEach((val) => {
-          counts[val] = this._scopeItems().filter((c) => {
-            const v = f.extract ? f.extract(c) : c[f.field];
-            const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
-            return arr.includes(val);
-          }).length;
+          counts[val] = scope.filter((c) => this._filterValuesOf(f, c).includes(val)).length;
         });
       }
-      if (!f.fixedValues && values.length <= 1) {
+      if (!f.values && values.length <= 1) {
         f.checkboxes = [];
         f.options.hidden = true;
         return;
       }
       f.options.hidden = false;
-      if (!isEstado) anyFilterVisible = true;
+      // The `estado` groups live in the internal-state flyout, which has a button of its own:
+      // they must not be the reason the filter button of the panel shows up.
+      if (!inEstado) anyFilterVisible = true;
       if (f.sortValues) values.sort(f.sortValues);
       // A group longer than its cut shows the values that filter the most, and hides the rest
       // behind a "Ver más (N)" toggle. `sort` is stable, so ties keep the order they had. A
-      // group that declares its own order (`sortValues`: newest year first, "Descartado"
-      // first) keeps it and is only truncated, because that order is the meaningful one.
-      const limit = this._filterMaxVisible(f.field);
+      // group that declares its own order (`sortValues`) keeps it and is only truncated,
+      // because that order is the meaningful one.
+      const limit = this._filterMaxVisible(f);
       const overflow = limit >= 2 ? Math.max(0, values.length - limit) : 0;
       if (overflow) values.sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
       f.options.innerHTML = '';
@@ -2119,7 +2247,7 @@ export default class Timeline {
         const cb = document.createElement('input');
         cb.type = 'checkbox';
         cb.value = val;
-        const savedValues = ESTADO_FILTER_FIELDS.includes(f.field) ? savedEstado[f.field] : undefined;
+        const savedValues = f.persist ? savedState[f.field] : undefined;
         cb.checked = savedValues
           ? savedValues.includes(val)
           : f.defaultChecked
@@ -2127,7 +2255,7 @@ export default class Timeline {
             : false;
         const span = document.createElement('span');
         span.className = 'filter-option-label';
-        const display = f.formatLabel ? f.formatLabel(val) : val;
+        const display = this._filterLabelOf(f, val);
         span.textContent = display;
         const countSpan = document.createElement('span');
         countSpan.className = 'filter-option-count';
@@ -2137,7 +2265,7 @@ export default class Timeline {
         label.appendChild(span);
         label.appendChild(countSpan);
         cb.addEventListener('change', () => {
-          if (ESTADO_FILTER_FIELDS.includes(f.field)) this._saveEstadoFilterState();
+          if (f.persist) this._savePersistedFilterState();
           this._applyFilters(true);
         });
         f.options.appendChild(label);
@@ -2155,13 +2283,15 @@ export default class Timeline {
       this.estadoWrap.style.display = '';
     }
     // En modo API el botón se muestra desde el arranque aunque todavía no haya facets: sin ellos
-    // los grupos sin `fixedValues` no tienen valores, y esperar la respuesta deja el toolbar
+    // los grupos sin `values` no tienen nada que mostrar, y esperar la respuesta deja el toolbar
     // incompleto y lo ensancha de golpe (muy notorio al iniciar con `startExpanded`). El panel se
     // arma con la respuesta, y hasta entonces el botón no tiene listener, así que no abre nada.
     // Cuando el pedido termina manda `anyFilterVisible`: si no hay nada que filtrar, se oculta
     // solo. En modo local los valores ya están, así que la condición queda como estaba.
+    // El botón puede no existir: una declaración de filtros que solo tiene grupos `estado`
+    // (o ninguna) no dibuja el panel, y entonces no hay nada que mostrar ni que ocultar.
     const pendingFacets = !!this.api && !this._apiFacetsSettled;
-    this.filterToggle.style.display = anyFilterVisible || pendingFacets ? '' : 'none';
+    if (this.filterToggle) this.filterToggle.style.display = anyFilterVisible || pendingFacets ? '' : 'none';
   }
 
   /**
@@ -2204,10 +2334,14 @@ export default class Timeline {
     f.options.appendChild(more);
   }
 
-  /** Load the persisted estado-interno filter state from localStorage */
-  protected _loadEstadoFilterState(): Record<string, string[]> {
+  /**
+   * Load the state of the filters marked `persist` from localStorage, keyed by `field`.
+   * A group that declares no `persist` never reads it, which is what makes the rebuilds (the API
+   * facets, a taxonomy re-scope) start over on those instead of silently keeping a value.
+   */
+  protected _loadPersistedFilterState(): Record<string, string[]> {
     try {
-      const raw = window.localStorage.getItem(ESTADO_FILTER_STORAGE_KEY);
+      const raw = window.localStorage.getItem(PERSISTED_FILTER_STORAGE_KEY);
       if (!raw) return {};
       const parsed = JSON.parse(raw);
       return parsed && typeof parsed === 'object' ? (parsed as Record<string, string[]>) : {};
@@ -2216,15 +2350,16 @@ export default class Timeline {
     }
   }
 
-  /** Persist the current estado-interno filter state to localStorage */
-  protected _saveEstadoFilterState(): void {
+  /** Persist the checked values of every group marked `persist` to localStorage */
+  protected _savePersistedFilterState(): void {
     const state: Record<string, string[]> = {};
-    ESTADO_FILTER_FIELDS.forEach((field) => {
-      const f = this.filters.find((x) => x.field === field);
-      if (f) state[field] = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
-    });
+    this.filters
+      .filter((f) => f.persist)
+      .forEach((f) => {
+        state[f.field] = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+      });
     try {
-      window.localStorage.setItem(ESTADO_FILTER_STORAGE_KEY, JSON.stringify(state));
+      window.localStorage.setItem(PERSISTED_FILTER_STORAGE_KEY, JSON.stringify(state));
     } catch {
       /* localStorage unavailable */
     }
@@ -2634,15 +2769,19 @@ export default class Timeline {
     this._insertBeforeFooter(el);
   }
 
-  /** Sync the active class on the search/filter/estado toggle buttons */
+  /**
+   * Sync the active class on the search/filter/estado toggle buttons.
+   * Each button is lit by the groups **it** holds, not by any active filter: the `estado` groups
+   * live in the flyout, so they only light the flyout button and never the one of the panel.
+   */
   protected _syncFilterToggleState(): void {
-    const anyActive = this.filters
-      .filter((f) => !ESTADO_FILTER_FIELDS.includes(f.field))
-      .some((f) => f.checkboxes.some((cb) => cb.checked));
-    this.filterToggle.classList.toggle('active', anyActive);
-    const estadoActive = this.filters
-      .filter((f) => ESTADO_FILTER_FIELDS.includes(f.field))
-      .some((f) => f.checkboxes.some((cb) => cb.checked));
+    const isActive = (f: FilterDef) => f.checkboxes.some((cb) => cb.checked);
+    if (this.filterToggle)
+      this.filterToggle.classList.toggle(
+        'active',
+        this.filters.some((f) => f.group !== 'estado' && isActive(f))
+      );
+    const estadoActive = this.filters.some((f) => f.group === 'estado' && isActive(f));
     if (this.estadoToggle) this.estadoToggle.classList.toggle('active', estadoActive);
     this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
   }
@@ -2667,9 +2806,7 @@ export default class Timeline {
       this.filters.every((f) => {
         const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
         if (active.length === 0) return true;
-        const v = f.extract ? f.extract(c) : c[f.field];
-        const arr = Array.isArray(v) ? v.map((x) => String(x)) : [v == null ? '' : String(v)];
-        return arr.some((x) => active.includes(x));
+        return this._filterValuesOf(f, c).some((x) => active.includes(x));
       });
     this.allCards = this._sortByDateDesc(this._scopeItems().filter(matches));
     this._featuredCards = this._sortByDateDesc(this._allItems().filter(matches));
@@ -3037,16 +3174,18 @@ export default class Timeline {
     if (this.api) {
       this._bindBaseEvents();
       this._renderApiLoading();
-      // The checkboxes are built here, before the first page, so the default checks (estado
-      // filters) travel in the initial query just like in local mode. With no facets yet the
-      // non-estado groups stay hidden, so nothing can be checked before they arrive: the
-      // panel is rebuilt with the counts by `_ensureApiFacets()`.
+      // The checkboxes are built here, before the first page, so the `defaultChecked` of the
+      // groups travel in the initial query just like in local mode. With no facets yet the groups
+      // without `values` have nothing to show, so nothing can be checked before they arrive:
+      // the panel is rebuilt with the counts by `_ensureApiFacets()`.
       this._buildFilterCheckboxes();
       this._syncFilterToggleState();
       // The facets travel the static values of the collection (counts, total, lastUpdated) and
       // the expand toggle shows two of them before the user interacts, so they are requested
-      // here, in parallel with the first page, and not on the first expand. Waiting would gain
-      // nothing: the estado defaults of the checkboxes above do not depend on the facets.
+      // here, in parallel with the first page, and not on the first expand. They are requested
+      // even with no filter group declared, because the total and the `lastUpdated` they carry
+      // feed the expand counter and the footer. Waiting would gain nothing: the defaults of the
+      // checkboxes above do not depend on the facets.
       void this._ensureApiFacets();
       // The embed preload reads the rendered cards, so it waits for the first page.
       void this._fetchPage(1).then(() => {
@@ -3075,10 +3214,11 @@ export default class Timeline {
    * local mode and from the `.then()` of `_ensureApiFacets` in API mode, which runs once.
    */
   protected _bindFilterToggle(): void {
+    if (!this.filterToggle || !this.filterMenu) return;
     this.filterToggle.addEventListener('click', (e: Event) => {
       e.stopPropagation();
-      this.filterMenu.classList.toggle('open');
-      this.filterToggle.classList.toggle('open');
+      this.filterMenu?.classList.toggle('open');
+      this.filterToggle?.classList.toggle('open');
     });
   }
 
@@ -3146,9 +3286,9 @@ export default class Timeline {
       if (!(e.target as HTMLElement).closest('.card-adjuntos-btn, .card-adjuntos-menu')) {
         this.container.querySelectorAll('.card-adjuntos-menu.open').forEach((m) => m.classList.remove('open'));
       }
-      if (!(e.target as HTMLElement).closest('.filter-wrap')) {
+      if (this.filterMenu && !(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');
-        this.filterToggle.classList.remove('open');
+        this.filterToggle?.classList.remove('open');
       }
       if (!(e.target as HTMLElement).closest('.estado-wrap') && this.estadoMenu) {
         this.estadoMenu.classList.remove('open');

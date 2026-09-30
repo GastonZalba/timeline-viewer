@@ -31,16 +31,42 @@ No hay bundler. El pipeline de build es: **Prettier** (format) → `tsc` (TS→J
 ## Comandos
 
 ```bash
-npm run build        # Formatea + Build completo (TS + plugin zoom + SCSS)
+npm run build        # Formatea + Build completo (TS + SCSS)
 npm run build:ts     # Solo TypeScript
 npm run build:css    # Solo SCSS
 npm run format       # Formatea código con Prettier
 npm run format:check # Verifica formato sin modificar
-npm run watch          # Copia el plugin zoom + Watch mode + dev server en :3010
+npm run watch          # Watch mode (TS + SCSS) + dev server en :3010
 npm start            # Solo dev server en :3010
+npm test             # test:unit + test:e2e
+npm run test:unit    # Build de TS + suite jsdom (node:test, sin browser)
+npm run test:e2e     # Suite Playwright (Chromium) contra el server de ejemplo
 ```
 
-El `build` ejecuta Prettier automáticamente antes de compilar. **No hay tests configurados.**
+El `build` ejecuta Prettier automáticamente antes de compilar.
+
+### Tests
+
+Hay dos suites, y la separación es deliberada:
+
+| Suite | Runner | Corre | Qué cubre |
+|---|---|---|---|
+| `test/*.test.js` | `node:test` + jsdom | `npm run test:unit` | DOM, markup, estado y lógica: qué nodos existen, qué botones están deshabilitados, aritmética de páginas, resets de cursor, `_findScrollContainer` |
+| `e2e/*.spec.js` | `@playwright/test` | `npm run test:e2e` | Lo que jsdom no puede: geometría real, offsets de scroll, sticky bajo `fullpage`, requests al servidor |
+
+Reglas que costan descubrir y conviene no romper:
+
+- **Los tests jsdom importan `dist/TimelineViewer.js`, no `src/`.** Se prueban los tipos distribuidos y el consumer real, y no hace falta transpilar TS para testear. Por eso `test:unit` corre `build:ts` antes: si se toca `src/` hay que rebuildar, y `dist/` nunca se edita a mano (ver "Qué NO hacer" #11).
+- **El import de lightGallery necesita un hook de resolución.** `dist/TimelineViewer.js` importa `lightgallery/plugins/thumbnail` y `lightgallery/plugins/zoom`, que son specifiers de browser/bundler: el importmap del demo los resuelve, pero el resolver de Node no (sin `exports` map → `ERR_UNSUPPORTED_DIR_IMPORT`). `test/helpers/resolve-lightgallery.js` es un `resolve` hook que le da a Node el mismo mapeo, apuntando a los mismos `.es5.js`. **No cambiar esos imports para contentar al runner**: el contrato es del consumidor.
+- **Los helpers viven en `test/helpers/`, así que `node --test test/` los reporta como dos "ok" sin subtests.** Es ruido esperado, no un test roto. (Por eso los specs de Playwright están en `e2e/` y no en `test/`: si colgaran de `test/`, el runner de Node los ejecutaría y fallarían fuera de su runner.)
+- **`IntersectionObserver` no existe en jsdom** y se stubea en `test/helpers/dom.js`. El componente solo lo construye con el timeline expandido (`_setupTimelineObserver`); `_setupObserver` es código muerto y no se llama nunca.
+- **jsdom no tiene motor de layout**: `getBoundingClientRect()` devuelve ceros y `scrollTop` es inerte. Por eso todo lo que es geometría o scroll vive en Playwright, no en la suite jsdom.
+- **Los tests de Playwright son herméticos**: `e2e/helpers/network.js` intercepta el importmap de jsDelivr y sirve lightGallery desde el `node_modules` local, y aborta todo lo demás externo (imágenes de `picsum`). Corren sin internet.
+- **En la suite jsdom, las filas de control también son `.timeline-item`.** El source arma cada fila como `'timeline-item timeline-<x>-item'`, así que los selectores de artículos tienen que excluir `.timeline-paginator-item`, `.timeline-status-item`, `.timeline-load-more-item` y `.timeline-footer-item` o se cuelan como artículos. El id de un artículo tampoco está en la fila: está en `.timeline-card[data-card-id]` (o, para los ítems `capturado: false`, en el texto de `.card-not-captured-id`).
+- **`test-results/` y `playwright-report/` están en `.gitignore`.** El primer browser se baja una vez con `npx playwright install chromium`.
+- Los tests del demo usan flags de `example/script.js`: `?flat`, `?pagination`, `?full`, `?expanded`, `?api`. Ojo con `?pagination` **sin** `?flat`: el modo `content` arranca en la primera taxonomía, que tiene 9 ítems contra un `itemsPerPage` de 10, o sea una sola página y sin paginador (comportamiento correcto). Para ver paginación en modo local hay que ir a `?flat` o elegir "Ver todo" en el selector.
+
+El `build` ejecuta Prettier automáticamente antes de compilar.
 
 ## Qué NO hacer
 
@@ -186,14 +212,12 @@ Es un **peer dependency** (`^2.9.0`). El componente importa:
 ```typescript
 import lightGallery from 'lightgallery';
 import lgThumbnail from 'lightgallery/plugins/thumbnail';
-import lgZoomCustom from './lg-zoom-custom/lg-zoom.es5.js';
+import lgZoom from 'lightgallery/plugins/zoom';
 ```
 
-El plugin zoom usa una **copia vendada** en `src/lg-zoom-custom/` (basada en lightgallery 2.7.1) porque `TimelineViewer.ts` la modifica en runtime (scroll wheel zoom en `_openLightGallery`). `tsc` no copia `.js` a `dist/`, por eso `build:lgzoom` copia la carpeta `lg-zoom-custom` completa a `dist/`. No usar `lightgallery/plugins/zoom` (el import original) para el zoom.
+Los tres specifiers son de browser/bundler: el consumidor los tiene que resolver (bundle propio o importmap, como hace `example/index.html`). El componente NO incluye lightGallery en su build, y `npm run build` no necesita copiar nada de `node_modules` a `dist/`.
 
-El consumidor debe proveer lightGallery en su bundle o via importmap (como hace `example/index.html`). El componente NO incluye lightGallery en su build.
-
-Para testing local, el example usa CDN via importmap.
+El consumidor debe proveer lightGallery en su bundle o via importmap. Para los tests, el importmap del demo apunta a jsDelivr, pero `e2e/helpers/network.js` intercepta esas requests y sirve los mismos `.es5.js` desde el `node_modules` local, así que la suite corre sin internet.
 
 ## Estructura de archivos
 
@@ -201,13 +225,11 @@ Para testing local, el example usa CDN via importmap.
 src/
   TimelineViewer.ts    ← Toda la lógica (único archivo TS)
   styles.scss          ← Todos los estilos (único archivo SCSS)
-  lg-zoom-custom/      ← Plugin zoom vendado de lightgallery (js + .d.ts)
 
 dist/
   TimelineViewer.js    ← ES module compilado
   TimelineViewer.d.ts  ← Type declarations
   styles.css           ← CSS compilado
-  lg-zoom-custom/      ← Copia del plugin zoom vendado (via build:lgzoom)
 
 example/
   index.html           ← Demo page con importmap para lightGallery CDN
@@ -215,14 +237,28 @@ example/
   mock-data.js         ← 19 artículos de ejemplo agrupados en 3 taxonomías (`content`) + lista plana (`items`)
   server.js            ← HTTP server estático (:3010)
   base.css             ← Reset/base styles del demo
+
+test/                  ← Suite jsdom (node:test), sin browser
+  *.test.js
+  helpers/
+    dom.js             ← jsdom + globals + stub de IntersectionObserver
+    resolve-lightgallery.js ← Hook de resolución ESM para lightGallery
+
+e2e/                   ← Suite Playwright (Chromium)
+  *.spec.js
+  helpers/
+    demo.js            ← Abrir el demo y leer el DOM
+    network.js         ← Importmap de jsDelivr servido desde node_modules
+
+playwright.config.js   ← testDir ./e2e, webServer en :3010
 ```
 
 ## Git
 
 - Branch principal: `master`
 - Remote: `https://github.com/GastonZalba/timeline-viewer`
-- `.gitignore` excluye `package-lock.json` (no se commitea)
-- No hay CI/CD configurado
+- `.gitignore` excluye `package-lock.json` (no se commitea), ni `test-results/` / `playwright-report/`
+- No hay CI/CD configurado: los tests se corren a mano con `npm test`
 
 ## Cambios frecuentes
 
