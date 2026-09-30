@@ -61,21 +61,20 @@ The `Timeline` constructor accepts a single config object:
 
 | Option          | Type                           | Default    | Description                          |
 |-----------------|--------------------------------|------------|--------------------------------------|
-| `container`     | `string` (CSS selector/Element)| **required** | DOM element to mount into          |
+| `container` | `string` (CSS selector/Element) | **required** | DOM element to mount into |
 | `content`       | `ContentGroup[]`              | `[]`       | Optional. Array of `{ label, items }` groups: the **medium taxonomies**. The `label` of each group becomes an option of the selector shown above the expanded timeline, shown next to the number of articles of that group, and the timeline and the filters are scoped to the selected group (with 2+ groups a trailing **"Ver todo"** option scopes the timeline back to the whole pool). The counter in the expand button always shows the **total of every group**, regardless of the selected taxonomy. Takes precedence over `items`. Groups with no `label` or with an empty `items` array are ignored. When no group survives (or in API mode) **no selector is rendered and the layout is unchanged**. See [Content taxonomies](#content-taxonomies) |
 | `items`         | `TimelineItem[]`              | `[]`       | Legacy flat list of article card objects. Ignored when `content` is set. Kept for backwards compatibility: with no `content` the component behaves exactly as before |
 | `api`           | `{ url: string; fetchImpl?: typeof fetch }` | — | Optional. Enables **API mode**: the component fetches the paginated list from `{url}`, the static collection values (filter counts, total, `lastUpdated`) from `{url}/facets` (**once, at startup**) and the lazy detail of each card from `{url}/:id`. When set, `content` and `items` are ignored, **no taxonomy selector is rendered**, and filters, search, sort and pagination are resolved server-side. `fetchImpl` allows injecting a custom fetch (useful for tests or auth headers) |
 | `featuredCount` | `number`                       | `6`        | Cards in the featured stack          |
 | `startExpanded` | `boolean`                      | `false`    | When `true`, the timeline starts **already expanded** instead of collapsed on the featured stack. It only sets the initial state: the expand toggle keeps working and the choice is **not persisted**, so every page load starts from this value. Ignored in single mode (`singleId`), which always renders a single expanded card. |
 | `fullpage`    | `boolean`                      | `false`    | When `true`, renders in **fullpage mode**: the timeline is always open and the **page itself is what scrolls**. It implies `startExpanded`, makes the timeline non-collapsible (the expand button keeps showing the related count but loses its chevron and its click), removes the height limit of the list (so `#timeline-cards` is never a scroll box on its own), removes the **resize handle**, and **pins the toolbar** (counter, search, filters, sort and internal buttons) to the top of the viewport. The featured stack is not rendered at all, since it would never be seen, so `featuredCount` has no effect. Ignored in single mode (`singleId`), which already renders a single expanded card. See [Fullpage mode](#fullpage-mode) |
-| `filters` | `TimelineFilter[]` | — | Optional. Declares the **filter groups** of the toolbar: each one has a `field`, a `label`, a `group` (`'menu'` panel column or `'estado'` internal flyout) and its value list. Both the toolbar and the query parameters of API mode come from here, so without the option there is **no filter UI at all** (no button, no panel, no params). Groups with a missing `field`/`label`, an unsupported `type` or a duplicated `field` are dropped with a `console.warn`. See [Configurable filters](#configurable-filters) |
-| `filtersMaxVisible` | `number` \| `Partial<Record<string, number>>` | `5` | Values a filter group shows before collapsing the rest behind a **"Ver más (N)"** toggle. A number applies to every group; a record tunes single ones (`{ tipo_fuente: 8 }`) and the groups left out keep the default. A group's own `maxVisible` wins over both. `0` (or any value below 2) shows every value and renders no toggle. The visible ones are those with **the most results**, except in the groups that declare `sortValues` (`fecha_publicacion`, `descartado` in the demo), which keep their order and are just truncated. A group with a checked value never collapses. See [Filter "Ver más"](#filter-ver-más) |
+| `filters` | `TimelineFilter[]` | — | Optional. Declares the **filter groups** of the toolbar: each one has a `field`, a `label`, a `group` (`'menu'` panel column or `'filtros_internos'` internal-filters flyout) and its `items` (the values it offers, with their label and whether they start checked). Both the toolbar and the query parameters of API mode come from here, so without the option there is **no filter UI at all** (no button, no panel, no params). A group without `items` derives its values from the data. Groups with a missing `field`/`label`, an unsupported `type`, a duplicated `field` or an unusable `items` are dropped with a `console.warn`. See [Configurable filters](#configurable-filters) |
 | `itemsPerPage`  | `number`                       | `10`       | Items per page in timeline. `0` shows all items without pagination |
 | `pagination`    | `boolean`                      | `false`    | When `true`, the **"Cargar más" button is replaced by a paginator** — "‹ Anterior &#124; Página X de Y &#124; Siguiente ›" — that jumps between fixed-size pages instead of appending them, in local mode and in API mode alike. `itemsPerPage` is the size of every page, so the current page always shows exactly that many articles (less on the last one), which is what the API mode already sends per request. `0` still means "no pagination" (no paginator, no button). Because the pages are disjoint, a page change **replaces** the list rather than adding to it, and the timeline scrolls back to the top; in API mode the outgoing cards are swapped for the loading placeholders right away, since they are no longer what was asked for. The featured stack stays on the first page's, so collapsing the timeline always brings back the same articles. Works together with the search, the filters, the sort and the taxonomy selector: any of them starts over at page 1. Ignored in single mode (`singleId`) |
 | `lastUpdated`   | `string` (ISO date)            | `''`       | Timestamp shown in the footer        |
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
-| `inlineAdjuntos`| `boolean`                      | `false`    | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button |
-| `internalButtons`| `boolean`                     | `false`    | When `true`, shows the internal work controls in the timeline toolbar: the red "work notes" toggle (hide/show `notas_de_trabajo` on cards and topics) and the red "Estado interno" flyout button. The flyout only renders when the `filters` option declares at least one group with `group: 'estado'` (validado / capturado / descartado in the demo). When `false` (default) those buttons are not rendered |
+| `inlineAdjuntos` | `boolean` | `false` | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button |
+| `internalButtons` | `boolean` | `false` | When `true`, shows the internal work controls in the timeline toolbar: the red "work notes" toggle (hide/show `notas_de_trabajo` on cards and topics) and the red "Filtros internos" flyout button. The flyout only renders when the `filters` option declares at least one group with `group: 'filtros_internos'` (validado / capturado / descartado in the demo). When `false` (default) those buttons are not rendered |
 | `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given count. When unset, the default Spanish label is used with singular/plural logic. `count` is the **total number of publications, independent of the selected taxonomy** (the same number shown next to the label), which keeps the singular/plural grammatical. The returned string is injected as **HTML (not escaped)**, so it can contain markup (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`); escape any untrusted value before returning it |
 | `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode. The navigation links block under the card is not configured here: it comes from the item's own `taxonomias` field. See [Single view taxonomies](#single-view-taxonomies) |
 
@@ -91,15 +90,17 @@ Each object in `content[].items` (or in the legacy `items`) supports these field
 | `thumbnail`         | `string` (URL) / `null`     | Main card image                          |
 | `link_web`             | `string` (URL)              | External article link                    |
 | `fecha_publicacion`    | `string` (YYYY-MM-DD)       | Publication date                         |
+| `anio_publicacion` | `string` / `null` | Year of `fecha_publicacion` already reduced to text, or `null` when the item has no date. Precomputed by the pipeline so a year filter needs no `extract` |
 | `fecha_scrapeo`        | `string` (ISO)              | When it was crawled                      |
 | `tonos_sociales`      | `string[]`                  | Overall sentiment(s) — unique tones present in the article's `temas` |
 | `fuente_institucional` | `string` / `null`          | Source / publication name                |
-| `tipo_fuente`           | `string`                    | Source type. One of: `Decreto o norma`, `Libro o publicación`, `Sitio web o portal`, `Red Social`, `Gacetilla o comunicado de prensa`, `Video` |
+| `tipo_fuente` | `string` / `null` | Source type. One of: `Decreto o norma`, `Libro o publicación`, `Sitio web o portal`, `Red Social`, `Gacetilla o comunicado de prensa`, `Video`, or `null` when the detection has no type yet |
 | `es_oficial`            | `boolean`                   | Whether the source is official (`true`) or not (`false`) |
 | `validado`              | `boolean` / `null`          | Whether the article has been validated (`true`), not validated (`false`), or pending/unknown (`null`) |
 | `capturado`             | `boolean`                   | Whether the article has been captured by the pipeline. When `false`, the entry is an unprocessed detection and only `id` and `link_web` are populated; all other fields are empty |
 | `descartado`            | `boolean` / `null`          | Whether the article has been discarded (`true`), kept (`false`), or unknown (`null`). By default the filter excludes discarded articles |
 | `adjuntos`              | `string[]`                  | Attached files/links — may be empty |
+| `contenido` | `string[]` | Content types the item carries, preclassified for filtering: `adjuntos`, `video`, `imagenes` (any combination, possibly empty) |
 | `actores_principales`  | `string[]` / `null`        | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
 | `imagenes`             | `{ thumb: string; full: string }[]` / `null` | Image gallery with low-res `thumb` and full-res `full` URLs. `null` is accepted and treated as an empty gallery |
@@ -137,7 +138,7 @@ Mientras una respuesta de lista está en vuelo, el componente muestra **tarjetas
 | Endpoint          | Uso                                                                    | Respuesta                    |
 |-------------------|------------------------------------------------------------------------|------------------------------|
 | `GET {url}`       | Lista paginada con búsqueda, filtros y orden                        | Objeto con `items` y `total` |
-| `GET {url}/facets`| Valores estáticos de la colección completa: conteos de los filtros, total y `lastUpdated`. Se pide **una sola vez**, al iniciar, en paralelo con la primera página | Objeto con `facets`, `total` y `lastUpdated` opcional |
+| `GET {url}/facets` | Valores estáticos de la colección completa: conteos de los filtros, total y `lastUpdated`. Se pide **una sola vez**, al iniciar, en paralelo con la primera página | Objeto con `facets`, `total` y `lastUpdated` opcional |
 | `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta, y en single mode) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
 
 > El campo `items` de la respuesta es la lista paginada que devuelve el servidor y **no** tiene relación con la opción `content` ni con el alias legacy `items`. En modo API no se renderiza el selector de taxonomías.
@@ -155,13 +156,15 @@ Los parámetros de filtro son los **grupos declarados** en la opción `filters`,
 | `sort`             | `asc`/`desc` | Orden por `fecha_publicacion` (el campo es fijo, el parámetro solo lleva la dirección). `desc` (reciente primero) es el default; cualquier valor distinto de `asc` cae a `desc`. Los ítems **sin fecha van al final en `desc` y al principio en `asc`**, que es lo que hace el componente en modo local |
 | `q`                | `string`  | Texto libre. Coincide con `id`, `nombre_fuente`, `fuente_institucional` y `actores_principales`, sin distinguir acentos ni mayúsculas |
 | `tonos_sociales`   | `string`  | CSV de tonos (`Positivo`, `Negativo`, `Neutro`) — OR dentro del campo    |
-| `tipo_fuente`      | `string`  | CSV de tipos (`sin-tipo` para los que no declaran tipo)                  |
-| `validado`         | `string`  | `validado`, `no-validado`                                                |
-| `capturado`        | `string`  | `capturado`, `no-capturado`                                              |
-| `descartado`       | `string`  | `descartado`, `no-descartado`                                            |
-| `es_oficial`       | `string`  | `oficial`, `no-oficial`                                                  |
-| `fecha_publicacion`| `string`  | CSV de años (`2026`) o `sin-fecha`                                       |
+| `tipo_fuente` | `string` | CSV de tipos (`Sitio web o portal`, ...) o `null` para los que no declaran tipo |
+| `anio_publicacion` | `string` | CSV de años (`2026`, ...) o `null` para el ítem sin fecha |
 | `contenido`        | `string`  | CSV de `adjuntos`, `video`, `imagenes`                                   |
+| `validado` | `string` | CSV de `true`, `false`, `null` (los tres tildados por defecto) |
+| `capturado` | `string` | `true` (por defecto) o `false` |
+| `descartado` | `string` | `false,null` (por defecto) o `true` |
+| `es_oficial` | `string` | `true` / `false` |
+
+> **Los valores viajan tal como los declara el consumidor.** El `value` de cada ítem es el token que se manda: `true` viaja como `true`, `false` como `false` y `null` como `null` (el string de cuatro letras, no ausencia). Cuando un ítem declara varios valores, viajan unidos por comas en el mismo param: `{ value: [false, null] }` se manda como `descartado=false,null`, y el servidor lo parte por comas como cualquier otro CSV. Por eso un `value` no puede contener una coma: `_normalizeFilters()` descarta el grupo entero con un `console.warn`. En el lado del ítem la comparación es por token: un `null` matchea los ítems que no traen el campo (o lo traen en `null`), y un valor que el ítem trae en un array cuenta (`tonos_sociales`, `contenido`).
 
 > **Dónde caen los ítems sin fecha.** El bucket de los que no tienen `fecha_publicacion` **es parte de la dirección**, no un grupo fijo: en `desc` quedan al final y en `asc` quedan al principio. No alcanza con invertir la comparación de fechas, hay que invertir también ese caso. Es el comportamiento del modo local, que ordena descendente y después da vuelta el array (`_sortByDateDesc()` + `reverse()` en `_applyFilters()`), así que un backend que lo haga de otra forma muestra los sin fecha en un lado en un modo y en el otro en el otro, y el componente no tiene forma de corregirlo: en modo API nunca ordena del lado del cliente, renderiza la página tal cual la devuelve el servidor.
 
@@ -169,7 +172,7 @@ Los parámetros de filtro son los **grupos declarados** en la opción `filters`,
 
 ```jsonc
 {
-  "items": [ /* TimelineItemSummary[] */ ],
+  "items": [/* TimelineItemSummary[] */],
   "total": 123               // total de publicaciones que matchean búsqueda + filtros
 }
 ```
@@ -186,29 +189,30 @@ Los parámetros de filtro son los **grupos declarados** en la opción `filters`,
 {
   "facets": {
     "tonos_sociales": { "Positivo": 15, "Negativo": 5, "Neutro": 8 },
-    "tipo_fuente": { "Sitio web o portal": 9 },
-    "validado": { "validado": 12, "no-validado": 7 },
-    "capturado": { "capturado": 17, "no-capturado": 2 },
-    "descartado": { "descartado": 3, "no-descartado": 16 },
-    "es_oficial": { "oficial": 10, "no-oficial": 9 },
-    "fecha_publicacion": { "2026": 15 },
-    "contenido": { "adjuntos": 4, "video": 6, "imagenes": 8 }
+    "tipo_fuente": { "Sitio web o portal": 9, "null": 2 },
+    "anio_publicacion": { "2026": 15, "null": 2 },
+    "contenido": { "adjuntos": 4, "video": 6, "imagenes": 8 },
+    "validado": { "true": 12, "false": 3, "null": 4 },
+    "capturado": { "true": 17, "false": 2 },
+    "descartado": { "true": 2, "false": 12, "null": 5 },
+    "es_oficial": { "true": 10, "false": 9 }
   },
   "total": 19,                              // total de la colección, sin q ni filtros
   "lastUpdated": "2026-06-25T14:30:00"     // opcional
 }
 ```
 
-Los `facets` y el `total` se calculan sobre la **colección completa**, sin depender de `q` ni de los filtros activos, y por eso no cambian: se piden una sola vez, al iniciar, y tanto el panel de filtros como el contador del botón de expandir se reconstruyen con ese único request (los checkboxes se crean de antemano sin conteos, así que los `defaultChecked` —los del grupo por su `values`, o los `estado` persistidos— ya viajan en la primera request de la lista). Como consecuencia, los números entre paréntesis son el total de la colección y **no** el conteo de la búsqueda actual, y los valores de un filtro no desaparecen al filtrar (el grupo completo se oculta solo si la colección tiene un solo valor para ese campo). Las claves canónicas (`validado`, `no-validado`, `oficial`, `sin-tipo`, etc.) deben coincidir con las que devuelve cada campo.
+Los `facets` y el `total` se calculan sobre la **colección completa**, sin depender de `q` ni de los filtros activos, y por eso no cambian: se piden una sola vez, al iniciar, y tanto el panel de filtros como el contador del botón de expandir se reconstruyen con ese único request (los checkboxes se crean de antemano sin conteos, así que los `checked` declarados —o los `filtros_internos` ya persistidos— viajan en la primera request de la lista). Como consecuencia, los números entre paréntesis son el total de la colección y **no** el conteo de la búsqueda actual, y los valores de un filtro no desaparecen al filtrar (un grupo que deriva sus valores se oculta solo si la colección tiene un solo valor para ese campo; uno que declara `items` no se oculta nunca). **Las claves de los facets son los mismos tokens que los `value` declarados**: como la comparación es por token, `"null"` cuenta los ítems sin valor y `"true"` los que traen el booleano, así que el servidor no renombra nada (`example/server.js` ya no tiene lógica por campo: solo tokeniza con `String()`).
 
-Mientras los facets no llegan, el botón de filtros queda **visible pero inerte**: se muestra igual para que la barra no cambie de ancho a mitad de carga, sin listener y con el panel sin nada que abrir — salvo los grupos con `values` fijos, que ya muestran sus checkboxes sin conteos. El contador del botón de expandir muestra `0` y el pie "Actualizado por última vez el ..." todavía no se muestra.
+Mientras los facets no llegan, el botón de filtros queda **visible pero inerte**: se muestra igual para que la barra no cambie de ancho a mitad de carga, sin listener y con el panel sin nada que abrir — salvo los grupos que declaran `items`, que ya muestran sus checkboxes sin conteos (en cero). El contador del botón de expandir muestra `0` y el pie "Actualizado por última vez el ..." todavía no se muestra.
 
 Cuatro detalles del ciclo de vida:
 
-- Si `GET {url}/facets` falla, la lista se sigue mostrando y el panel de filtros queda sin los conteos (solo sobreviven los grupos con valores fijos, declarados con `values`, como los de estado). No hay reintentos, y un fallo **no** borra unos facets que ya se hayan adoptado desde la lista.
+- Si `GET {url}/facets` falla, la lista se sigue mostrando y el panel de filtros queda sin los conteos (los grupos que declaran `items` siguen con `(0)`). No hay reintentos, y un fallo **no** borra unos facets que ya se hayan adoptado desde la lista.
 - Si la respuesta no trae `total`, el contador del botón de expandir queda en `0`: no se usa como fallback el `total` de la lista (que cambia con la búsqueda y los filtros y daría un número que se movería). El `lastUpdated` sí acepta la opción `lastUpdated` del constructor como fuente.
 - Por compat, si la respuesta de `GET {url}` todavía trae un campo `facets` y el endpoint dedicado no respondió, se usan esos valores. Sirve para backends que todavía no migraron; no hay que mandarlos en las páginas siguientes.
-- Los grupos con valores fijos (`values`) arrancan con sus `defaultChecked` (el demo: `validado` + `no-validado`, `capturado`, `no-descartado`; los `estado` además se persisten en `localStorage`) y esos defaults viajan en la **primera** request, igual que en el modo local.
+- Los grupos con `items` arrancan con los `checked` que declaran (el demo: `capturado`, `descartado` = `false,null`, y `validado` con los tres; los `filtros_internos` además se persisten en `localStorage`) y esos valores viajan en la **primera** request, igual que en el modo local.
+- Un grupo **derivado** en modo API no ofrece la clave `"null"` del facet (igual que en local, donde los ítems sin valor no generan ningún valor), salvo que declare `allowEmpty: true`: entonces aparece como `"Sin valor"` al final, y tildarla manda `campo=null` en la lista, que el servidor tiene que resolver contra los ítems que no traen el campo.
 
 #### `TimelineItemSummary`
 
@@ -271,12 +275,12 @@ new Timeline({
 Behaviour:
 
 - **Collapsed timeline — nothing changes.** The featured stack keeps showing the first `featuredCount` captured items of **the whole pool**, mixing every taxonomy, and no selector is visible.
-- **Expanded timeline** — a small pill-shaped selector appears right under the "publicaciones relacionadas" button, aligned just to the right of the timeline line (in the same column as the dates). Its options are the taxonomy labels, in the order they were passed, **each followed by the raw number of articles of that group** (`Tecnología y herramientas (9)`). The trailing "Ver todo" option shows the grand total (`Ver todo (19)`). These counts are static: the selector is a *scope*, not a filter, so they never react to the checkboxes.
+- **Expanded timeline** — a small pill-shaped selector appears right under the "publicaciones relacionadas" button, aligned just to the right of the timeline line (in the same column as the dates). Its options are the taxonomy labels, in the order they were passed, **each followed by the raw number of articles of that group** (`Tecnología y herramientas (9)`). The trailing "Ver todo" option shows the grand total (`Ver todo (19)`). These counts are static: the selector is a _scope_, not a filter, so they never react to the checkboxes.
 - **The first taxonomy is selected by default** and the select displays its label.
 - **With two or more taxonomies a trailing "Ver todo" option is added** (last in the list, never the default). Selecting it shows every article of every taxonomy at once — the same set the collapsed featured stack draws from. Internally the "all" state is `_contentIndex === -1`, and `_scopeItems()` falls back to the whole pool.
 - **With a single taxonomy the label is still shown**, but the select is rendered **disabled** (muted, no dropdown arrow) and **no "Ver todo" option is added** — there is nothing to aggregate.
-- **Selecting a taxonomy re-scopes the timeline**: the cards, the filter checkboxes and their `(N)` counts and the pagination are all computed over the items of the selected group only. The estado interno filters keep their `localStorage` state, the rest fall back to each filter's defaults. Both sets are sorted by date and honour the sort toggle: descending leaves the **undated last**, ascending puts them **first** (the toggle reverses the descending array rather than re-sorting). The same placement applies in API mode, where the direction travels to the server in the `sort` param.
-- **The number in the expand button never changes with the taxonomy**: it always shows the total of every group, and `relatedLabel(count)` receives that same total, so the singular/plural always matches. Narrowing a taxonomy changes *what* the timeline lists, not *how many* publications the section has.
+- **Selecting a taxonomy re-scopes the timeline**: the cards, the filter checkboxes and their `(N)` counts and the pagination are all computed over the items of the selected group only. The `filtros_internos` groups keep their `localStorage` state, the rest fall back to each filter's defaults. Both sets are sorted by date and honour the sort toggle: descending leaves the **undated last**, ascending puts them **first** (the toggle reverses the descending array rather than re-sorting). The same placement applies in API mode, where the direction travels to the server in the `sort` param.
+- **The number in the expand button never changes with the taxonomy**: it always shows the total of every group, and `relatedLabel(count)` receives that same total, so the singular/plural always matches. Narrowing a taxonomy changes _what_ the timeline lists, not _how many_ publications the section has.
 - The selector is **not rendered at all** when: `content` is not set, every group is invalid, the legacy `items` alias is used, or the component runs in API mode. In those cases the layout is byte-for-byte the previous one.
 - Group `label`s are plain text (no HTML). A label longer than the pill crops with a real ellipsis (`...`) while its **`(N)` count always stays visible**, because the pill is a flex row where only the label shrinks. The pill is capped at `max-width: 240px` and its full width is `shrink-to-content`, so it narrows on short labels. Hovering shows the complete `label (N)` in a tooltip.
 - `content` takes precedence over `items`; `items` is kept as a legacy alias and simply behaves like before (one implicit group, no selector).
@@ -359,7 +363,7 @@ Sticky positioning needs no scroll container between the section and the page, a
 
 ### Configurable filters
 
-The filter toolbar is driven entirely by the `filters` option: declare the groups and the component builds the panel (or the "Estado interno" flyout), derives or fetches the values and applies them. Without the option there is no filter UI — not a hidden one, none at all.
+The filter toolbar is driven entirely by the `filters` option: declare the groups and the component builds the panel (or the "Filtros internos" flyout), derives or fetches the values and applies them. Without the option there is no filter UI — not a hidden one, none at all.
 
 ```js
 new Timeline({
@@ -367,23 +371,33 @@ new Timeline({
   content: [/* ContentGroup[] */],
   filters: [
     {
-      field: 'tipo_fuente',                  // field of the item (or key of the facets) to read
+      // No `items`: the values come from the data (the items of the selected taxonomy, or the
+      // facets in API mode). Perfect for an open list like the source types.
+      field: 'tipo_fuente',
       label: 'Tipo de fuente',
-      maxVisible: 6                          // this group's own "Ver más" cut
+      maxVisible: 4 // this group's own "Ver más" cut (default 5)
     },
     {
       field: 'es_oficial',
       label: 'Fuente oficial',
-      extract: (item) => (item.es_oficial ? 'oficial' : 'no-oficial'), // a boolean split in two named values
-      formatLabel: (val) => (val === 'oficial' ? 'Sí' : 'No'),
-      values: ['oficial', 'no-oficial']      // fixed list: shown even if the data has no item for it
+      // `items`: the group shows exactly these values, in this order, even if no item (or no
+      // facet) carries them. `value` is the token that is compared and sent to the server; `label`
+      // is the visible text; `checked` is the initial state.
+      items: [
+        { value: true, label: 'Sí' },
+        { value: false, label: 'No' }
+      ]
     },
     {
-      field: 'validado',
-      label: 'Validado',
-      group: 'estado',                       // lives in the "Estado interno" flyout (needs `internalButtons: true`)
-      values: ['validado', 'no-validado'],
-      defaultChecked: ['validado', 'no-validado'],
+      field: 'descartado',
+      label: 'Descartado',
+      group: 'filtros_internos', // lives in the "Filtros internos" flyout (needs `internalButtons: true`)
+      items: [
+        { value: true, label: 'Descartado' },
+        // Several values in one checkbox: it matches either, and travels as `descartado=false,null`.
+        // Both checked here, so the default list hides only the discarded ones.
+        { value: [false, null], label: 'Sin descartar', checked: true }
+      ],
       persist: true                          // its checked state survives reloads in localStorage
     }
   ]
@@ -395,56 +409,66 @@ new Timeline({
 | Field            | Type                                        | Default    | Description                              |
 |------------------|---------------------------------------------|------------|------------------------------------------|
 | `field`          | `string`                                    | **required** | Name of the field the group filters by. In local mode it is read from each item (or produced by `extract`); in API mode it is the key the server uses in `GET {url}/facets`, which is also the query parameter the active values are sent in |
-| `label`          | `string`                                    | **required** | Header of the group in the panel. Escaped before being injected. The `estado` flyout has no headers |
+| `label` | `string` | **required** | Header of the group in the panel. Escaped before being injected. The `filtros_internos` flyout has no headers |
 | `type`           | `'checkboxes'`                              | `'checkboxes'` | Control of the group. Only checkboxes exist today; a different value drops the group with a `console.warn` |
-| `group`          | `'menu' \| 'estado'`                        | `'menu'`   | `'menu'` renders the group in a column of the panel; `'estado'` renders it in the internal-state flyout, which is part of the internal toolbar and needs `internalButtons: true` |
-| `values`         | `string[]`                                  | —          | Fixed value list. When given, the group exists even if no item (or no facet) carries a value for it, and the list is the order unless `sortValues` says otherwise. Without it, the values come from the data: in local mode the unique `extract`/`field` values of the active scope, in API mode the keys of `facets[field]` |
-| `defaultChecked` | `string[]`                                  | —          | Values checked when the group is built. They travel in the first request of API mode, and a `persist` group starts from them until the user changes something |
+| `group` | `'menu' \| 'filtros_internos'` | `'menu'` | `'menu'` renders the group in a column of the panel; `'filtros_internos'` renders it in the internal-filters flyout, which is part of the internal toolbar and needs `internalButtons: true`. Any other value is treated as `'menu'` |
+| `items` | `{ value, label, checked? }[]` | — | The values of the group, in display order. When given, the group exists even if no item (or no facet) carries a value for it, and the list is the order the panel shows (and the one the "Ver más" cut truncates). Without it, the values come from the data: in local mode the unique `extract`/`field` values of the active scope, in API mode the keys of `facets[field]` |
+| `allowEmpty` | `boolean` | `false` | Offers the items that carry **no value** for the field (`null`, or the field missing) as one more value of a group **without** `items`, labelled `"Sin valor"`, and always as its **last** value (whatever the order of the others). It appears only when the data —or the `facets`, in API mode— has such items, and it travels like any other value (`?campo=null`). Ignored when `items` declares the values: there the empty bucket is one declared item, `{ value: null, label: 'Sin tipo' }` |
 | `persist`        | `boolean`                                   | `false`    | Keeps the checked values of the group in `localStorage`, so they survive the checkbox rebuilds (the API facets, a taxonomy re-scope) and the page loads. Saving only happens on a user gesture |
-| `maxVisible`     | `number`                                    | —          | Values shown before the "Ver más (N)" toggle of the group, above `filtersMaxVisible`. Below 2 the group never collapses |
-| `extract`        | `(item) => string \| string[]`              | —          | Values a single item carries. Defaults to reading `item[field]`: arrays are expanded and `null` / `undefined` count as no value at all. Use it for fields that need a canonical value (a boolean split in two, a date reduced to its year) or a synthetic field that is not a property of the item |
-| `formatLabel`    | `(val: string) => string`                   | —          | Label shown for a value. Defaults to the value itself, except `true` → "Sí" and `false` → "No" so a boolean field does not read as raw `true` / `false` |
-| `sortValues`     | `(a: string, b: string) => number`          | —          | Deliberate order of the values. A group that declares one keeps it when the long list is truncated, instead of leading with the values that filter the most |
+| `maxVisible` | `number` | `5` | Values shown before the "Ver más (N)" toggle of the group. Below 2 the group never collapses |
+| `extract` | `(item) => string \| string[]` | — | Values a single item carries. Defaults to reading `item[field]`: arrays are expanded and `null` / `undefined` count as the `'null'` token. Use it for fields that need a canonical value (a boolean split in two, a date reduced to its year) or a synthetic field that is not a property of the item |
+| `formatLabel` | `(val: string) => string` | — | Label shown for a value of a group **without** `items` (one that derives them). Defaults to the value itself, except `true` → "Sí" and `false` → "No" so a boolean field does not read as raw `true` / `false`. A declared value carries its own `label`, so it never goes through here |
+| `sortValues` | `(a: string, b: string) => number` | — | Deliberate order of the values. A group without `items` that declares one keeps it when the long list is truncated, instead of leading with the values that filter the most |
+
+#### `TimelineFilterItem`
+
+| Field | Type | Default | Description |
+| ----------------------------- | ------------------------------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `value` | `string \| number \| boolean \| null \| (string \| number \| boolean \| null)[]` | **required** | The token(s) this option matches and sends. A list is one checkbox that matches any of them (and travels as a CSV in the query param); `null` matches the items that do not carry the field, and travels as the `'null'` string. Cannot contain a comma |
+| `label` | `string` | **required** | Visible text of the checkbox. Free text: it never has to be the value (`{ value: true, label: 'Sí' }`) |
+| `checked` | `boolean` | `false` | Whether the option starts checked. It travels in the first request of API mode, and a `persist` group starts from it until the user changes something |
 
 Details worth knowing:
 
-- **Two buckets, two buttons.** `group: 'menu'` groups fill the drop-down panel, dealt out in two columns (the first half of the declaration goes to the first column, the rest to the second). `group: 'estado'` groups fill the flyout of the internal "Estado interno" button. Each toggle lights up only with the groups it owns: an active panel value lights `#filter-toggle`, an active flyout value lights `#estado-toggle`, never the other way around.
+- **Two buckets, two buttons.** `group: 'menu'` groups fill the drop-down panel, dealt out in two columns (the first half of the declaration goes to the first column, the rest to the second). `group: 'filtros_internos'` groups fill the flyout of the internal "Filtros internos" button. Each toggle lights up only with the groups it owns: an active panel value lights `#filter-toggle`, an active flyout value lights `#filtros-internos-toggle`, never the other way around.
 - **One value per checkbox.** A checked group means "any of these values" (OR inside a group); groups combine with **AND**, and with the search.
+- **Everything is compared as a token.** A value is matched with `String(value)`, and `null` / `undefined` both read as `'null'`, so a declared `value: null` catches the items that do not carry the field. Arrays on the item are expanded, so one item can answer several values of the same group (`tonos_sociales`, `contenido`).
+- **The empty bucket needs no declaration.** A group without `items` never offers the items that carry no value (nobody declared that bucket), which is what `allowEmpty: true` is for: it adds them as a last value labelled `"Sin valor"`, so `{ field: 'tipo_fuente', label: 'Tipo de fuente', allowEmpty: true }` is a complete group — no `items` to keep in sync with the data, and no "Sin tipo" / "Sin fecha" label to invent per field. The label is fixed on purpose (the bucket is the same everywhere), the value goes last whatever the order of the others, it can sit behind the "Ver más" toggle like any other, and a group whose only value is that bucket still shows up (filtering by it is what drops everything that *does* have a value). With `items` declared, `allowEmpty` is ignored: express it as `{ value: null, label: 'Sin tipo' }` and keep your own label.
 - **`(N)` counts.** In local mode they are computed over the active scope (which is why they change when you switch taxonomy). In API mode they come from `GET {url}/facets`, so they are the collection totals and do not move with the search.
-- **The value list is shared with the server.** In API mode each group sends `field=<csv>` to `GET {url}`, and its canonical keys must match the ones `/facets` returns. A group with `values` works even before the facets land; a group without them needs the facets to exist at all.
-- **A dropped group is loud.** A missing `field` or `label`, an unsupported `type` or a duplicated `field` discards just that group with a `console.warn` instead of failing the whole option, so a typo does not go unnoticed.
+- **The value list is shared with the server.** In API mode each group sends `field=<csv>` to `GET {url}`, made of the very tokens the checkboxes carry in the DOM, and the keys `/facets` returns are the same tokens. A group with `items` works even before the facets land (with the counts in zero); a group without them needs the facets to exist at all.
+- **A derived group hides the `"null"` facet.** The items with no value for the field are not a value of the group unless it declares `allowEmpty: true`, which turns that bucket into a last value labelled `"Sin valor"` and sends `field=null` when it is checked — the server resolves it against the items that do not carry the field, same as in local mode.
+- **A dropped group is loud.** A missing `field` or `label`, an unsupported `type`, a duplicated `field` or an `items` that cannot be resolved (empty, an entry without `value` / `label`, two entries with the same token, a value with a comma) discards that group with a `console.warn` instead of failing the whole option, so a typo does not go unnoticed.
 
 ### Filter "Ver más"
 
-Filter groups with an open value list (`tipo_fuente`, `tonos_sociales`, `contenido`...) can get long. By default each group shows the **5 values that filter the most** and hides the rest behind a "Ver más (N)" toggle that swaps to "Ver menos":
-
-```js
-new Timeline({
-  container: '#noticias-container',
-  content: [/* ContentGroup[] */]
-}); // tipo_fuente with 7 values -> 5 shown, "Ver más (2)"
-```
+Filter groups with a long value list can get out of hand. Each group shows 5 values and hides the rest behind a "Ver más (N)" toggle that swaps to "Ver menos":
 
 ```js
 new Timeline({
   container: '#noticias-container',
   content: [/* ContentGroup[] */],
-  filtersMaxVisible: 0 // every value, no toggle
-});
-
-new Timeline({
-  container: '#noticias-container',
-  content: [/* ContentGroup[] */],
-  filtersMaxVisible: { tipo_fuente: 8, tonos_sociales: 3 } // per group, default 5 for the rest
+  filters: [
+    {
+      field: 'tipo_fuente',
+      label: 'Tipo de fuente',
+      maxVisible: 4 // 4 shown, "Ver más (3)"
+    },
+    {
+      field: 'tonos_sociales',
+      label: 'Tono social',
+      maxVisible: 0 // every value, no toggle (as is any value below 2)
+    }
+  ]
 });
 ```
 
-Details worth knowing:
+The cut is **per group**, through `maxVisible`, and it keeps the order the group already has:
 
-- **Which values stay visible** is by result count, which works in both modes: in local mode the counts come from the items in the selected taxonomy, in API mode from `GET {url}/facets`. Groups with a **deliberate order** — those declaring `sortValues`, like `fecha_publicacion` (newest year first) and `descartado` ("Descartado" first) in the demo — keep it and are only truncated, so the year list never leads with the year that happens to have the most articles.
+- A group that declares `items` shows the **first values of its declaration** and hides the tail, so the toggle reveals exactly what you left out.
+- A group that derives its values from the data leads with the **ones that filter the most** (the counts come from the items of the active taxonomy, or from the facets in API mode). Give it a `sortValues` comparator to lead with a deliberate order instead — that is how a year list can start at the newest year.
 - **A group with a checked value never collapses**, so a filter you applied is never hidden behind the toggle. It also reopens by itself on the rebuilds (when the API facets land, and when you switch taxonomy).
 - **The toggle is not a filter**: it does not touch the results and does not re-render the timeline, so opening and closing it is instant. Whether the group is open is kept in memory for the session (not in `localStorage`; only the groups with `persist: true` are persisted).
-- Groups with one or zero values are hidden entirely, as before, and the groups with fixed `values` of two options (the internal-state ones in the demo) never have enough values to collapse in the first place.
+- A group that derives its values is hidden entirely when the data has one or zero of them. A group with `items` never hides itself: it is a decision the consumer took, and it keeps being offered even with nothing behind it.
 
 ## Build
 
@@ -457,6 +481,7 @@ Compiles TypeScript (`src/TimelineViewer.ts`) and SCSS (`src/styles.scss`) into 
 > **Nota:** Los archivos de `dist/` se generan automáticamente con el build. No los edites a mano — haz los cambios en `src/` y ejecuta `npm run build`.
 
 Run only the TypeScript compilation:
+
 ```bash
 npm run build:ts
 ```
@@ -477,13 +502,13 @@ npm start
 
 The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency.
 
-The demo declares its filters in `example/filters.js` and passes them through the `filters` option, so the toolbar you see is built from that config — tweak a group there to see the panel change without touching the library. The mock's `fecha_publicacion` reduces to its year and `contenido` is a synthetic field assembled from `adjuntos` / `has_video` / `imagenes` via `extract`.
+The demo declares its filters in `example/filters.js` and passes them through the `filters` option, so the toolbar you see is built from that config — tweak a group there to see the panel change without touching the library. All eight groups declare their `items`, and the mock ships the fields already classified for them (`tipo_fuente`, `contenido`, `anio_publicacion`), so the demo needs no `extract`: `example/server.js` tokenizes with `String()` and has no per-field logic either.
 
 Query flags of the demo page:
 
 | Flag | Effect |
-|------|--------|
-| *(none)* | Local mode with `content`: 3 taxonomies, so the selector and the "Ver todo" option are visible. The **Tipo de fuente** group has 7 values, so it shows the 5 with the most results plus a "Ver más (2)" toggle |
+| -------------------------------- | ------------ |
+| _(none)_ | Local mode with `content`: 3 taxonomies, so the selector and the "Ver todo" option are visible. The **Tipo de fuente** group has 7 values, so it shows the 5 with the most results plus a "Ver más (2)" toggle |
 | `?flat` | Local mode with the legacy `items` alias: verifies that no taxonomy selector is rendered and the layout is unchanged |
 | `?expanded` | Starts the timeline expanded (`startExpanded: true`) instead of collapsed. Combinable with the other flags |
 | `?full` | Fullpage mode (`fullpage: true`): always expanded, no resize handle, the page does the scrolling and the toolbar sticks to the top. Subsumes `?expanded`. Combinable with the other flags |
@@ -521,4 +546,4 @@ Both are dev-only dependencies; nothing here is needed to consume the component.
 
 ---
 
-*Vibecoded with [opencode](https://opencode.ai) and free AI models.*
+_Vibecoded with [opencode](https://opencode.ai) and free AI models._

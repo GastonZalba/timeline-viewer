@@ -51,64 +51,64 @@ new Timeline({ container, items, ... })
 | Método | Línea | Descripción |
 |--------|-------|-------------|
 | `constructor(config)` | 101 | Recibe `TimelineOptions`, inicializa propiedades, llama `_init()` |
-| `_init()` | 834 | Orquesta todo: layout → filtros → sort → render → eventos |
+| `_init()` | 3353 | Orquesta todo: layout → filtros → sort → render → eventos |
 
 ### Rendering
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_buildLayout()` | 426 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
-| `_renderAll()` | 2476 | Renderiza featured + timeline + load-more. Método principal de "refresh" (rebuild completo) |
-| `_renderFeatured(cards)` | 941 | Renderiza el stack de tarjetas superpuestas |
-| `_renderTimeline(cards)` | 1608 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`) |
-| `_appendTimelineItems(items, startIndex)` | 1639 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
-| `_createTimelineItem(card, index)` | 971 | Crea una tarjeta individual con todos sus event listeners |
-| `_renderLoadMoreButton()` | 2511 | Agrega el botón "Cargar más" al final del timeline |
-| `_insertBeforeFooter(el)` | 1580 | Helper: inserta antes del footer o al final si no hay footer |
-| `_insertBeforeTrailing(el)` | 1596 | Helper: inserta al final de las tarjetas, antes del bloque final (load-more / status / footer) |
-| `_appendPageItems()` | 2193 | Modo API: pide la página siguiente y **agrega** las tarjetas nuevas, sin rebuild. Saca el botón de "Cargar más" si `_hasMorePages()` pasa a `false` |
-| `_renderApiLoading()` | 2308 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
-| `_clearApiLoading()` | 2372 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
-| `_renderStatus()` | 2379 | Fila de status al pie de la lista: cargando / error / "Mostrando X de Y". Se abstiene mientras hay skeletons |
-| `_renderSingleCard()` | 2639 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
-| `_buildTaxonomies(taxonomias)` | 1217 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
-| `_appendTaxonomies(taxonomias)` | 1244 | Inserta el bloque de taxonomías al final de la `.publicaciones-section` en modo single. Sin datos: no se invoca (en el camino de "article not found" no hay ítem del cual leerlas) |
+| `_buildLayout()` | 806 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
+| `_renderAll()` | 3038 | Renderiza featured + timeline + load-more. Método principal de "refresh" (rebuild completo) |
+| `_renderFeatured(cards)` | 1218 | Renderiza el stack de tarjetas superpuestas |
+| `_renderTimeline(cards)` | 1885 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`) |
+| `_appendTimelineItems(items, startIndex)` | 1916 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
+| `_createTimelineItem(card, index)` | 1248 | Crea una tarjeta individual con todos sus event listeners |
+| `_renderLoadMoreButton()` | 3109 | Agrega el botón "Cargar más" al final del timeline |
+| `_insertBeforeFooter(el)` | 1857 | Helper: inserta antes del footer o al final si no hay footer |
+| `_insertBeforeTrailing(el)` | 1873 | Helper: inserta al final de las tarjetas, antes del bloque final (load-more / status / footer) |
+| `_appendPageItems()` | 2729 | Modo API: pide la página siguiente y **agrega** las tarjetas nuevas, sin rebuild. Saca el botón de "Cargar más" si `_hasMorePages()` pasa a `false` |
+| `_renderApiLoading()` | 2848 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
+| `_clearApiLoading()` | 2914 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
+| `_renderStatus()` | 2929 | Fila de status al pie de la lista: cargando / error / "Mostrando X de Y". Se abstiene mientras hay skeletons |
+| `_renderSingleCard()` | 3312 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
+| `_buildTaxonomies(taxonomias)` | 1554 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
+| `_bindTaxonomyToggles(root)` | 1593 | Modo single: bindea los "Ver más (N)" del bloque de links, en los grupos que superan `TAXONOMY_VISIBLE_LINKS`. Cada toggle es independiente: alterna la clase `expanded` de su `ul.card-taxonomy-list` (y su `aria-expanded`) |
 
 ### UI/Interacción
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_toggleExpand(scrollTo?)` | 2005 | Alterna entre vista featured (colapsada) y timeline (expandida) |
-| `_scrollToSection()` | 2067 | Smooth scroll para hacer visible el timeline |
-| `_toggleSort()` | 2120 | Invierte orden ascendente/descendente por fecha |
-| `_applyFilters(immediate)` | 2794 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
-| `_syncFilterToggleState()` | 2777 | Enciende `#filter-toggle` / `#estado-toggle` / `#search-toggle` según lo activo en cada dominio (los grupos `estado` solo encienden su propio botón, nunca el del panel) |
+| `_toggleExpand(scrollTo?)` | 2107 | Alterna entre vista featured (colapsada) y timeline (expandida) |
+| `_scrollToSection()` | 2169 | Smooth scroll para hacer visible el timeline |
+| `_toggleSort()` | 2222 | Invierte orden ascendente/descendente por fecha |
+| `_applyFilters(immediate)` | 2978 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
+| `_syncFilterToggleState()` | 2961 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-toggle` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
 
 ### Embeds sociales
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_parseLinkWeb(url)` | 212 | Detecta URLs de YouTube/Instagram/Twitter/Facebook, retorna `LinkInfo` |
-| `_preloadEmbedLibraries()` | 606 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook** |
+| `_parseLinkWeb(url)` | 1008 | Detecta URLs de YouTube/Instagram/Twitter/Facebook, retorna `LinkInfo` |
+| `_preloadEmbedLibraries()` | 2000 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook** |
 
 ### Utilidades
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_formatDate(dateStr)` | 198 | Fecha YYYY-MM-DD → string locale `es-ES` |
-| `_formatDateTime(dateStr)` | 205 | Datetime ISO → string locale `es-ES` |
+| `_formatDate(dateStr)` | 988 | Fecha YYYY-MM-DD → string locale `es-ES` |
+| `_formatDateTime(dateStr)` | 995 | Datetime ISO → string locale `es-ES` |
 | `_getFileExt(url)` | — | Extrae la extensión de una URL en minúsculas |
 | `_fileIconSvg(ext)` | — | SVG de icono de archivo según extensión (pdf vs genérico) |
-| `_openLightGallery(images, title, showFileName, startIndex?)` | 228 | Abre modal lightGallery con galería de imágenes |
-| `_absoluteUrl(url)` | 810 | Resuelve una URL del ítem contra `window.location.href` para poder compartirla (devuelve el valor crudo si no es una URL válida). Se usa con `link_view_entry` |
-| `_escapeHtml(value)` | 773 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores del dato de `taxonomias` (`content`, `link` y `label`), que siempre son texto plano |
+| `_openLightGallery(images, title, showFileName, startIndex?)` | 1042 | Abre modal lightGallery con galería de imágenes |
+| `_absoluteUrl(url)` | 1140 | Resuelve una URL del ítem contra `window.location.href` para poder compartirla (devuelve el valor crudo si no es una URL válida). Se usa con `link_view_entry` |
+| `_escapeHtml(value)` | 1100 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores del dato de `taxonomias` (`content`, `link` y `label`), que siempre son texto plano |
 
 ### Observers
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_setupObserver()` | 570 | IntersectionObserver para animación de entrada de featured cards |
-| `_setupTimelineObserver(items?)` | 1698 | IntersectionObserver para animación de entrada de timeline items. `items` acota qué se observa (la paginación pasa solo las tarjetas nuevas); por defecto observa todas las `.timeline-item` del container |
+| `_setupObserver()` | 1957 | IntersectionObserver para animación de entrada de featured cards |
+| `_setupTimelineObserver(items?)` | 1980 | IntersectionObserver para animación de entrada de timeline items. `items` acota qué se observa (la paginación pasa solo las tarjetas nuevas); por defecto observa todas las `.timeline-item` del container |
 
 ## Estructura DOM
 
@@ -130,9 +130,9 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │   └── button.sort-toggle (#sort-toggle)
   │   │   └── (toolbar interno, solo `internalButtons: true`)
   │   │       ├── button.work-notes-toggle (#work-notes-toggle)
-  │   │       └── .estado-wrap (#estado-wrap, solo si hay grupos `group: 'estado'`)
-  │   │           ├── button.estado-toggle (#estado-toggle)
-  │   │           └── div.estado-menu (#estado-menu)
+  │   │       └── .filtros-internos-wrap (#filtros-internos-wrap, solo si hay grupos `group: 'filtros_internos'`)
+  │   │           ├── button.filtros-internos-toggle (#filtros-internos-toggle)
+  │   │           └── div.filtros-internos-menu (#filtros-internos-menu)
   │   │               └── .filter-options[data-filter-field] × N (validado / capturado / descartado)
   │   └── .featured-cards (#featured-cards)
   │       └── .featured-card × N (generados por _renderFeatured)
@@ -200,15 +200,17 @@ section.publicaciones-section.single-mode
 │   └── button.work-notes-toggle
 ├── .timeline-item.visible (sin .timeline-date-col)
 │   └── .timeline-card.expanded   (misma estructura que en el timeline, ver arriba)
-└── .single-taxonomies (si la card declara `taxonomias` y hay algo renderizable)
-    └── .single-taxonomy × N
-        ├── .single-taxonomy-label (texto plano, crop con `...`, texto completo en `title`)
-        └── .single-taxonomy-list
-            └── li > a.single-taxonomy-link × N  (target=_blank, rel=noopener)
-                └── texto escapado
+│   └── .card-taxonomies (dentro del .card-taxonomies-slot de la card, si declara `taxonomias` y hay algo renderizable)
+        └── .card-taxonomy × N
+            ├── .card-taxonomy-label (texto plano, crop con `...`, texto completo en `title`)
+            └── ul.card-taxonomy-list
+                ├── li > a.card-taxonomy-link × N  (target=_blank, rel=noopener)
+                │   └── texto escapado
+                ├── li.card-taxonomy-extra[hidden] × N  (la cola del "Ver más")
+                └── li.card-taxonomy-more-item > button.card-taxonomy-more (solo si el grupo tiene cola)
 ```
 
-El bloque de taxonomías se inserta al final de la sección con `_appendTaxonomies(card.taxonomias)`, **solo cuando la card se pudo cargar**: los grupos vienen en el propio ítem (en modo API viajan en el detalle de `GET {url}/:id`), así que en el camino de "article not found" no hay datos y no se inserta nada. Los grupos con `label` vacío, `items` vacío, o items sin `content`/`link` se descartan; si no queda ningún grupo, no se inyecta markup. Sus estilos viven dentro de `&.single-mode` en `styles.scss`, así que solo existen en este modo.
+El bloque de taxonomías se renderiza con `_buildTaxonomias(card.taxonomias)` dentro del `.card-taxonomies-slot` de la tarjeta, y sus toggles se bindean con `_bindTaxonomyToggles(slot)`, **solo cuando la card se pudo cargar**: los grupos vienen en el propio ítem (en modo API viajan en el detalle de `GET {url}/:id`), así que en el camino de "article not found" no hay datos y no se inserta nada. Los grupos con `label` vacío, `items` vacío, o items sin `content`/`link` se descartan; si no queda ningún grupo, no se inyecta markup. Sus estilos viven dentro de `&.single-mode` en `styles.scss`, así que solo existen en este modo.
 
 **Render en una fase.** `_buildTaxonomies(taxonomias)` devuelve el markup completo como string: `content` y `label` son texto plano y se escapan con `_escapeHtml`, `link` va al `href`. No hay placeholders ni nodos que intercambiar (antes `content` aceptaba un `HTMLElement` que había que mover con `replaceWith`): el dato viene de la API, que solo puede mandar strings.
 
@@ -305,43 +307,55 @@ Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** 
 
 ## Sistema de filtros
 
-Los filtros **no están hardcodeados**: salen enteros de la opción `filters` del constructor. Cada entrada declara su campo, su label, dónde vive (`group: 'menu'` en el panel, `group: 'estado'` en el flyout rojo de Estado interno) y sus valores (fijos con `values`, o derivados). Sin la opción no hay panel, ni botones, ni params de API. Los grupos inválidos o duplicados se descartan con `console.warn` (`_warnFilter`), no rompen la opción entera: un typo se nota pero no tumba el toolbar.
+Los filtros **no están hardcodeados**: salen enteros de la opción `filters` del constructor. Cada entrada declara su campo, su label, dónde vive (`group: 'menu'` en el panel, `group: 'filtros_internos'` en el flyout rojo de Filtros internos) y sus valores (declarados con `items`, o derivados del dato, en cuyo caso `allowEmpty` puede sumar el bucket vacío).
 
-El demo declara los 8 grupos en `example/filters.js`: los cinco del panel (`tonos_sociales`, `fecha_publicacion` con `extract` de año y `sortValues`, `contenido` sintético con `extract`, `tipo_fuente` con `sin-tipo`, `es_oficial` booleano partido en dos) y los tres del flyout (`validado`, `capturado`, `descartado`, todos con `values` fijos, `defaultChecked` y `persist: true`).
+El bucket vacío de los filtros es el único valor que **nadie declara**: los ítems que no traen nada para el campo (o no traen el campo) no son un valor del grupo, así que no se ofrecen. Un grupo **sin `items`** que declara `allowEmpty: true` lo agrega como **un valor más**, con el token `'null'` (el mismo que produce `_filterToken()`) y el label fijo `"Sin valor"` (`FILTER_EMPTY_LABEL`, no configurable: el bucket es el mismo en todos los campos). En local sale de los ítems del scope activo; en API, de la clave `"null"` de `facets[field]`, que el backend no tiene que agregar: si el facet no la trae, no hay nada que ofrecer. Reglas:
+- Va **siempre al final**, en `_buildFilterCheckboxes()`, que lo mueve ahí *después* del sort (por conteo o el `sortValues` del grupo): ni un grupo colapsado ni un orden deliberado lo dejan en medio.
+- Participa del corte "Ver más" como cualquier otro valor, así que puede caer en la cola `filter-option-extra`.
+- Es la **única excepción** a la regla de ocultar los grupos derivados con un solo valor: sin `allowEmpty`, un grupo cuyo único valor sería el vacío no se muestra (no hay nada que filtrar); con `allowEmpty` se muestra y filtrar por él deja solo los ítems sin valor.
+- **Con `items` declarado se ignora en silencio**: ahí el bucket vacío es un valor declarado más (`{ value: null, label: 'Sin tipo' }`), con el label que el consumidor quiera.
+
+El demo declara los 8 grupos en `example/filters.js`, **todos con `items`**: los cinco del panel (`tonos_sociales`, `anio_publicacion` con `null` = "Sin fecha", `contenido`, `tipo_fuente` con `maxVisible: 4`, `es_oficial`) y los tres del flyout (`validado`, `capturado`, `descartado`, los tres con `persist: true`). El mock trae los campos ya clasificados (`contenido`, `anio_publicacion`, `tipo_fuente: null`), así que ni el demo ni `example/server.js` tienen lógica por campo.
 
 Mapa de métodos (líneas actuales):
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_normalizeFilters(filters)` | 545 | Valida la opción `filters`, resuelve defaults (`group`, `persist`, `column`) y reparte los grupos `'menu'` en dos columnas (la primera mitad de la declaración a la columna 0, el resto a la 1) |
-| `_buildFilterOptionsHtml(f)` | 651 | Markup del slot de un grupo: `.filter-section` + `.filter-header` (label) + `.filter-options[data-filter-field]` para los `'menu'`; un `.filter-options` pelado para los `'estado'` (el flyout no tiene headers). El `id` es solo un handle de debug: el wiring va por `data-filter-field`, así un `field` inválido como selector CSS no rompe nada |
-| `_buildFilterMenuHtml()` | 667 | Markup del panel `.filter-wrap` (botón `#filter-toggle` + `#filter-menu`) con las dos columnas. `''` si no hay grupos `'menu'` |
-| `_buildInternalButtonsHtml()` | 688 | Markup del toolbar interno: toggle de notas de trabajo +, si hay grupos `'estado'`, el `.estado-wrap` con `#estado-toggle` y `#estado-menu`. Ambos condicionales a `internalButtons` y a la opción `filters` |
-| `_attachFilterOptions()` | 798 | Apunta cada `FilterDef.options` al slot que `_buildLayout` le renderizó (lookup por `data-filter-field`). Un grupo sin slot (ej. `'estado'` sin `internalButtons`) conserva su config y `_buildFilterCheckboxes` simplemente lo esquiva |
-| `_filterValuesOf(f, item)` | 2177 | Valores que un ítem lleva para el grupo: lo que devuelve `extract`, o `item[field]` (arrays expandidos, todo stringificado). Un `null` / `undefined` es "sin valor": por eso un boolean necesita `extract` propio si "no hay valor" tiene que ser un valor |
-| `_filterLabelOf(f, value)` | 2187 | Label de un valor: lo que devuelve `formatLabel`, o el valor mismo salvo `true` → "Sí" / `false` → "No" |
-| `_filterMaxVisible(f)` | 2162 | Resuelve el corte "Ver más": `f.maxVisible` primero, luego `filtersMaxVisible` (número global o record por campo), y el default `DEFAULT_FILTER_MAX_VISIBLE = 5`. Debajo de 2 no hay corte |
-| `_buildFilterCheckboxes()` | 2200 | Construye los checkboxes de cada grupo con sus valores y conteos (ver flujo abajo) y aplica el corte "Ver más" |
-| `_buildFilterMore(f, overflow)` | 2312 | Agrega el `button.filter-more` al final del grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
-| `_loadPersistedFilterState()` | 2342 | Lee la key histórica `tv-estado-filters` de `localStorage` |
-| `_savePersistedFilterState()` | 2354 | Escribe el estado de los grupos con `persist: true` (solo en el gesture del usuario) |
-| `_syncFilterToggleState()` | 2777 | Enciende los botones por dominio (ver arriba) |
+| `_normalizeFilters(filters)` | 595 | Valida la opción `filters`, resuelve defaults (`group`, `persist`, `allowEmpty`, `column`), resuelve los `items` de cada grupo y reparte los grupos `'menu'` en dos columnas (la primera mitad de la declaración a la columna 0, el resto a la 1) |
+| `_resolveFilterItems(field, items)` | 666 | Convierte los `items` declarados en los tokens de los checkboxes: `token` (los valores unidos por comas, que es el `input.value` y el query param) + `tokens` (uno por valor, para comparar contra el ítem), más `label` y `checked`. Devuelve `null` con warning si la declaración no se puede usar (vacía, un ítem sin `label` / sin `value`, tokens repetidos, un valor con coma) |
+| `_buildFilterOptionsHtml(f)` | 752 | Markup del slot de un grupo: `.filter-section` + `.filter-header` (label) + `.filter-options[data-filter-field]` para los `'menu'`; un `.filter-options` pelado para los `'filtros_internos'` (el flyout no tiene headers). El `id` es solo un handle de debug: el wiring va por `data-filter-field`, así un `field` inválido como selector CSS no rompe nada |
+| `_buildFilterMenuHtml()` | 768 | Markup del panel `.filter-wrap` (botón `#filter-toggle` + `#filter-menu`) con las dos columnas. `''` si no hay grupos `'menu'` |
+| `_buildInternalButtonsHtml()` | 789 | Markup del toolbar interno: toggle de notas de trabajo +, si hay grupos `'filtros_internos'`, el `.filtros-internos-wrap` con `#filtros-internos-toggle` y `#filtros-internos-menu`. Ambos condicionales a `internalButtons` y a la opción `filters` |
+| `_attachFilterOptions()` | 900 | Apunta cada `FilterDef.options` al slot que `_buildLayout` le renderizó (lookup por `data-filter-field`). Un grupo sin slot (ej. `'filtros_internos'` sin `internalButtons`) conserva su config y `_buildFilterCheckboxes` simplemente lo esquiva |
+| `_filterToken(value)` | 2271 | El token de un valor crudo: `String(value)`, con `null` / `undefined` como `'null'`. Todo el matching y los query params pasan por acá |
+| `_filterValuesOf(f, item)` | 2282 | Tokens que un ítem lleva para el grupo: lo que devuelve `extract`, o `item[field]` (arrays expandidos, todo tokenizado). Un `null` / `undefined` **es** el token `'null'`, así que matchea el valor que lo declara; un grupo derivado los descarta al armar la lista de valores, porque ahí no hay nadie a quien atribuírselos |
+| `_filterActiveTokens(f)` | 2292 | Los tokens que el grupo está filtrando: los `input.value` de los checkboxes tildados, partidos por comas (un `value: [false, null]` aporta los dos). Lo usan tanto `_applyFilters()` como la cuenta de `_buildFilterCheckboxes()` |
+| `_filterLabelOf(f, value)` | 2302 | Label de un valor de un grupo **derivado**: lo que devuelve `formatLabel`, o el valor mismo salvo `true` → "Sí" / `false` → "No". Un valor declarado trae su `label` en el `items` y no pasa por acá |
+| `_filterMaxVisible(f)` | 2262 | Resuelve el corte "Ver más": `f.maxVisible`, o el default `DEFAULT_FILTER_MAX_VISIBLE = 5`. Debajo de 2 no hay corte |
+| `_buildFilterCheckboxes()` | 2315 | Construye los checkboxes de cada grupo con sus valores y conteos (ver flujo abajo) y aplica el corte "Ver más". En la rama derivada también decide si ofrece el bucket vacío (`allowEmpty`), y en todo caso lo deja último |
+| `_buildFilterMore(f, overflow)` | 2477 | Agrega el `button.filter-more` al final del grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
+| `_loadPersistedFilterState()` | 2507 | Lee la key `tv-filtros-internos-filters` de `localStorage` (los valores son los `input.value`, o sea tokens) |
+| `_savePersistedFilterState()` | 2519 | Escribe el estado de los grupos con `persist: true` (solo en el gesture del usuario) |
+| `_buildQueryParams(page)` | 2605 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`) |
+| `_syncFilterToggleState()` | 2961 | Enciende los botones por dominio (ver arriba) |
 
 Flujo:
-1. `_normalizeFilters()` valida la opción y `_buildLayout()` + `_attachFilterOptions()` crean los slots.
-2. `_buildFilterCheckboxes()` obtiene valores y conteos por grupo: en local, los valores únicos de `_filterValuesOf(f, ·)` sobre el **scope activo** (`f.values` fijos si el grupo los declara); en API, las claves de `GET {url}/facets` (o las mismas `f.values`). En API los checkboxes se arman **dos veces y solo dos**: sin conteos al iniciar (para que los `defaultChecked` ya viajen en la primera request) y otra vez cuando llegan los facets — nunca en cada página, porque recrearlos borraría el estado de los grupos sin `persist`. Los grupos con `f.values` funcionan sin facets; los que no los tienen quedan ocultos hasta que llegan.
+
+1. `_normalizeFilters()` valida la opción (y `_resolveFilterItems()` resuelve los `items`) y `_buildLayout()` + `_attachFilterOptions()` crean los slots.
+2. `_buildFilterCheckboxes()` obtiene valores y conteos por grupo, en dos ramas: un grupo **con `items`** muestra esos valores, en ese orden, y solo los cuenta (en local sobre el **scope activo**; en API sobre `GET {url}/facets`, con `(0)` para lo que el server todavía no mandó); un grupo **sin `items`** deriva los valores del dato (en local los tokens únicos del scope, en API las claves de los facets), descarta el token vacío salvo que declare `allowEmpty`, y los ordena por conteo cuando hay que truncarlo (el bucket vacío, si está, se mueve al final después de ese sort). En API los checkboxes se arman **dos veces y solo dos**: sin conteos al iniciar (para que los `checked` ya viajen en la primera request) y otra vez cuando llegan los facets — nunca en cada página, porque recrearlos borraría el estado de los grupos sin `persist`. Los grupos con `items` funcionan sin facets (con los conteos en cero); los derivados quedan ocultos hasta que llegan.
 3. Al cambiar un checkbox, `_applyFilters(true)` filtra el scope activo con **AND entre grupos, OR dentro de cada uno** (además de la búsqueda), y `_renderAll()` re-renderiza. En modo API el paso no filtra nada local: `_applyFilters()` delega en `_schedulePageReload(immediate)` y el `true` pide el borde de entrada del debounce (el `input` del buscador es el único trigger que no lo pasa, porque cada tecla es un prefijo del término).
 4. El sort se re-aplica después del filtrado (`_sortByDateDesc()` + `reverse()`), así `asc` no re-ordena de verdad: invierte la lista descendente.
 
-El botón activo es **por dominio**: `_syncFilterToggleState()` enciende `#filter-toggle` solo con los grupos `group !== 'estado'` y `#estado-toggle` solo con los `'estado'`. El puntito del panel lo deciden los grupos del panel; un `validado`/`capturado`/`descartado` activo enciende únicamente el botón rojo del flyout.
+El botón activo es **por dominio**: `_syncFilterToggleState()` enciende `#filter-toggle` solo con los grupos `group !== 'filtros_internos'` y `#filtros-internos-toggle` solo con los `'filtros_internos'`. El puntito del panel lo deciden los grupos del panel; un `validado`/`capturado`/`descartado` activo enciende únicamente el botón rojo del flyout.
 
-En modo API el botón del panel aparece desde el arranque **pero inerte**: hasta que llegan los facets no tiene listener (`_bindFilterToggle` corre en el `.then()` de `_ensureApiFacets()`, una sola vez) y el panel no tiene nada que abrir. El `estado-toggle`, en cambio, se bindea siempre en `_bindBaseEvents()`.
+En modo API el botón del panel aparece desde el arranque **pero inerte**: hasta que llegan los facets no tiene listener (`_bindFilterToggle` corre en el `.then()` de `_ensureApiFacets()`, una sola vez) y el panel no tiene nada que abrir. El `#filtros-internos-toggle`, en cambio, se bindea siempre en `_bindBaseEvents()`.
 
 ### Grupos largos: el toggle "Ver más (N)"
 
-Un grupo con lista abierta (`tipo_fuente` con 7 valores, `tonos_sociales`, `contenido`) puede tener más valores de los que entran cómodo en el menú. `_buildFilterCheckboxes()` recorta con la resolución de `_filterMaxVisible(f)` y `_buildFilterMore()` agrega el botón:
+Un grupo con muchos valores (`tipo_fuente` con 7 en el demo) puede tener más de los que entran cómodo en el menú. `_buildFilterCheckboxes()` recorta con la resolución de `_filterMaxVisible(f)` y `_buildFilterMore()` agrega el botón:
 
-- El corte se aplica **solo cuando el grupo lo supera**. **Los visibles son los de mayor conteo** (`counts[b] - counts[a]`; `sort` es estable, así que los empates conservan el orden previo), salvo los grupos con `sortValues` —`fecha_publicacion` (año más nuevo primero) y `descartado` ("Descartado" primero) en el demo—, cuyo orden es intencional y solo se trunca.
+- El corte se aplica **solo cuando el grupo lo supera**, y es **por grupo** (`maxVisible`, default `DEFAULT_FILTER_MAX_VISIBLE = 5`): la opción global `filtersMaxVisible` ya no existe.
+- **El corte respeta el orden que el grupo ya tiene.** Un grupo con `items` muestra los primeros declarados y esconde la cola (el botón revela lo que el consumidor dejó afuera); un grupo derivado se ordena por conteo antes de truncar (`counts[b] - counts[a]`; `sort` es estable, así que los empates conservan el orden previo), salvo que declare `sortValues`, cuyo orden es intencional y solo se trunca.
 - La cola se marca `label.filter-option.filter-option-extra` + `hidden`, y `_buildFilterMore()` pone al final del `.filter-options` el `button.filter-more` ("Ver más (N)" ⇄ "Ver menos", con `aria-expanded`).
 - **La visibilidad la manda el SCSS**, no el atributo `hidden`: `.filter-menu .filter-option` tiene `display: flex` de autor, que le gana a la regla `[hidden]` de la UA (mismo motivo que obliga a `.taxonomy-row[hidden]`), así que hacen falta las reglas `.filter-option-extra { display: none }` y `.filter-options.expanded .filter-option-extra { display: flex }` al mismo peso. El `hidden` se mantiene igualado.
 - **Un grupo con algún checkbox tildado nunca queda colapsado** (`f.checkboxes.some(cb => cb.checked)`): un filtro aplicado desde un valor invisible es peor que un grupo una línea más largo. También se reabre solo en los rebuilds.
@@ -375,8 +389,7 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sortAscending` | `boolean` | Dirección del sort |
-| `filtersMaxVisible` | `number \| Partial<Record<string, number>>` | Corte "Ver más" por grupo: número global, record por `field`, o el `maxVisible` del propio grupo (opción del constructor, default 5) |
-| `filters` | `FilterDef[]` | Grupos normalizados de la opción `filters` (defaults resueltos, columnas repartidas, slots DOM y `checkboxes`). Vacío = sin filtros |
+| `filters` | `FilterDef[]` | Grupos normalizados de la opción `filters` (defaults resueltos, `items` resueltos en `declared`, columnas repartidas, slots DOM y `checkboxes`). Vacío = sin filtros |
 | `_filterExpanded` | `Set<string>` | Grupos de filtros (por `field`) con el "Ver más" abierto (sobrevive a los rebuilds de los checkboxes) |
 | `section` | `HTMLElement` | `.publicaciones-section` |
 | `featuredContainer` | `HTMLElement` | `#featured-cards` |
@@ -389,9 +402,9 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `filterToggle` | `HTMLElement \| null` | `#filter-toggle` (sus listeners/estilo se resguardan de `null`: sin grupos `'menu'` no se renderiza) |
 | `filterMenu` | `HTMLElement \| null` | `#filter-menu` |
 | `workNotesToggle` | `HTMLElement` | `#work-notes-toggle` (solo con `internalButtons: true`) |
-| `estadoWrap` | `HTMLElement` | `.estado-wrap` (`#estado-wrap`) |
-| `estadoToggle` | `HTMLElement` | `#estado-toggle` — el botón rojo del flyout de estado |
-| `estadoMenu` | `HTMLElement` | `#estado-menu` — el flyout con los grupos `group: 'estado'` |
+| `filtrosInternosWrap` | `HTMLElement` | `.filtros-internos-wrap` (`#filtros-internos-wrap`) |
+| `filtrosInternosToggle` | `HTMLElement` | `#filtros-internos-toggle` — el botón rojo del flyout de filtros internos |
+| `filtrosInternosMenu` | `HTMLElement` | `#filtros-internos-menu` — el flyout con los grupos `group: 'filtros_internos'` |
 | `_lgInstance` | `LightGallery \| null` | Instancia actual de lightGallery |
 | `_shareTimer` | `number` | Timer del ícono de confirmación tras copiar al portapapeles (`0` = inactivo) |
 | `_lgContainer` | `HTMLElement \| null` | Container para lightGallery |
@@ -410,12 +423,12 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `.loaded` | `.card-inline-thumb` | Thumbnail inline cargado (quita shimmer) |
 | `.loaded` | `.card-iframe-wrap` | Iframe/embed cargado |
 | `.open` | `.filter-menu` | Menú de filtros abierto |
-| `.open` | `.estado-menu` | Flyout de estado interno abierto (junto a `.open` en `#estado-toggle`) |
+| `.open` | `.filtros-internos-menu` | Flyout de estado interno abierto (junto a `.open` en `#filtros-internos-toggle`) |
 | `.expanded` | `.filter-options` | Grupo de filtros con el "Ver más" abierto: muestra los `label.filter-option-extra` (la visibilidad la decide esta clase, no el atributo `hidden`) |
 | `.open` | `.card-info-menu` | Menú de info de tarjeta abierto |
 | `tv-share-toast` | `.card-share-toast` | Animación del cartelito "Copiado al portapapeles!" (fade in/out, 1.5s) |
-| `.active` | `.filter-toggle` | Filtros del panel activos (al menos un grupo `'menu'` con algún valor seleccionado; los `'estado'` no lo encienden) |
-| `.active` | `.estado-toggle` | Filtros del flyout activos (algún grupo `'estado'` con algún valor seleccionado) |
+| `.active` | `.filter-toggle` | Filtros del panel activos (al menos un grupo `'menu'` con algún valor seleccionado; los `'filtros_internos'` no lo encienden) |
+| `.active` | `.filtros-internos-toggle` | Filtros del flyout activos (algún grupo `'filtros_internos'` con algún valor seleccionado) |
 | `.asc` | `.sort-toggle` | Orden ascendente activo |
 | `.rotated` | `.expand-icon` | Icono de expand rotado 180° |
 

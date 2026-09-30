@@ -33,31 +33,6 @@ function normalize(value) {
 }
 
 /**
- * Canonical filter values per field, for the fields that need them.
- *
- * A field is only listed here when the value it stores is not the value the client filters by: a
- * boolean split into two named buckets, a date reduced to its year, a synthetic field that is not
- * a property of the item. Everything else (`tipo_fuente`, `tonos_sociales`, or any field a
- * consumer adds later) is read by `readField` below, which is the generic counterpart: the client
- * declares the group in its `filters` option and the server just has to count and compare.
- */
-const FIELD_EXTRACT = {
-  tipo_fuente: (item) => (item.tipo_fuente ? [item.tipo_fuente] : ['sin-tipo']),
-  validado: (item) => (item.validado === true ? ['validado'] : ['no-validado']),
-  capturado: (item) => (item.capturado !== true ? ['no-capturado'] : ['capturado']),
-  descartado: (item) => (item.descartado === true ? ['descartado'] : ['no-descartado']),
-  es_oficial: (item) => (item.es_oficial ? ['oficial'] : ['no-oficial']),
-  fecha_publicacion: (item) => (item.fecha_publicacion ? [item.fecha_publicacion.slice(0, 4)] : ['sin-fecha']),
-  contenido: (item) => {
-    const types = [];
-    if ((item.adjuntos || []).length > 0) types.push('adjuntos');
-    if (item.has_video) types.push('video');
-    if ((item.imagenes || []).length > 0) types.push('imagenes');
-    return types;
-  }
-};
-
-/**
  * The fields this backend exposes facets for: the ones the demo UI declares in its `filters`
  * option (see `example/filters.js`). That is the whole contract between the two halves — the
  * client says which groups it has, the server answers with the values of each one — so a filter
@@ -69,17 +44,20 @@ const FACET_FIELDS = filters.map((f) => f.field);
 const RESERVED_PARAMS = new Set(['page', 'pageSize', 'sort', 'q']);
 
 /**
- * Values an item carries for a field, in the shape the client filters on: always a list of
- * strings, with arrays expanded and `null` / `undefined` counting as no value at all. It falls
- * back to reading the field itself, so a group declared by the client for a field with no
- * canonical extractor still filters (and counts) correctly.
+ * Values an item carries for a field, as the tokens the client filters on: always a list of
+ * strings, with arrays expanded. This is the generic counterpart of the client's own
+ * `_filterValuesOf`: the data arrives already classified (that is the whole point of the
+ * `filters` option), so the backend has no per-field logic — it just counts and compares tokens.
+ *
+ * `null` / `undefined` tokenize as `'null'`, because the client offers "no value" as a value of its
+ * own (`items: [{ value: null }]`): an item with a `null` field —or with no field at all— has to
+ * land in that bucket instead of in none, exactly like in local mode, where a missing property
+ * reads as `undefined` and `_filterValuesOf` tokenizes it the same way.
  */
 function readField(item, field) {
-  const extract = FIELD_EXTRACT[field];
-  if (extract) return extract(item);
   const value = item[field];
-  if (value == null) return [];
-  return (Array.isArray(value) ? value : [value]).map((v) => String(v)).filter(Boolean);
+  if (value === null || value === undefined) return ['null'];
+  return (Array.isArray(value) ? value : [value]).map((v) => (v === null || v === undefined ? 'null' : String(v)));
 }
 
 /** Check a single item against the full-text search term */

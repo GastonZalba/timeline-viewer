@@ -3,23 +3,32 @@
  *
  * La librería no trae ningún filtro hardcodeado: sin esta opción el componente no tiene panel de
  * filtros, ni botón, ni mandaría params de filtro en modo API. Es el consumidor el que declara
- * qué se filtra, con qué etiqueta y de qué manera, y la librería arma el panel, deriva los
- * valores y aplica el filtrado. Agregar un filtro es agregar una entrada acá.
+ * qué se filtra, con qué etiqueta y con qué valores, y la librería arma el panel, cuenta, aplica
+ * el filtrado y manda los params. Agregar un filtro es agregar una entrada acá.
  *
  * Cada entrada necesita `field` y `label`:
  *
- * - `field` es el nombre del campo. En modo local se lee del ítem (los arrays se expanden) o
- *   sale de `extract`; en modo API es la clave del facet en `GET /api/facets` y el query param.
+ * - `field` es el nombre del campo. En modo local se lee del ítem (los arrays se expanden, y un
+ *   `null` es el valor `'null'`); en modo API es la clave del facet en `GET /api/facets` y el query
+ *   param. El demo **no usa `extract` ni campos sintéticos**: los ítems del mock ya traen los
+ *   campos listos para filtrar (`tipo_fuente`, `contenido`, `anio_publicacion`...).
  * - `label` es el header del grupo.
  * - `type` solo admite `'checkboxes'` (es el default) y está reservado para los próximos tipos.
- * - `group: 'estado'` manda el grupo al flyout rojo de "Estado interno" (necesita
+ * - `items` es la lista de valores del grupo: `{ value, label, checked? }`. El grupo muestra
+ *   exactamente esos valores, en ese orden, y existen aunque los datos no traigan ninguno.
+ * - `value` acepta un valor solo o una lista. `[false, null]` es un valor que matchea cualquiera de
+ *   los dos, útil para "No y pendiente" en un campo de tres estados. Sus valores viajan al servidor
+ *   tal cual (`validado=false,null`), y un `null` matchea los ítems que no traen el campo.
+ * - `label` de cada ítem es el texto visible del checkbox (el valor crudo puede no servir: `true`,
+ *   `adjuntos`, `2026`...).
+ * - `checked` tilda el valor al construir; en modo API viaja en la primera request y después manda
+ *   el grupo (con `persist`) en `localStorage`, así sobrevive a los rebuilds del panel (los facets
+ *   de la API, el cambio de taxonomía) y a las recargas.
+ * - `maxVisible` corta los valores detrás del "Ver más (N)" (default: 5). El corte respeta el
+ *   orden declarado, así que el botón "Ver más" muestra la cola de la lista, no un desorden por
+ *   conteo. `sortValues` sigue existiendo para los grupos que no declaran `items`.
+ * - `group: 'filtros_internos'` manda el grupo al flyout rojo de "Filtros internos" (necesita
  *   `internalButtons: true`) en vez de a una columna del panel.
- * - `values` fija los valores del grupo: existe aunque los datos no traigan ninguno, y es lo que
- *   permite que un grupo de dos opciones fijas se vea siempre.
- * - `defaultChecked` tilda valores al construir; en modo API viajan en la primera request.
- * - `persist` guarda el estado del grupo en `localStorage`, así sobrevive a los rebuilds del panel
- *   (los facets de la API, el cambio de taxonomía) y a las recargas.
- * - `extract` / `formatLabel` / `sortValues` ajustan los valores, sus etiquetas y su orden.
  *
  * El orden de la declaración es el orden de lectura: los primeros grupos `'menu'` van en la
  * primera columna del panel y el resto en la segunda.
@@ -27,89 +36,101 @@
 const filters = [
   // ---- Columna 1 --------------------------------------------------------
   {
-    field: 'tonos_sociales',
-    label: 'Tono social'
     // Campo array: los valores son los tonos que aparecen en los ítems, sin nada que extraer.
+    field: 'tonos_sociales',
+    label: 'Tono social',
+    items: [
+      { value: 'Positivo', label: 'Positivo' },
+      { value: 'Neutro', label: 'Neutro' },
+      { value: 'Negativo', label: 'Negativo' }
+    ]
   },
   {
-    field: 'fecha_publicacion',
+    // Año ya reducido en el dato (`anio_publicacion`), así que tampoco necesita `extract`: el
+    // orden declarado (más nuevo primero) es el que se muestra y el que se trunca.
+    field: 'anio_publicacion',
     label: 'Año publicación',
-    // `YYYY-MM-DD` reducido a su año; el año sin fecha tiene su propio valor en vez de desaparecer.
-    extract: (item) => (item.fecha_publicacion ? item.fecha_publicacion.slice(0, 4) : 'sin-fecha'),
-    formatLabel: (val) => (val === 'sin-fecha' ? 'Sin fecha' : val),
-    // Orden deliberado (año más nuevo primero): el grupo se trunca sin reordenar por conteo, así
-    // la lista de años no arranca por el año que casualmente tiene más artículos.
-    sortValues: (a, b) => {
-      if (a === 'sin-fecha') return 1;
-      if (b === 'sin-fecha') return -1;
-      return Number(b) - Number(a);
-    }
+    items: [
+      { value: '2026', label: '2026' },
+      { value: '2025', label: '2025' },
+      { value: '2024', label: '2024' },
+      // El ítem sin fecha tiene su propio valor en vez de desaparecer.
+      { value: null, label: 'Sin fecha' }
+    ]
   },
   {
-    // Campo sintético: no es una propiedad del ítem, se arma con `extract` a partir de tres.
-    // En modo API viaja igual, como el query param `contenido=adjuntos,video`.
+    // Campo sintético del scraping (`contenido`): qué tipo de material trae el artículo.
     field: 'contenido',
     label: 'Contenido',
-    extract: (item) => {
-      const types = [];
-      if ((item.adjuntos || []).length > 0) types.push('adjuntos');
-      if (item.has_video) types.push('video');
-      if ((item.imagenes || []).length > 0) types.push('imagenes');
-      return types;
-    },
-    formatLabel: (val) => (val === 'adjuntos' ? 'Con adjuntos' : val === 'video' ? 'Con video' : 'Con imágenes')
+    items: [
+      { value: 'adjuntos', label: 'Con adjuntos' },
+      { value: 'video', label: 'Con video' },
+      { value: 'imagenes', label: 'Con imágenes' }
+    ]
   },
 
   // ---- Columna 2 --------------------------------------------------------
   {
+    // El grupo más largo del demo: 7 valores declarados, así que el "Ver más (3)" muestra la cola
+    // que se haya declarado, no los tres valores que más filtran.
     field: 'tipo_fuente',
     label: 'Tipo de fuente',
-    extract: (item) => (item.tipo_fuente ? item.tipo_fuente : 'sin-tipo'),
-    formatLabel: (val) => (val === 'sin-tipo' ? 'Sin tipo' : val)
+    maxVisible: 4,
+    items: [
+      { value: 'Sitio web o portal', label: 'Sitio web o portal' },
+      { value: 'Gacetilla o comunicado de prensa', label: 'Gacetilla o comunicado de prensa' },
+      { value: 'Decreto o norma', label: 'Decreto o norma' },
+      { value: 'Libro o publicación', label: 'Libro o publicación' },
+      { value: 'Video', label: 'Video' },
+      { value: 'Red Social', label: 'Red Social' },
+      { value: null, label: 'Sin tipo' }
+    ]
   },
   {
-    // Booleano: sin `extract` los valores serían los valores literales (`true` / `false`) y
-    // quedarían fuera los ítems sin el campo. Acá se parte en dos valores nombrados.
+    // Booleano: los valores literales (`true` / `false`) con su etiqueta en español.
     field: 'es_oficial',
     label: 'Fuente oficial',
-    extract: (item) => (item.es_oficial ? 'oficial' : 'no-oficial'),
-    formatLabel: (val) => (val === 'oficial' ? 'Sí' : 'No')
+    items: [
+      { value: true, label: 'Sí' },
+      { value: false, label: 'No' }
+    ]
   },
 
-  // ---- Flyout de "Estado interno" (requiere `internalButtons: true`) ----
+  // ---- Flyout de "Filtros internos" (requiere `internalButtons: true`) ----
   // Los tres son grupos de valores fijos, así que se ven siempre y con `null` incluido.
   {
     field: 'validado',
     label: 'Validado',
-    group: 'estado',
-    values: ['validado', 'no-validado'],
-    extract: (item) => (item.validado === true ? ['validado'] : ['no-validado']),
-    formatLabel: (val) => (val === 'validado' ? 'Validado' : 'Sin validar'),
-    defaultChecked: ['validado', 'no-validado'],
+    group: 'filtros_internos',
+    items: [
+      // Los tres tildados: el grupo existe para que el usuario acote, no para filtrar solo.
+      { value: true, label: 'Validado', checked: true },
+      { value: false, label: 'Sin validar', checked: true },
+      { value: null, label: 'Pendiente', checked: true }
+    ],
     persist: true
   },
   {
     field: 'capturado',
     label: 'Capturado',
-    group: 'estado',
-    values: ['capturado', 'no-capturado'],
-    extract: (item) => (item.capturado === true ? ['capturado'] : ['no-capturado']),
-    formatLabel: (val) => (val === 'capturado' ? 'Capturado' : 'Sin capturar'),
-    // Por defecto solo los capturados: el resto son detecciones sin procesar.
-    defaultChecked: ['capturado'],
+    group: 'filtros_internos',
+    items: [
+      { value: true, label: 'Capturado', checked: true },
+      { value: false, label: 'Sin capturar' }
+    ],
     persist: true
   },
   {
     field: 'descartado',
     label: 'Descartado',
-    group: 'estado',
-    values: ['descartado', 'no-descartado'],
-    extract: (item) => (item.descartado === true ? ['descartado'] : ['no-descartado']),
-    formatLabel: (val) => (val === 'descartado' ? 'Descartado' : 'Sin descartar'),
-    // "Descartado" primero, y el grupo se truca sin reordenar por conteo.
-    sortValues: (a, b) => (a === 'descartado' ? -1 : b === 'descartado' ? 1 : 0),
-    // Por defecto se excluyen los descartados.
-    defaultChecked: ['no-descartado'],
+    group: 'filtros_internos',
+    items: [
+      { value: true, label: 'Descartado' },
+      // `false` y `null` tildados: "pendiente de descartar" no es lo mismo que descartado, pero
+      // por defecto tampoco se esconde (la lista arranca con todo lo que no está descartado).
+      { value: false, label: 'Sin descartar', checked: true },
+      { value: null, label: 'Pendiente', checked: true }
+    ],
     persist: true
   }
 ];

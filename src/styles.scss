@@ -195,7 +195,7 @@
     }
 
     .work-notes-toggle,
-    .estado-toggle {
+    .filtros-internos-toggle {
       display: inline-flex;
     }
 
@@ -283,7 +283,7 @@
       // desde el borde superior de la barra. El 62px es el alto real de la barra pegada
       // (10px de padding * 2 + la píldora de 42px).
       .filter-menu,
-      .estado-menu {
+      .filtros-internos-menu {
         top: calc(var(--tv-sticky-top) + 62px);
         max-height: calc(100vh - var(--tv-sticky-top) - 80px);
       }
@@ -402,7 +402,7 @@
   }
 
   .work-notes-toggle,
-  .estado-toggle {
+  .filtros-internos-toggle {
     border: 1px solid var(--tv-tone-negative);
     border-radius: 34px;
     height: 34px;
@@ -431,7 +431,7 @@
     }
   }
 
-  .estado-toggle {
+  .filtros-internos-toggle {
     position: relative;
 
     &.open {
@@ -633,7 +633,7 @@
   }
 
   .filter-menu .filter-option,
-  .estado-menu .filter-option {
+  .filtros-internos-menu .filter-option {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -677,12 +677,12 @@
   // `.filter-menu .filter-option`, así que hace falta una regla con su mismo peso. El
   // atributo se mantiene igualado en el TS para cuando no haya stylesheet.
   .filter-menu .filter-option-extra,
-  .estado-menu .filter-option-extra {
+  .filtros-internos-menu .filter-option-extra {
     display: none;
   }
 
   .filter-menu .filter-options.expanded .filter-option-extra,
-  .estado-menu .filter-options.expanded .filter-option-extra {
+  .filtros-internos-menu .filter-options.expanded .filter-option-extra {
     display: flex;
   }
 
@@ -712,11 +712,11 @@
     }
   }
 
-  .estado-wrap {
+  .filtros-internos-wrap {
     position: relative;
   }
 
-  .estado-menu {
+  .filtros-internos-menu {
     display: none;
     position: absolute;
     top: calc(100% + 8px);
@@ -741,7 +741,7 @@
   }
 
   @media (max-width: 600px) {
-    .estado-menu {
+    .filtros-internos-menu {
       position: fixed;
       top: 56px;
       left: 50%;
@@ -911,7 +911,7 @@
     gap: 6px;
     width: fit-content;
     max-width: 100%;
-    margin: 0px auto 8px;
+    margin: 8px auto 8px;
     padding: 6px 14px;
     border-radius: 42px;
     font-size: 0.7rem;

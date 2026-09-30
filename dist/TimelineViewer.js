@@ -24,13 +24,22 @@ const API_UNBOUNDED_PAGE_SIZE = 1000000;
 /** Links shown per taxonomy group before the "Ver más" toggle appears (single mode) */
 const TAXONOMY_VISIBLE_LINKS = 3;
 /**
- * Values shown per filter group before the "Ver más (N)" toggle appears, when the option
- * `filtersMaxVisible` (or the `maxVisible` of the group itself) does not say otherwise.
- * Below 2 the group is never collapsed.
+ * Values shown per filter group before the "Ver más (N)" toggle appears, when the `maxVisible`
+ * of the group itself does not say otherwise. Below 2 the group is never collapsed.
  */
 const DEFAULT_FILTER_MAX_VISIBLE = 5;
 /** Control types a filter group can declare. Checkboxes are the only one implemented so far. */
 const SUPPORTED_FILTER_TYPES = ['checkboxes'];
+/**
+ * Token of the items that carry no value for a field (`null`, or the field missing): what
+ * `_filterToken` gives both, and therefore the only way to reach them in a filter.
+ */
+const FILTER_EMPTY_VALUE = 'null';
+/**
+ * Label of the option a group with `allowEmpty` gets for that token. Fixed on purpose: the bucket
+ * is the same everywhere (a missing type, a missing date), so it does not get a label per group.
+ */
+const FILTER_EMPTY_LABEL = 'Sin valor';
 /** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
 const ALL_TAXONOMIES_LABEL = 'Ver todo';
 /** `_contentIndex` value that means "every taxonomy" instead of a single group */
@@ -43,10 +52,9 @@ const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
 /**
  * `localStorage` key of the state of the filters marked `persist`. The record inside is keyed by
  * `field`, not by a fixed list, so a filter declared later by the consumer persists like the ones
- * that were always there. The key keeps its historical name (`tv-estado-filters`, from when
- * persisting only meant the internal-state groups) so the state already saved survives the change.
+ * that were always there.
  */
-const PERSISTED_FILTER_STORAGE_KEY = 'tv-estado-filters';
+const PERSISTED_FILTER_STORAGE_KEY = 'tv-filtros-internos-filters';
 const TONE_LABEL = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
 export default class Timeline {
     constructor(config) {
@@ -67,7 +75,6 @@ export default class Timeline {
         this.inlineAdjuntos = config.inlineAdjuntos || false;
         this.internalButtons = config.internalButtons || false;
         this.fullpage = config.fullpage === true;
-        this.filtersMaxVisible = config.filtersMaxVisible ?? DEFAULT_FILTER_MAX_VISIBLE;
         this.filters = this._normalizeFilters(config.filters);
         this._filterExpanded = new Set();
         this.relatedLabel = config.relatedLabel || null;
@@ -96,9 +103,9 @@ export default class Timeline {
         this.workNotesToggle = null;
         this.filterToggle = null;
         this.filterMenu = null;
-        this.estadoWrap = null;
-        this.estadoToggle = null;
-        this.estadoMenu = null;
+        this.filtrosInternosWrap = null;
+        this.filtrosInternosToggle = null;
+        this.filtrosInternosMenu = null;
         this.section = null;
         this.searchWrap = null;
         this.searchToggle = null;
@@ -173,18 +180,28 @@ export default class Timeline {
                 this._warnFilter(i, `"${f.field}" ya está declarado en otro grupo`);
                 return;
             }
+            // Un grupo que declara `items` los resuelve acá: la validación es por ítem, pero un ítem
+            // roto descarta el grupo entero (y avisa), porque medio grupo declarado es peor que
+            // ninguno: dejar un valor sin checkbox lo saca de la declaración en silencio.
+            let declaredItems;
+            if (f.items !== undefined) {
+                const resolved = this._resolveFilterItems(f.field, f.items);
+                if (!resolved)
+                    return;
+                declaredItems = resolved;
+            }
             declared.add(f.field);
             defs.push({
                 field: f.field.trim(),
                 label: f.label.trim(),
-                group: f.group === 'estado' ? 'estado' : 'menu',
+                group: f.group === 'filtros_internos' ? 'filtros_internos' : 'menu',
                 persist: f.persist === true,
+                allowEmpty: f.allowEmpty === true,
                 column: 0,
                 extract: f.extract,
                 formatLabel: f.formatLabel,
                 sortValues: f.sortValues,
-                defaultChecked: f.defaultChecked,
-                values: f.values,
+                declared: declaredItems,
                 maxVisible: typeof f.maxVisible === 'number' ? f.maxVisible : undefined,
                 options: null,
                 checkboxes: []
@@ -196,6 +213,49 @@ export default class Timeline {
             f.column = i < half ? 0 : 1;
         });
         return defs;
+    }
+    /**
+     * Resolve the `items` a filter group declares into the tokens the checkboxes carry. Returns
+     * `null` (after warning) when the declaration is unusable: not a list, empty, an entry without a
+     * `label` or without a `value`, or two entries that would share the same token.
+     *
+     * The token of an entry is what lands in the DOM (`input.value`) and in the query param of API
+     * mode: the declared values joined by commas. The same values one by one are what an item is
+     * compared against, so `[false, null]` is one checkbox that matches either.
+     */
+    _resolveFilterItems(field, items) {
+        const reject = (reason) => {
+            console.warn(`TimelineViewer: filtro "${field}" descartado: ${reason}.`);
+            return null;
+        };
+        if (!Array.isArray(items) || items.length === 0)
+            return reject('declara `items` vacío');
+        const resolved = [];
+        const seen = new Set();
+        for (const item of items) {
+            if (!item || typeof item !== 'object' || typeof item.label !== 'string' || item.label.trim() === '') {
+                return reject('un ítem de `items` no tiene `label`');
+            }
+            const value = item.value;
+            const isList = Array.isArray(value);
+            if (value === undefined || (isList && value.length === 0)) {
+                return reject(`el ítem "${item.label}" no tiene \`value\``);
+            }
+            const values = (isList ? value : [value]);
+            if (values.some((v) => v === undefined)) {
+                return reject(`el ítem "${item.label}" tiene un valor undefined`);
+            }
+            const tokens = values.map((v) => this._filterToken(v));
+            const token = tokens.join(',');
+            if (tokens.some((t) => t.includes(','))) {
+                return reject(`el ítem "${item.label}" declara un valor con coma, que rompe el query param`);
+            }
+            if (seen.has(token))
+                return reject(`el ítem "${item.label}" repite el valor "${token}"`);
+            seen.add(token);
+            resolved.push({ token, tokens, label: item.label.trim(), checked: item.checked === true });
+        }
+        return resolved;
     }
     /** Report a group of the `filters` option that was dropped, so a typo does not go unnoticed */
     _warnFilter(index, reason) {
@@ -249,12 +309,12 @@ export default class Timeline {
      * selector cannot break the wiring. `data-filter-field` is also the stable hook for a
      * consumer's own tests.
      *
-     * A `'menu'` group is a section with its header inside the panel; a `'estado'` one is a bare
-     * box, because the flyout has no headers of its own.
+     * A `'menu'` group is a section with its header inside the panel; a `'filtros_internos'` one is a
+     * bare box, because the flyout has no headers of its own.
      */
     _buildFilterOptionsHtml(f) {
         const slot = `<div class="filter-options" id="filter-options-${this._escapeHtml(f.field)}" data-filter-field="${this._escapeHtml(f.field)}"></div>`;
-        if (f.group === 'estado')
+        if (f.group === 'filtros_internos')
             return slot;
         return `<div class="filter-section">
               <div class="filter-header">${this._escapeHtml(f.label)}</div>
@@ -286,8 +346,8 @@ export default class Timeline {
     }
     /**
      * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
-     * declared for it, the `estado` flyout. Without the latter the button would open an empty
-     * menu, so both of them are conditional on the `filters` option as well.
+     * declared for it, the `filtros_internos` flyout. Without the latter the button would open an
+     * empty menu, so both of them are conditional on the `filters` option as well.
      */
     _buildInternalButtonsHtml() {
         if (!this.internalButtons)
@@ -295,15 +355,15 @@ export default class Timeline {
         const workNotesButton = `<button class="work-notes-toggle" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
             </button>`;
-        const estadoGroups = this.filters.filter((f) => f.group === 'estado');
-        if (estadoGroups.length === 0)
+        const internalGroups = this.filters.filter((f) => f.group === 'filtros_internos');
+        if (internalGroups.length === 0)
             return workNotesButton;
         return `${workNotesButton}
-            <div class="estado-wrap" id="estado-wrap">
-              <button class="estado-toggle" id="estado-toggle" title="Estado interno">
+            <div class="filtros-internos-wrap" id="filtros-internos-wrap">
+              <button class="filtros-internos-toggle" id="filtros-internos-toggle" title="Filtros internos">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
-              <div class="estado-menu" id="estado-menu">${estadoGroups.map((f) => this._buildFilterOptionsHtml(f)).join('')}</div>
+              <div class="filtros-internos-menu" id="filtros-internos-menu">${internalGroups.map((f) => this._buildFilterOptionsHtml(f)).join('')}</div>
             </div>`;
     }
     /** Build the main DOM layout and cache element references */
@@ -369,9 +429,9 @@ export default class Timeline {
         this.workNotesToggle = this.container.querySelector('#work-notes-toggle');
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
-        this.estadoWrap = this.container.querySelector('#estado-wrap');
-        this.estadoToggle = this.container.querySelector('#estado-toggle');
-        this.estadoMenu = this.container.querySelector('#estado-menu');
+        this.filtrosInternosWrap = this.container.querySelector('#filtros-internos-wrap');
+        this.filtrosInternosToggle = this.container.querySelector('#filtros-internos-toggle');
+        this.filtrosInternosMenu = this.container.querySelector('#filtros-internos-menu');
         this.searchWrap = this.container.querySelector('#search-wrap');
         this.searchToggle = this.container.querySelector('#search-toggle');
         this.searchInput = this.container.querySelector('#search-input');
@@ -395,9 +455,10 @@ export default class Timeline {
      * The lookup goes through the `data-filter-field` attribute rather than the id, so a `field`
      * that is not a valid CSS selector identifier still finds its box.
      *
-     * A group with no box is one whose container was not rendered: a `'estado'` group without
-     * `internalButtons`, for instance. It keeps its configuration (so a later `_buildFilterCheckboxes`
-     * just skips it) but has nowhere to draw, exactly as when the flyout did not exist before.
+     * A group with no box is one whose container was not rendered: a `'filtros_internos'` group
+     * without `internalButtons`, for instance. It keeps its configuration (so a later
+     * `_buildFilterCheckboxes` just skips it) but has nowhere to draw, exactly as when the flyout did
+     * not exist before.
      */
     _attachFilterOptions() {
         const slots = new Map();
@@ -980,7 +1041,7 @@ export default class Timeline {
       </div>
       <div class="card-info-row">
         <span class="card-info-label">Tipo</span>
-        <span class="card-info-value">${card.tipo_fuente}</span>
+        <span class="card-info-value">${card.tipo_fuente || 'Sin tipo'}</span>
       </div>
       <div class="card-info-row">
         <span class="card-info-label">Oficial</span>
@@ -1706,35 +1767,44 @@ export default class Timeline {
     }
     /**
      * How many values the group `f` shows before the "Ver más (N)" toggle appears: its own
-     * `maxVisible` first, then the per-field entry of `filtersMaxVisible` when the option is a
-     * record, its number when it is a plain one, and the default otherwise.
-     * Below 2 no group collapses.
+     * `maxVisible`, or the default when it declares none. Below 2 no group collapses.
      */
     _filterMaxVisible(f) {
-        if (typeof f.maxVisible === 'number')
-            return f.maxVisible;
-        const cfg = this.filtersMaxVisible;
-        if (typeof cfg === 'number')
-            return cfg;
-        const perField = cfg[f.field];
-        return typeof perField === 'number' ? perField : DEFAULT_FILTER_MAX_VISIBLE;
+        return typeof f.maxVisible === 'number' ? f.maxVisible : DEFAULT_FILTER_MAX_VISIBLE;
     }
     /**
-     * Values a group carries for a single item, as the array the code filters on:
+     * The token a raw value is compared and sent as: its `String()`, with `null` / `undefined` both
+     * read as `FILTER_EMPTY_VALUE` so an option declared with `value: null`, or the "Sin valor" of an
+     * `allowEmpty` group, matches an item that does not carry the field.
+     */
+    _filterToken(value) {
+        return value === undefined || value === null ? FILTER_EMPTY_VALUE : String(value);
+    }
+    /**
+     * Values a group carries for a single item, as the tokens the code filters on:
      * what `extract` returns, or the `field` of the item itself (arrays expanded, everything
-     * stringified). A `null` / `undefined` is no value at all, so the item belongs to none of
-     * the checkboxes — which is what makes a boolean field need an `extract` of its own if
-     * "no value" has to be a value too.
+     * tokenized). An item with no value carries the empty token, which is a value of its own: it
+     * matches the option that declares it (or the "Sin valor" of an `allowEmpty` group), and in a
+     * derived group without `allowEmpty` it produces no value at all.
      */
     _filterValuesOf(f, item) {
         const v = f.extract ? f.extract(item) : item[f.field];
         if (v == null)
-            return [];
-        return (Array.isArray(v) ? v : [v]).map((x) => String(x)).filter(Boolean);
+            return [FILTER_EMPTY_VALUE];
+        return (Array.isArray(v) ? v : [v]).map((x) => this._filterToken(x));
     }
     /**
-     * Label shown for a value: what `formatLabel` returns, or the value itself — except the
-     * booleans, that would otherwise read as raw `true` / `false`.
+     * The tokens the checkboxes of the group currently filter by: the ones checked, each split back
+     * into the values it declared, so an option like `[false, null]` contributes both.
+     */
+    _filterActiveTokens(f) {
+        return f.checkboxes.filter((cb) => cb.checked).flatMap((cb) => cb.value.split(','));
+    }
+    /**
+     * Label shown for a value of a group that derives its values: what `formatLabel` returns, or the
+     * value itself — except the booleans, that would otherwise read as raw `true` / `false`.
+     * A declared group carries the label in its own `items`, and the empty bucket of an `allowEmpty`
+     * group has its own fixed label, so neither reaches this method.
      */
     _filterLabelOf(f, value) {
         if (f.formatLabel)
@@ -1760,45 +1830,88 @@ export default class Timeline {
         this.filters.forEach((f) => {
             if (!f.options)
                 return;
-            const inEstado = f.group === 'estado';
+            const inInternos = f.group === 'filtros_internos';
+            const declared = f.declared;
             let values;
             let counts;
-            if (this.api) {
+            if (declared) {
+                // Los valores ya están declarados: solo falta contarlos. En API mode salen de los facets
+                // (y un valor que el server todavía no mandó cuenta 0 en vez de desaparecer).
+                values = declared.map((d) => d.token);
+                const facets = this.api ? this._apiFacets[f.field] || {} : null;
+                counts = {};
+                values.forEach((token) => {
+                    const item = declared.find((d) => d.token === token);
+                    if (facets) {
+                        // Los facets son por token crudo, así que un valor declarado con varios tokens
+                        // (`[false, null]`) no tiene una clave propia: se suman las de cada token, que es
+                        // exacto mientras el campo tenga un solo valor por ítem (el caso normal) y cuenta de
+                        // más solo cuando un ítem responde más de una vez al mismo checkbox.
+                        counts[token] = (item?.tokens || []).reduce((sum, t) => sum + (facets[t] || 0), 0);
+                    }
+                    else {
+                        counts[token] = scope.filter((c) => this._filterValuesOf(f, c).some((x) => item?.tokens.includes(x))).length;
+                    }
+                });
+            }
+            else if (this.api) {
+                // Derivados en API: las claves del facet que tienen algo detrás. El bucket vacío se
+                // descarta igual que en local, salvo que el grupo lo pida con `allowEmpty`: los facets son
+                // por token, así que la clave `"null"` es la que lo representa.
                 const facetCounts = this._apiFacets[f.field] || {};
-                values = f.values ? [...f.values] : Object.keys(facetCounts).filter((v) => (facetCounts[v] || 0) > 0);
+                values = Object.keys(facetCounts).filter((v) => (facetCounts[v] || 0) > 0 && (f.allowEmpty || v !== FILTER_EMPTY_VALUE));
                 counts = facetCounts;
             }
             else {
-                values = f.values ? [...f.values] : [...new Set(scope.flatMap((c) => this._filterValuesOf(f, c)))];
+                // Derivados: los tokens que traen los items. El bucket vacío (`'null'`) y `''` no generan
+                // una opción por su cuenta: en un grupo sin `items` no hay a quién atribuírsela, salvo que
+                // el grupo lo pida con `allowEmpty` (y entonces lo ofrece como "Sin valor").
+                const tokens = [...new Set(scope.flatMap((c) => this._filterValuesOf(f, c)))].filter((v) => v !== '');
+                values = f.allowEmpty ? tokens : tokens.filter((v) => v !== FILTER_EMPTY_VALUE);
                 counts = {};
                 values.forEach((val) => {
                     counts[val] = scope.filter((c) => this._filterValuesOf(f, c).includes(val)).length;
                 });
             }
-            if (!f.values && values.length <= 1) {
+            // Solo un grupo que deriva sus valores se puede quedar sin nada que decidir: uno declarado
+            // existe siempre, aunque ningún item (o ningún facet) traiga sus valores. La excepción es el
+            // grupo con `allowEmpty` que solo encontró el bucket vacío: el consumidor lo pidió, y filtrar
+            // por él (dejar fuera los que sí tienen valor) es una decisión, no un dato vacío.
+            const onlyEmpty = values.length === 1 && values[0] === FILTER_EMPTY_VALUE;
+            if (!declared && values.length <= 1 && !(f.allowEmpty && onlyEmpty)) {
                 f.checkboxes = [];
                 f.options.hidden = true;
                 return;
             }
             f.options.hidden = false;
-            // The `estado` groups live in the internal-state flyout, which has a button of its own:
-            // they must not be the reason the filter button of the panel shows up.
-            if (!inEstado)
+            // The `filtros_internos` groups live in the internal-filters flyout, which has a button of
+            // its own: they must not be the reason the filter button of the panel shows up.
+            if (!inInternos)
                 anyFilterVisible = true;
             if (f.sortValues)
                 values.sort(f.sortValues);
-            // A group longer than its cut shows the values that filter the most, and hides the rest
-            // behind a "Ver más (N)" toggle. `sort` is stable, so ties keep the order they had. A
-            // group that declares its own order (`sortValues`) keeps it and is only truncated,
-            // because that order is the meaningful one.
+            // A group longer than its cut shows the first values of its declared order (or the one
+            // `sortValues` gives it) and hides the rest behind a "Ver más (N)" toggle. Only a group that
+            // declares neither is reordered by count, because that order is the useful one when the
+            // values came from the data. `sort` is stable, so ties keep the order they had.
             const limit = this._filterMaxVisible(f);
             const overflow = limit >= 2 ? Math.max(0, values.length - limit) : 0;
-            if (overflow)
+            if (overflow && !declared && !f.sortValues)
                 values.sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+            // El bucket vacío va siempre al final, después de cualquier orden (declarado, `sortValues` o
+            // por conteo): es la ausencia de un valor, no un valor más, y al final se lee como la
+            // ás la excepción que es. El corte no cambia (mide cuántos valores hay, no cuáles), así que el
+            // bucket puede caer en la cola del "Ver más (N)" — y si el usuario lo tilda, el grupo se abre solo.
+            if (f.allowEmpty) {
+                const emptyIndex = values.indexOf(FILTER_EMPTY_VALUE);
+                if (emptyIndex > -1 && emptyIndex < values.length - 1)
+                    values.push(...values.splice(emptyIndex, 1));
+            }
             f.options.innerHTML = '';
             f.options.classList.remove('expanded');
             f.checkboxes = [];
             values.forEach((val, i) => {
+                const declaredItem = declared?.find((d) => d.token === val);
                 const isExtra = overflow > 0 && i >= values.length - overflow;
                 const label = document.createElement('label');
                 label.className = isExtra ? 'filter-option filter-option-extra' : 'filter-option';
@@ -1808,14 +1921,16 @@ export default class Timeline {
                 cb.type = 'checkbox';
                 cb.value = val;
                 const savedValues = f.persist ? savedState[f.field] : undefined;
-                cb.checked = savedValues
-                    ? savedValues.includes(val)
-                    : f.defaultChecked
-                        ? f.defaultChecked.includes(val)
-                        : false;
+                cb.checked = savedValues ? savedValues.includes(val) : declaredItem?.checked === true;
                 const span = document.createElement('span');
                 span.className = 'filter-option-label';
-                const display = this._filterLabelOf(f, val);
+                // El bucket vacío de un grupo `allowEmpty` tiene label fijo (y no pasa por `formatLabel`,
+                // que es para los valores que el dato trae).
+                const display = declaredItem
+                    ? declaredItem.label
+                    : f.allowEmpty && val === FILTER_EMPTY_VALUE
+                        ? FILTER_EMPTY_LABEL
+                        : this._filterLabelOf(f, val);
                 span.textContent = display;
                 const countSpan = document.createElement('span');
                 countSpan.className = 'filter-option-count';
@@ -1841,17 +1956,19 @@ export default class Timeline {
             const hasOptions = opts.some((o) => this.filters.some((ef) => ef.options === o && ef.checkboxes.length > 0));
             section.hidden = opts.length > 0 && !hasOptions;
         });
-        if (this.estadoWrap) {
-            this.estadoWrap.style.display = '';
+        if (this.filtrosInternosWrap) {
+            this.filtrosInternosWrap.style.display = '';
         }
         // En modo API el botón se muestra desde el arranque aunque todavía no haya facets: sin ellos
-        // los grupos sin `values` no tienen nada que mostrar, y esperar la respuesta deja el toolbar
-        // incompleto y lo ensancha de golpe (muy notorio al iniciar con `startExpanded`). El panel se
-        // arma con la respuesta, y hasta entonces el botón no tiene listener, así que no abre nada.
-        // Cuando el pedido termina manda `anyFilterVisible`: si no hay nada que filtrar, se oculta
-        // solo. En modo local los valores ya están, así que la condición queda como estaba.
-        // El botón puede no existir: una declaración de filtros que solo tiene grupos `estado`
-        // (o ninguna) no dibuja el panel, y entonces no hay nada que mostrar ni que ocultar.
+        // los grupos que derivan sus valores no tienen nada que mostrar, y esperar la respuesta deja el
+        // toolbar incompleto y lo ensancha de golpe (muy notorio al iniciar con `startExpanded`). El
+        // panel se arma con la respuesta, y hasta entonces el botón no tiene listener, así que no abre
+        // nada. Cuando el pedido termina manda `anyFilterVisible`: si no hay nada que filtrar, se oculta
+        // solo. Los grupos declarados existen igual (con los conteos en cero), así que la condición queda
+        // como estaba en modo local.
+        // El botón puede no existir: una declaración de filtros que solo tiene grupos
+        // `filtros_internos` (o ninguna) no dibuja el panel, y entonces no hay nada que mostrar ni que
+        // ocultar.
         const pendingFacets = !!this.api && !this._apiFacetsSettled;
         if (this.filterToggle)
             this.filterToggle.style.display = anyFilterVisible || pendingFacets ? '' : 'none';
@@ -1993,7 +2110,11 @@ export default class Timeline {
             throw new Error(`API request failed: ${response.status}`);
         return (await response.json());
     }
-    /** Build the query string params for the list endpoint from the current UI state */
+    /**
+     * Build the query string params for the list endpoint from the current UI state.
+     * Each group sends the tokens of its checked checkboxes joined by commas, which is exactly the
+     * `value` of those checkboxes: a declared `[false, null]` travels as `validado=false,null`.
+     */
     _buildQueryParams(page) {
         const params = {
             page: String(page),
@@ -2362,17 +2483,17 @@ export default class Timeline {
         this._insertBeforeFooter(el);
     }
     /**
-     * Sync the active class on the search/filter/estado toggle buttons.
-     * Each button is lit by the groups **it** holds, not by any active filter: the `estado` groups
-     * live in the flyout, so they only light the flyout button and never the one of the panel.
+     * Sync the active class on the search/filter/internal-filters toggle buttons.
+     * Each button is lit by the groups **it** holds, not by any active filter: the `filtros_internos`
+     * groups live in the flyout, so they only light the flyout button and never the one of the panel.
      */
     _syncFilterToggleState() {
         const isActive = (f) => f.checkboxes.some((cb) => cb.checked);
         if (this.filterToggle)
-            this.filterToggle.classList.toggle('active', this.filters.some((f) => f.group !== 'estado' && isActive(f)));
-        const estadoActive = this.filters.some((f) => f.group === 'estado' && isActive(f));
-        if (this.estadoToggle)
-            this.estadoToggle.classList.toggle('active', estadoActive);
+            this.filterToggle.classList.toggle('active', this.filters.some((f) => f.group !== 'filtros_internos' && isActive(f)));
+        const internosActive = this.filters.some((f) => f.group === 'filtros_internos' && isActive(f));
+        if (this.filtrosInternosToggle)
+            this.filtrosInternosToggle.classList.toggle('active', internosActive);
         this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
     }
     /**
@@ -2392,7 +2513,7 @@ export default class Timeline {
         }
         const matches = (c) => this._matchesSearch(c) &&
             this.filters.every((f) => {
-                const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+                const active = this._filterActiveTokens(f);
                 if (active.length === 0)
                     return true;
                 return this._filterValuesOf(f, c).some((x) => active.includes(x));
@@ -2776,10 +2897,11 @@ export default class Timeline {
         if (this.api) {
             this._bindBaseEvents();
             this._renderApiLoading();
-            // The checkboxes are built here, before the first page, so the `defaultChecked` of the
-            // groups travel in the initial query just like in local mode. With no facets yet the groups
-            // without `values` have nothing to show, so nothing can be checked before they arrive:
-            // the panel is rebuilt with the counts by `_ensureApiFacets()`.
+            // The checkboxes are built here, before the first page, so the values a group presets with
+            // `checked` travel in the initial query just like in local mode. With no facets yet the
+            // derived groups have nothing to show, so nothing can be checked before they arrive: the
+            // panel is rebuilt with the counts by `_ensureApiFacets()`. A group that declares `items`
+            // shows them right away (with the counts in zero) and the rebuild only fills the counts.
             this._buildFilterCheckboxes();
             this._syncFilterToggleState();
             // The facets travel the static values of the collection (counts, total, lastUpdated) and
@@ -2832,7 +2954,7 @@ export default class Timeline {
         this.featuredRow.addEventListener('click', (e) => {
             if (this.isExpanded)
                 return;
-            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .estado-toggle, .estado-wrap'))
+            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .filtros-internos-toggle, .filtros-internos-wrap'))
                 return;
             this._toggleExpand();
         });
@@ -2849,11 +2971,11 @@ export default class Timeline {
         // que es el único lugar que reconstruye el panel con valores. Corre una sola vez.
         if (!this.api)
             this._bindFilterToggle();
-        if (this.estadoToggle) {
-            this.estadoToggle.addEventListener('click', (e) => {
+        if (this.filtrosInternosToggle) {
+            this.filtrosInternosToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.estadoMenu.classList.toggle('open');
-                this.estadoToggle.classList.toggle('open');
+                this.filtrosInternosMenu.classList.toggle('open');
+                this.filtrosInternosToggle.classList.toggle('open');
             });
         }
         this.searchToggle.addEventListener('click', (e) => {
@@ -2890,9 +3012,9 @@ export default class Timeline {
                 this.filterMenu.classList.remove('open');
                 this.filterToggle?.classList.remove('open');
             }
-            if (!e.target.closest('.estado-wrap') && this.estadoMenu) {
-                this.estadoMenu.classList.remove('open');
-                this.estadoToggle.classList.remove('open');
+            if (!e.target.closest('.filtros-internos-wrap') && this.filtrosInternosMenu) {
+                this.filtrosInternosMenu.classList.remove('open');
+                this.filtrosInternosToggle.classList.remove('open');
             }
             if (!e.target.closest('.search-wrap')) {
                 this.searchWrap.classList.remove('open');

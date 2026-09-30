@@ -10,10 +10,11 @@ import mockData from '../example/mock-data.js';
  * of values and the persistence logic; here the same filters are exercised end to end.
  *
  * The demo declares `example/filters.js` and passes it to `Timeline`, so these tests use the
- * demo config (the "Ver más" cut, the two columns, the estado flyout and the persisted state).
+ * demo config (the "Ver más" cut, the two columns, the internal-filters flyout and the persisted
+ * state).
  *
  * Three browser-only details the tests have to respect:
- * - The panel and the estado flyout are dropdowns: they open when their toggle is clicked.
+ * - The panel and the internal-filters flyout are dropdowns: they open when their toggle is clicked.
  * - The inputs of a group are visually hidden (the styled box is the checkmark), so the clicks
  *   land on the `.filter-option` label, and state is asserted on the input underneath.
  * - The demo renders `itemsPerPage` 10 rows, so a page of results is the first 10 of the list.
@@ -38,18 +39,18 @@ const firstPageOf = (list) => list.slice(0, 10);
 /** The clickable label of an option of a group */
 const optionLabel = (field, value) => `[data-filter-field="${field}"] .filter-option:has(input[value="${value}"])`;
 
-/** Open the panel and, separately, the estado flyout (each dropdown toggles independently) */
+/** Open the panel and, separately, the internal-filters flyout (each dropdown toggles independently) */
 async function openPanel(page) {
   await page.click('#filter-toggle');
   await expect(page.locator(sel.section + ' .filter-menu')).toHaveClass(/open/);
 }
-async function openEstado(page) {
-  await page.click('#estado-toggle');
-  await expect(page.locator(sel.section + ' #estado-menu')).toHaveClass(/open/);
+async function openInternos(page) {
+  await page.click('#filtros-internos-toggle');
+  await expect(page.locator(sel.section + ' #filtros-internos-menu')).toHaveClass(/open/);
 }
 
 test.describe('filtros configurables en el navegador', () => {
-  test('modo local: el panel arma dos columnas y el flyout de estado interno', async ({ page }) => {
+  test('modo local: el panel arma dos columnas y el flyout de filtros internos', async ({ page }) => {
     await openDemo(page, 'flat&expanded');
 
     const cols = await page.locator('.filter-menu .filter-column').count();
@@ -63,12 +64,14 @@ test.describe('filtros configurables en el navegador', () => {
       'Tipo de fuente',
       'Fuente oficial'
     ]);
-    // Los grupos de estado viven en el flyout del botón interno, no en el panel.
+    // Los grupos de filtros internos viven en el flyout del botón interno, no en el panel.
     expect(
-      await page.locator('#estado-menu .filter-options').evaluateAll((els) => els.map((e) => e.dataset.filterField))
+      await page
+        .locator('#filtros-internos-menu .filter-options')
+        .evaluateAll((els) => els.map((e) => e.dataset.filterField))
     ).toEqual(['validado', 'capturado', 'descartado']);
-    // El default del demo (`descartado: no-descartado`) enciende solo el botón del flyout.
-    await expect(page.locator('#estado-toggle')).toHaveClass(/active/);
+    // El default del demo (`descartado` = sin descartar + pendiente) enciende solo el botón del flyout.
+    await expect(page.locator('#filtros-internos-toggle')).toHaveClass(/active/);
     await expect(page.locator('#filter-toggle')).not.toHaveClass(/active/);
     // Y la lista ya viene con ese recorte aplicado (la primera página, ordenada por fecha).
     expect(
@@ -82,7 +85,7 @@ test.describe('filtros configurables en el navegador', () => {
     await openDemo(page, 'flat&expanded');
     await openPanel(page);
 
-    const sitios = enUso((i) => (i.tipo_fuente || 'sin-tipo') === 'Sitio web o portal');
+    const sitios = enUso((i) => i.tipo_fuente === 'Sitio web o portal');
     expect(sitios.length).toBeGreaterThan(0);
 
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
@@ -104,12 +107,13 @@ test.describe('filtros configurables en el navegador', () => {
     await openDemo(page, 'flat&expanded');
     await openPanel(page);
 
-    // `tipo_fuente` tiene 7 valores en el mock y `filtersMaxVisible` corta en 5.
+    // `tipo_fuente` declara 7 valores en el demo y los corta con su propio `maxVisible: 4`, así
+    // que el "Ver más" muestra la cola declarada (los 3 últimos) y no los que más filtran.
     const group = page.locator('[data-filter-field="tipo_fuente"]');
     await expect(group.locator('.filter-option')).toHaveCount(7);
-    await expect(group.locator('.filter-option:visible')).toHaveCount(5);
+    await expect(group.locator('.filter-option:visible')).toHaveCount(4);
     const more = group.locator('.filter-more');
-    await expect(more).toHaveText('Ver más (2)');
+    await expect(more).toHaveText('Ver más (3)');
     await expect(more).toHaveAttribute('aria-expanded', 'false');
 
     await more.click();
@@ -118,18 +122,18 @@ test.describe('filtros configurables en el navegador', () => {
     await expect(group.locator('.filter-option:visible')).toHaveCount(7);
 
     await more.click();
-    await expect(more).toHaveText('Ver más (2)');
-    await expect(group.locator('.filter-option:visible')).toHaveCount(5);
+    await expect(more).toHaveText('Ver más (3)');
+    await expect(group.locator('.filter-option:visible')).toHaveCount(4);
   });
 
   test('modo local: el estado de los grupos con `persist` sobrevive a la recarga', async ({ page }) => {
     await openDemo(page, 'flat&expanded');
 
-    // Aflojar `capturado` (persiste, vive en el flyout de estado interno): el checkbox queda
+    // Aflojar `capturado` (persiste, vive en el flyout de filtros internos): el checkbox queda
     // destildado y así se guarda.
-    await openEstado(page);
-    await page.click(optionLabel('capturado', 'capturado'));
-    await expect(page.locator('[data-filter-field="capturado"] input[value="capturado"]')).not.toBeChecked();
+    await openInternos(page);
+    await page.click(optionLabel('capturado', 'true'));
+    await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).not.toBeChecked();
 
     // `tipo_fuente` no persiste: tildar un valor del panel es un estado efímero.
     await openPanel(page);
@@ -140,7 +144,7 @@ test.describe('filtros configurables en el navegador', () => {
 
     // El estado interno vuelve destildado (persistió el cambio) y el del panel con su default
     // (sin chequear, porque `tipo_fuente` no persiste).
-    await expect(page.locator('[data-filter-field="capturado"] input[value="capturado"]')).not.toBeChecked();
+    await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).not.toBeChecked();
     await expect(page.locator('[data-filter-field="tipo_fuente"] input[value="Sitio web o portal"]')).not.toBeChecked();
   });
 
@@ -153,7 +157,7 @@ test.describe('filtros configurables en el navegador', () => {
 
     await openDemo(page, 'api&expanded');
 
-    // Los counts vienen del endpoint (mismo recorte de estado que en local).
+    // Los counts vienen del endpoint (mismo recorte de los filtros internos que en local).
     const grupo = page.locator('[data-filter-field="tipo_fuente"]');
     const count = grupo
       .locator('.filter-option')
@@ -165,18 +169,21 @@ test.describe('filtros configurables en el navegador', () => {
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
 
     // La última request de la lista lleva el filtro como `tipo_fuente=<valor>`, junto a los
-    // defaults de estado que viajan desde el arranque.
+    // Los defaults de los filtros internos viajan desde el arranque. Los grupos que declaran varios
+    // valores mandan uno por param, CSV: los que declara el consumidor, tal cual y con el `null`
+    // incluido.
     const last = requests[requests.length - 1];
     expect(last.get('tipo_fuente')).toBe('Sitio web o portal');
-    expect(last.get('descartado')).toBe('no-descartado');
-    expect(last.get('capturado')).toBe('capturado');
+    expect(last.get('descartado')).toBe('false,null');
+    expect(last.get('capturado')).toBe('true');
+    expect(last.get('validado')).toBe('true,false,null');
   });
 
   test('modo API: el resultado vuelve filtrado por el servidor', async ({ page }) => {
     await openDemo(page, 'api&expanded');
     expect(await page.$$eval(ARTICLE_ROWS, (rows) => rows.length)).toBeGreaterThan(0);
 
-    const sitios = enUso((i) => (i.tipo_fuente || 'sin-tipo') === 'Sitio web o portal');
+    const sitios = enUso((i) => i.tipo_fuente === 'Sitio web o portal');
     await openPanel(page);
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
 
