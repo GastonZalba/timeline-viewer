@@ -2148,6 +2148,74 @@
   opacity: 1;
   animation: tv-row-spin 2s linear infinite;
 }
+.publicaciones-section .timeline-paginator-item {
+  opacity: 1 !important;
+  transform: none !important;
+  margin-bottom: 0;
+}
+.publicaciones-section .timeline-paginator-dot {
+  display: none;
+}
+.publicaciones-section .timeline-paginator-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-left: 25px;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+}
+.publicaciones-section .timeline-paginator-text {
+  font-size: 12px;
+  color: var(--tv-text-muted);
+  min-width: 96px;
+  text-align: center;
+  user-select: none;
+}
+.publicaciones-section .timeline-paginator-btn {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: 1px solid var(--tv-accent);
+  color: var(--tv-accent-light);
+  padding: 8px 18px;
+  border-radius: 42px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  font-weight: 100;
+  position: relative;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+.publicaciones-section .timeline-paginator-btn::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(from var(--tv-row-angle), transparent 0 70%, var(--tv-accent) 90%, var(--tv-accent-light) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.publicaciones-section .timeline-paginator-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.15);
+}
+.publicaciones-section .timeline-paginator-btn:hover:not(:disabled)::before {
+  opacity: 1;
+  animation: tv-row-spin 2s linear infinite;
+}
+.publicaciones-section .timeline-paginator-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  border-color: var(--tv-border-section);
+  color: var(--tv-text-muted);
+}
 .publicaciones-section .timeline-empty-item {
   opacity: 1 !important;
   transform: none !important;

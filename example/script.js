@@ -9,6 +9,8 @@ import mockData from './mock-data.js';
 // ?full arranca en modo fullpage (`fullpage`): timeline siempre abierto, sin handle de
 // resize, sin scroll interno (scrollea la página) y con la barra de herramientas pegada
 // arriba. Implica `startExpanded` y subsume a `?expanded`.
+// ?pagination cambia "Cargar más" por el paginador numérico (`pagination`): páginas
+// disjuntas con Anterior/Siguiente, en vez de ir creciendo la lista hacia abajo.
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
 // el botón de compartir con esa misma URL.
@@ -19,12 +21,14 @@ const useFlat = new URLSearchParams(window.location.search).has('flat');
 // ?full (modo fullpage) implica abierto, así que subsume a ?expanded.
 const useExpanded = new URLSearchParams(window.location.search).has('expanded');
 const useFull = new URLSearchParams(window.location.search).has('full');
+const usePagination = new URLSearchParams(window.location.search).has('pagination');
 const singleId = new URLSearchParams(window.location.search).get('id');
 
 const baseOptions = {
   container: '#noticias-container',
   featuredCount: 10,
   itemsPerPage: 10,
+  pagination: usePagination,
   inlineImages: true,
   inlineAdjuntos: true,
   internalButtons: true,

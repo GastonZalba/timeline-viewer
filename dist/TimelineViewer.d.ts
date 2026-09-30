@@ -146,7 +146,23 @@ export interface TimelineOptions {
      */
     filtersMaxVisible?: number | Partial<Record<FilterField, number>>;
     lastUpdated?: string;
+    /**
+     * Items shown per page. `0` disables the batch pagination: every matching item is rendered
+     * at once and no "Cargar más" button is shown.
+     */
     itemsPerPage?: number;
+    /**
+     * Numeric pagination (default: false). When `true` the "Cargar más" button is replaced by a
+     * paginator — "‹ Anterior | Página X de Y | Siguiente ›" — that jumps between fixed-size pages
+     * instead of appending them, in local mode and in API mode alike. `itemsPerPage` is the size
+     * of every page, and `0` still means "no pagination" (no paginator, no button).
+     *
+     * Because the pages are disjoint, the current page always shows exactly `itemsPerPage` items
+     * (less on the last one), which is what the API mode already sends per request.
+     *
+     * Ignored in single mode (`singleId`), which renders a single expanded card.
+     */
+    pagination?: boolean;
     inlineImages?: boolean;
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
@@ -187,6 +203,7 @@ export default class Timeline {
     featured_count: number;
     lastUpdated: string;
     itemsPerPage: number;
+    pagination: boolean;
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
@@ -203,8 +220,20 @@ export default class Timeline {
     taxonomySelectCount: HTMLElement | null;
     taxonomySelect: HTMLSelectElement | null;
     _displayedCount: number;
+    /**
+     * Current page of the numeric paginator, 1-based, in local mode. The API mode has its own
+     * cursor (`_apiPage`), which the server owns, so it does not share this one.
+     */
+    _page: number;
     allCards: TimelineItem[];
     _featuredCards: TimelineItem[];
+    /**
+     * Featured stack of the first page in API mode + `pagination`, kept so that navigating away
+     * from page 1 leaves the collapsed stack alone. In API mode the stack is built from the items
+     * in memory, which with a paginator are the ones of the page being shown, so without this the
+     * collapsed stack would silently become "the featured of whatever page you are on".
+     */
+    _apiFeaturedCards: TimelineItem[];
     isExpanded: boolean;
     featuredContainer: HTMLElement;
     featuredRow: HTMLElement;
@@ -407,10 +436,10 @@ export default class Timeline {
     protected _insertBeforeFooter(el: HTMLElement): void;
     /**
      * Insert an element at the end of the cards, that is: before the first element of the
-     * trailing block (load-more button, status row, footer), which is what keeps the append
-     * order identical to the one `_renderTimeline` + `_renderLoadMoreButton` + `_renderStatus`
+     * trailing block (load-more button, paginator, status row, footer), which is what keeps the
+     * append order identical to the one `_renderTimeline` + `_renderLoadMoreButton` + `_renderStatus`
      * build. `querySelector` returns the first match in document order, so the load-more button
-     * wins when it is there.
+     * or the paginator wins when one of them is there.
      */
     protected _insertBeforeTrailing(el: HTMLElement): void;
     /** Render the timeline cards list, including the last-updated footer */
@@ -457,8 +486,39 @@ export default class Timeline {
     protected _collapseExpandState(): void;
     /** Toggle between expanded (timeline visible) and collapsed state */
     protected _toggleExpand(scrollTo?: boolean): void;
+    /**
+     * The element that actually scrolls a given one, or `null` when it is the viewport.
+     *
+     * Walks up from `el` looking for the first box with a scrollable `overflow`, so it works both
+     * when the page (or the window) is what scrolls and when the consumer mounts the component
+     * inside a scrollable container of their own. Returns `null` instead of falling back to the
+     * window, so each caller can scroll however it wants to (smoothly or not).
+     */
+    protected _findScrollContainer(el: HTMLElement | null): HTMLElement | null;
     /** Scroll the page/section to make the timeline container visible */
     protected _scrollToSection(): void;
+    /**
+     * Bring the timeline back to its first card, after the list was replaced (a page change, or a
+     * search/filter/sort change that reset to page 1).
+     *
+     * In the default mode `#timeline-cards` is the scroll box itself (`max-height` + `overflow-y`),
+     * so resetting its `scrollTop` is all it takes. **Fullpage is the exception**: the SCSS takes
+     * the list out of its own scroll box (`max-height: none; overflow: visible`) and makes the
+     * page scroll, so the same assignment is a no-op there — the timeline would keep the scroll
+     * position of the page it was on, and landing on page 2 of 4 would show its middle. The scroll
+     * therefore has to happen on whatever actually scrolls, found by walking up the ancestors
+     * (`_findScrollContainer`), with the window as the last resort.
+     *
+     * The target is the top of the list right **under the sticky toolbar** (`.featured-row`, which
+     * is `position: sticky` in fullpage), not the top of the scroller: scrolling all the way up
+     * would leave the toolbar overlapping the first cards, and the offset is read from the live
+     * `getBoundingClientRect()` of that row so it follows whatever height the toolbar ends up
+     * having, including the consumer's own `--tv-sticky-top`.
+     *
+     * Instant, unlike `_scrollToSection`: the list the scroll would travel through was just
+     * replaced, so animating it means scrolling across cards that are already gone.
+     */
+    protected _scrollToTimelineTop(): void;
     /** Toggle timeline sort order between ascending and descending */
     protected _toggleSort(): void;
     /** Apply the persisted work-notes visibility state to the section and toggle button */
@@ -497,8 +557,21 @@ export default class Timeline {
     protected _normalizeSearch(value: string | null | undefined): string;
     /** Check whether a card matches the current search term */
     protected _matchesSearch(card: TimelineItem): boolean;
-    /** Page size used by the API mode (falls back to 6 when itemsPerPage is 0/unset) */
+    /**
+     * Page size used by the API mode. `itemsPerPage: 0` means "no pagination", so the request
+     * asks for a page big enough to hold the whole collection in one response: the server only
+     * slices what it gets, and a small `pageSize` there would silently leave the user with the
+     * first few items and no way to ask for the rest.
+     */
     protected _apiPageSize(): number;
+    /**
+     * Number of pages the current result set is split into, always at least 1. It counts up to the
+     * total the mode knows about: the `total` the server sent in API mode, the filtered pool in
+     * local mode.
+     */
+    protected _pageCount(): number;
+    /** The page the user is on, 1-based. API mode reads the page the server was asked for */
+    protected _currentPage(): number;
     /** True when there are more pages to load */
     protected _hasMorePages(): boolean;
     /** Fetch a JSON resource from the API with the configured fetch implementation */
@@ -586,7 +659,14 @@ export default class Timeline {
      * the real render itself (which wipes both containers anyway, leaving only `aria-busy`).
      */
     protected _clearApiLoading(): void;
-    /** Render the API status row (loading / error / count) at the end of the timeline */
+    /**
+     * Render the API status row (error / loading / count) at the end of the timeline.
+     *
+     * With the numeric paginator the row is only half used: the error and loading lines stay,
+     * because the request can still fail and there is no other feedback, but the count line goes
+     * away — "Mostrando 10 de 87" counts the page on screen, not everything the user went
+     * through, and the paginator already says which page it is and how many there are.
+     */
     protected _renderStatus(): void;
     /** Sync the active class on the search/filter/estado toggle buttons */
     protected _syncFilterToggleState(): void;
@@ -610,8 +690,56 @@ export default class Timeline {
     protected _renderRelatedCount(): void;
     /** Render featured cards, timeline, and load-more button if needed */
     protected _renderAll(): void;
+    /**
+     * Cards shown in the local timeline, out of the filtered `allCards`.
+     *
+     * Two shapes for the same list, picked by the `pagination` option: the paginator takes the
+     * window of the current page, while "Cargar más" takes everything loaded so far, which grows
+     * with every click. `itemsPerPage: 0` means no pagination at all, so the whole list goes out
+     * in both cases.
+     */
+    protected _localDisplayCards(): TimelineItem[];
+    /**
+     * Featured stack in API mode, where it is built out of the items in memory — that is, out of
+     * the page on screen.
+     *
+     * With the paginator that would make the stack follow the navigation: collapsing the timeline
+     * on page 3 would show page 3's articles as "the" featured ones, even though the user never
+     * asked for them. So the stack is captured on the first page and kept from then on, which is
+     * also what the local mode does for free: there `_featuredCards` is the whole filtered pool,
+     * so the paginator cannot move it either.
+     */
+    protected _apiFeatured(): TimelineItem[];
     /** Render the "load more" button and wire its click handler */
     protected _renderLoadMoreButton(): void;
+    /**
+     * Render the numeric paginator: "‹ Anterior | Página X de Y | Siguiente ›".
+     *
+     * The counterpart of `_renderLoadMoreButton`, and mutually exclusive with it (see `_renderAll`):
+     * "Cargar más" grows one list downward, the paginator swaps one page for another, so it renders
+     * "Página X de Y" instead of a growing counter and the two arrows go back and forth.
+     *
+     * It sits in the same trailing slot as the load-more button, which is the one `_insertBeforeTrailing`
+     * looks for, so appending cards in "Cargar más" mode still lands above it.
+     *
+     * Nothing is rendered when there is a single page: a lone "Página 1 de 1" with both arrows dead
+     * is noise. The handlers read `_currentPage` / `_pageCount` on click rather than closing over
+     * the numbers of this render, so they stay correct after the arrows are re-rendered disabled.
+     */
+    protected _renderPaginator(): void;
+    /**
+     * Go to a page of the current result set, in both modes.
+     *
+     * Both replace the list instead of appending to it, which is the whole difference with "Cargar
+     * más": what is on screen after the change is not what was there before, so keeping the old
+     * cards would be a lie. The API branch therefore reuses `_fetchPage`, the very same call the
+     * search, the filters and the sort already make, and the local branch re-renders from
+     * `allCards`, which always holds the whole filtered pool.
+     *
+     * Out-of-range pages are clamped rather than rejected, so a shorter result set (the filters
+     * changed underneath, say) lands on the last page instead of an empty one.
+     */
+    protected _goToPage(page: number): Promise<void>;
     /** Read the current effective max-height of the timeline-cards in px */
     protected _getCardsHeightPx(): number;
     /** Clamp and apply a max-height (px) to the timeline-cards */
