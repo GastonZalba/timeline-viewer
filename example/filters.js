@@ -14,12 +14,16 @@
  *
  * Cada entrada necesita `field` y `label`:
  *
+ * - `type` elige el control: `'checkboxes'` (default) o `'select'`. Un `select` es un multiselect
+ *   con buscador que toma el **ancho completo** del panel, arriba del todo, y es el control para
+ *   un campo con muchos valores. `multiple` (default `true`) y `searchable` (automático: la caja
+ *   de búsqueda aparece sola si el grupo tiene más de 8 valores) son sus dos únicas opciones
+ *   propias; el resto se resuelve igual que en un grupo de checkboxes.
  * - `field` es el nombre del campo. En modo local se lee del ítem (los arrays se expanden, y un
  *   `null` es el valor `'null'`); en modo API es la clave del facet en `GET /api/facets` y el query
  *   param. El demo **no usa `extract` ni campos sintéticos**: los ítems del mock ya traen los
  *   campos listos para filtrar (`tipo_fuente`, `contenido`, `anio_publicacion`...).
  * - `label` es el header del grupo.
- * - `type` solo admite `'checkboxes'` (es el default) y está reservado para los próximos tipos.
  * - `items` es la lista de valores del grupo: `{ value, label, checked? }`. El grupo muestra
  *   exactamente esos valores, en ese orden, y existen aunque los datos no traigan ninguno. Sin
  *   `items` los valores se derivan del dato: el texto es el valor crudo, salvo los booleanos, que
@@ -47,23 +51,37 @@
  * - `maxVisible` corta los valores detrás del "Ver más (N)" (default: 5). Un grupo con `items`
  *   muestra los primeros declarados; uno derivado se ordena por **mayor conteo** antes de truncar
  *   (si no, el corte escondería los valores que más filtran), salvo que declare `sortValues`, cuyo
- *   orden es intencional y solo se trunca.
+ *   orden es intencional y solo se trunca. **No aplica a un `select`**: su lista scrollea y busca.
  * - `group: 'filtros_internos'` manda el grupo al flyout rojo de "Filtros internos" (necesita
  *   `internalButtons: true`) en vez de a una columna del panel.
  *
- * El orden de la declaración es el orden de lectura: los primeros grupos `'menu'` van en la
- * primera columna del panel y el resto en la segunda.
+ * El orden de la declaración es el orden de lectura: los grupos `'select'` van en su bloque de
+ * ancho completo, arriba del todo, y los primeros grupos `'menu'` de checkboxes van en la primera
+ * columna del panel y el resto en la segunda.
  */
 const filters = [
-  // ---- Columna 1 --------------------------------------------------------
+  // ---- Bloque de ancho completo, arriba del panel -------------------------------
   {
-    // Campo array: los valores son los tonos que aparecen en los ítems, sin nada que extraer. El
-    // `allowEmpty` no hace nada con este mock: ningún ítem viene sin `tonos_sociales` (el que trae
-    // el array vacío no genera token, así que ningún valor del grupo lo alcanza).
+    // El control `select`, a propósito sobre el campo con **muchos** valores, que es para lo que
+    // existe: `tonos_sociales` es un array, así que un ítem responde por varios tonos a la vez
+    // (OR dentro del grupo), y el buscador del desplegable es lo que vuelve usable una lista larga.
+    // `multiple` es el default (`true`) y está declarado explícito solo para que se lea.
+    //
+    // No usa `maxVisible` (ni "Ver más"): la lista scrollea y se busca. Sus valores vienen por el
+    // mismo camino que los de un grupo de checkboxes —del dato en local, de `GET /api/facets` en
+    // modo API— así que tampoco hay nada que cambiar del lado del servidor para este tipo.
+    //
+    // El `allowEmpty` sigue siendo inerte con este mock (ningún ítem viene sin `tonos_sociales`:
+    // el que trae el array vacío no genera token), y se conserva por ser la forma de no tener que
+    // distinguir el caso cuando el pipeline empiece a mandar ítems sin tonos.
     field: 'tonos_sociales',
     label: 'Tono social',
+    type: 'select',
+    multiple: true,
     allowEmpty: true
   },
+
+  // ---- Columna 1 --------------------------------------------------------
   {
     // Año ya reducido en el dato (`anio_publicacion`), así que tampoco necesita `extract`. Los tres
     // años que trae el mock más el bucket vacío son 4 valores: no hay corte (el default es 5), así

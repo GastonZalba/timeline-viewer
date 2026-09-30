@@ -12,6 +12,11 @@ import filters from './filters.js';
 // arriba. Implica `startExpanded` y subsume a `?expanded`.
 // ?pagination cambia "Cargar más" por el paginador numérico (`pagination`): páginas
 // disjuntas con Anterior/Siguiente, en vez de ir creciendo la lista hacia abajo.
+// ?many agrega un campo sintético con 400 valores distintos y su filtro `select`, para ver el
+// control en el caso para el que existe. El mock no lo trae: `tonos_sociales` resuelve a 3
+// valores, muy por debajo del corte que hace aparecer el buscador, así que sin este flag el
+// desplegable se ve como una lista corta y no dice nada sobre cómo se comporta con cientos.
+// No aplica en modo API (los ítems los manda el servidor, no este archivo).
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
 // el botón de compartir con esa misma URL.
@@ -23,7 +28,49 @@ const useFlat = new URLSearchParams(window.location.search).has('flat');
 const useExpanded = new URLSearchParams(window.location.search).has('expanded');
 const useFull = new URLSearchParams(window.location.search).has('full');
 const usePagination = new URLSearchParams(window.location.search).has('pagination');
+// ?many: el caso de uso del filtro `select`. Solo tiene efecto en modo local (ver la nota de arriba).
+const useMany = new URLSearchParams(window.location.search).has('many');
 const singleId = new URLSearchParams(window.location.search).get('id');
+
+/**
+ * Campo sintético de `?many`: un campo con **cientos** de valores distintos, que es el caso para el
+ * que existe el `select`. El mock tiene 19 ítems, así que repartir un tema por ítem daría 19 valores
+ * y no probaría nada: cada ítem lleva una porción del pool, y entre todos cubren los 400. Los
+ * sufijos van con tilde a propósito, para que se vea que el buscador las perdona.
+ */
+const MANY_SUFFIXES = [
+  'Ámbito',
+  'Política',
+  'Región',
+  'Información',
+  'Análisis',
+  'Educación',
+  'Sanidad',
+  'Energía',
+  // Uno largo a propósito: los chips del trigger cortan con "…" a los 200px, y con todos los
+  // valores cortos esa parte del control no se vería nunca en el demo.
+  'Comunicación institucional'
+];
+const MANY_COUNT = 400;
+/** Temas por ítem: 19 ítems × 21 = los 399 primeros del pool, sin repetir */
+const MANY_PER_ITEM = Math.ceil(MANY_COUNT / mockData.items.length);
+const manyTopics = Array.from(
+  { length: MANY_COUNT },
+  (_, i) => `Tema ${String(i + 1).padStart(3, '0')} ${MANY_SUFFIXES[i % MANY_SUFFIXES.length]}`
+);
+
+/** Los ítems del demo con el campo de `?many` ya puesto */
+function withManyTopics(items) {
+  return items.map((item, i) => ({
+    ...item,
+    topicos_demo: Array.from({ length: MANY_PER_ITEM }, (_, k) => manyTopics[(i * MANY_PER_ITEM + k) % MANY_COUNT])
+  }));
+}
+
+/** Los filtros del demo con el grupo de `?many` adelante, para verlo arriba del panel */
+function withManyFilter(groups) {
+  return [{ field: 'topicos_demo', label: `Temas (${MANY_COUNT} valores)`, type: 'select' }, ...groups];
+}
 
 const baseOptions = {
   container: '#noticias-container',
@@ -51,11 +98,19 @@ if (useApi) {
     api: { url: '/api' }
   });
 } else {
+  // `content` agrupa los artículos por taxonomía media: el label de cada grupo es la opción del
+  // selector que se muestra al expandir el timeline; `items` es la lista plana (alias legacy).
+  const data = useFlat ? { items: mockData.items } : { content: mockData.content };
+  // `?many` suma el campo de muchos valores a los ítems y su `select` a los filtros. Se aplica a
+  // `content` grupo por grupo, así que funciona con y sin `?flat`.
+  if (useMany) {
+    if (data.items) data.items = withManyTopics(data.items);
+    else data.content = data.content.map((group) => ({ ...group, items: withManyTopics(group.items) }));
+  }
   new Timeline({
     ...baseOptions,
-    // `content` agrupa los artículos por taxonomía media: el label de cada grupo es la
-    // opción del selector que se muestra al expandir el timeline.
-    ...(useFlat ? { items: mockData.items } : { content: mockData.content }),
+    ...data,
+    filters: useMany ? withManyFilter(filters) : filters,
     lastUpdated: mockData.lastUpdated
   });
 }

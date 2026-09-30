@@ -143,8 +143,9 @@ export interface TimelineOptions {
      * hardcoded, so a new filter is added here —or sent by a backend through `GET {url}/facets`—
      * without rebuilding the library.
      *
-     * Each entry needs a `field` and a `label`; `type` only accepts `'checkboxes'` today and
-     * defaults to it. A group that declares `items` shows exactly those values, in that order, and
+     * Each entry needs a `field` and a `label`; `type` picks the control (`'checkboxes'` by
+     * default, or `'select'` for a field with many values, which takes the full width of the panel).
+     * A group that declares `items` shows exactly those values, in that order, and
      * can preset them with `checked`; a group without them derives the values from the data (the
      * items of the selected taxonomy, or the facets in API mode). In both modes the values travel in
      * API mode as `field=<csv>` with the very tokens the checkboxes carry in the DOM. See
@@ -190,8 +191,18 @@ interface LinkInfo {
     url: string;
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
-/** Controls a filter group can be rendered with. Only checkboxes are supported today. */
-export type FilterType = 'checkboxes';
+/**
+ * Controls a filter group can be rendered with.
+ *
+ * - `'checkboxes'`: one checkbox per value, with the "Ver más (N)" cut for the long lists.
+ * - `'select'`: a trigger that carries the selected values and a searchable list opening below it.
+ *   It takes the full width of the menu, above the columns, and it is the control to declare for a
+ *   field with a long or open value list (hundreds of values).
+ *
+ * Both render the same values, resolved the same way (see `TimelineFilter`): only the control
+ * changes. `maxVisible` is the one option that only applies to `'checkboxes'`.
+ */
+export type FilterType = 'checkboxes' | 'select';
 /** Where a filter group is rendered: a column of the panel, or the internal-filters flyout */
 export type FilterGroup = 'menu' | 'filtros_internos';
 /**
@@ -243,6 +254,23 @@ export interface TimelineFilter {
     /** Control of the group. Defaults to `'checkboxes'`; any other value drops the group. */
     type?: FilterType;
     /**
+     * Accept several values at once in a `'select'` group (default: true). With `false` it is a
+     * classic single-value select: picking a value replaces the previous one, and picking it again
+     * clears it.
+     *
+     * Only applies to `'select'`; a `'checkboxes'` group is multi-value by construction.
+     */
+    multiple?: boolean;
+    /**
+     * Search box on the list of a `'select'` group. By default it appears only when the group has
+     * more values than `FILTER_SELECT_SEARCH_MIN`, which is the point of the control: with hundreds
+     * of values the list is unusable without it. Force it either way with `true` / `false`.
+     *
+     * The search filters the values already in memory, so it costs nothing on a long list. Ignored
+     * by a `'checkboxes'` group.
+     */
+    searchable?: boolean;
+    /**
      * `'menu'` (default) renders the group in a column of the panel, `'filtros_internos'` renders it
      * in the internal-filters flyout, which is part of the internal toolbar and therefore needs
      * `internalButtons: true`. A `'filtros_internos'` group without it is not rendered.
@@ -272,7 +300,10 @@ export interface TimelineFilter {
      * the rebuilds of the checkboxes (the API facets, a taxonomy re-scope) and the page loads.
      */
     persist?: boolean;
-    /** Values shown before the "Ver más (N)" toggle appears (default: 5). Below 2: all of them. */
+    /**
+     * Values shown before the "Ver más (N)" toggle appears (default: 5). Below 2: all of them.
+     * Ignored by a `'select'` group: its list scrolls and searches instead of truncating.
+     */
     maxVisible?: number;
     /**
      * Values of the group carried by an item. Defaults to reading `item[field]`: arrays are
@@ -303,19 +334,88 @@ interface FilterDefItem {
     checked: boolean;
 }
 /** A `TimelineFilter` normalized for rendering: defaults resolved and the DOM slot attached */
-interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label'> {
+interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label' | 'multiple' | 'searchable'> {
+    type: FilterType;
     group: FilterGroup;
     persist: boolean;
     /** The header of the group, normalized: `''` when the declaration brings none (so no header renders) */
     label: string;
     /** Add the "Sin valor" option to a group that derives its values (see `TimelineFilter`) */
     allowEmpty: boolean;
-    /** Column of the panel the group is rendered in. `0` for the `'filtros_internos'` flyout, ignored there. */
+    /** Several values at once in a `'select'` group. A no-op for `'checkboxes'`. */
+    multiple: boolean;
+    /** Search box of a `'select'` list. `undefined` = auto (only above `FILTER_SELECT_SEARCH_MIN`) */
+    searchable: boolean | undefined;
+    /** Column of the panel the group is rendered in. `0` for the `'filtros_internos'` flyout, ignored there */
     column: number;
+    /** The `.filter-options` box of a `'checkboxes'` group, its container to draw the values in */
     options: HTMLElement;
+    /**
+     * Tokens of the group the user has picked, and the **only** source of truth for "is anything
+     * active": the query params, the persisted state, the local match and the lit toggles all read
+     * this, so a `'select'` group participates in them without pretending to have checkboxes.
+     */
+    active: Set<string>;
+    /** The checkboxes of a `'checkboxes'` group, empty in a `'select'` one (whose control is not a list of boxes) */
     checkboxes: HTMLInputElement[];
     /** The declared options resolved, or `undefined` for a group that derives its values */
     declared?: FilterDefItem[];
+    /** The control of a `'select'` group, or `null` for a `'checkboxes'` one */
+    select: FilterSelect | null;
+}
+/**
+ * One row of the list of a `'select'` group. Just the node: what the search matches against is
+ * `FilterSelect.haystacks`, which covers every value and not only the rendered ones.
+ */
+interface FilterSelectOption {
+    el: HTMLElement;
+}
+/** The DOM of a `'select'` group, plus the state that only it uses */
+interface FilterSelect {
+    /** The `.filter-select` box, the handle the component looks its group up by */
+    root: HTMLElement;
+    /** The button that opens the list and carries the chips of the active values */
+    trigger: HTMLElement;
+    /** Where the chips go, so `_renderSelectTrigger` only has to rewrite one box */
+    value: HTMLElement;
+    panel: HTMLElement;
+    /**
+     * The rendered rows, by token. **Not** every value: only the ones inside the window (see
+     * `matches` / `shown`), because that is the point of the window.
+     */
+    options: Map<string, FilterSelectOption>;
+    /** The list of the values, built on the first open instead of with the panel */
+    list: HTMLElement;
+    /** The search box, when the group has enough values for it to earn its place */
+    search: HTMLInputElement;
+    /** The "Limpiar" button and the "N seleccionados" text */
+    clear: HTMLButtonElement;
+    footerCount: HTMLElement;
+    /** The "Sin resultados" line, shown when the search leaves nothing */
+    empty: HTMLElement;
+    /** Values to show, by token, from the last resolution. Held here because the list is lazy */
+    values: string[];
+    counts: Record<string, number>;
+    /**
+     * Folded `label + ' ' + token` of every value, parallel to `values`. Built on the first open and
+     * kept for the whole life of the list, which is what lets the search match values that are not
+     * rendered: without it, a match outside the window would be invisible to the search.
+     */
+    haystacks: string[];
+    /** Values that match the current search, in display order. The window is a slice of this */
+    matches: string[];
+    /** How many of `matches` are rendered right now */
+    shown: number;
+    /** Labels of `values`, resolved on demand instead of up front */
+    labels: Map<string, string>;
+    /** False until the first open. The whole point of the control: 500 rows are not in the DOM yet */
+    built: boolean;
+    /** False until the listeners of the control are bound, which happens on the first build only */
+    bound: boolean;
+    /** The current search, so a rebuild of the list can apply it again */
+    query: string;
+    /** Token of the option the arrow keys are on, or `''` when they are not on any */
+    cursor: string;
 }
 export default class Timeline {
     container: HTMLElement;
@@ -427,7 +527,9 @@ export default class Timeline {
      *
      * The `'menu'` groups are then dealt out to the columns of the panel: the first half goes to
      * the first column and the rest to the second, which reads a declaration top to bottom down
-     * the first column and then along the second.
+     * the first column and then along the second. A `'select'` group is left out of that deal: it
+     * does not live in a column but takes the full width above them, so the cut does not shift
+     * because of it.
      */
     protected _normalizeFilters(filters: TimelineFilter[] | undefined): FilterDef[];
     /**
@@ -472,20 +574,44 @@ export default class Timeline {
      * `data-filter-field` attribute, so a `field` with characters that are not valid in a CSS
      * selector cannot break the wiring. `data-filter-field` is also the stable hook for a
      * consumer's own tests.
+     *
+     * A `'select'` group keeps the same `.filter-section` and the same header — it is the *control*
+     * that changes, not how the group reads — and replaces the `.filter-options` box by the
+     * `.filter-select` one, whose list is built later (`_ensureSelectOptions`).
      */
     protected _buildFilterOptionsHtml(f: FilterDef): string;
+    /**
+     * Markup of the control of a `'select'` group: the trigger that opens the list and carries the
+     * values the user picked, and the panel that holds the search box, the values and the footer.
+     *
+     * The list itself is **not** in here: a field with hundreds of values would put hundreds of
+     * nodes in the DOM from the start, and they would sit there on every rebuild. `_ensureSelectOptions`
+     * builds them on the first open, which is also why `f.values`/`f.counts` are held on the
+     * `FilterSelect` and not re-derived from the DOM.
+     *
+     * `aria` is wired as a combobox that owns a listbox: the trigger says if it is open, and the
+     * active values are `aria-selected` options. The search box is emitted without its own value
+     * because whether it appears depends on how many values the group ends up with, which is only
+     * known once they are resolved (`_setupSelectSearch`).
+     */
+    protected _buildFilterSelectHtml(f: FilterDef): string;
     /**
      * Markup of the filter panel, or an empty string when no group is declared for it: with no
      * `filters` option the component has no filter UI at all, not a hidden one.
      * The columns come from the `column` that `_normalizeFilters` dealt out, in the order the
      * groups were declared, so the declaration reads down the first column and then along the
-     * second.
+     * second. A `'select'` group is not in a column: it goes in a full-width block above them, in
+     * the order it was declared, because it is the control for a field with many values and it has
+     * to read as the first thing in the panel rather than as one more group among the others.
      */
     protected _buildFilterMenuHtml(): string;
     /**
      * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
      * declared for it, the `filtros_internos` flyout. Without the latter the button would open an
      * empty menu, so both of them are conditional on the `filters` option as well.
+     *
+     * A `'select'` group of the flyout gets the same full-width block above the checkbox groups
+     * that it gets in the panel: the layout is a property of the control, not of the destination.
      */
     protected _buildInternalButtonsHtml(): string;
     /** Build the main DOM layout and cache element references */
@@ -495,12 +621,22 @@ export default class Timeline {
      * The lookup goes through the `data-filter-field` attribute rather than the id, so a `field`
      * that is not a valid CSS selector identifier still finds its box.
      *
+     * The two controls are found the same way and land in different fields: a `'checkboxes'` group
+     * in `f.options` (the box it fills with checkboxes), a `'select'` one in `f.select` (the DOM of
+     * its control, cached once because every later step of it reads those refs).
+     *
      * A group with no box is one whose container was not rendered: a `'filtros_internos'` group
      * without `internalButtons`, for instance. It keeps its configuration (so a later
      * `_buildFilterCheckboxes` just skips it) but has nowhere to draw, exactly as when the flyout did
      * not exist before.
      */
     protected _attachFilterOptions(): void;
+    /**
+     * Collect the refs of the control of a `'select'` group out of its markup, right after the
+     * layout is built. They live on `f.select` instead of being looked up again on every keystroke
+     * or click, because the box is never rebuilt: only its list is.
+     */
+    protected _initFilterSelect(root: HTMLElement): FilterSelect;
     /**
      * Populate the taxonomy selector with the labels of the `content` groups.
      * Nothing is rendered when there are no groups (legacy `items` option) or in API mode,
@@ -737,8 +873,15 @@ export default class Timeline {
      */
     protected _filterValuesOf(f: FilterDef, item: TimelineItem): string[];
     /**
-     * The tokens the checkboxes of the group currently filter by: the ones checked, each split back
-     * into the values it declared, so an option like `[false, null]` contributes both.
+     * The values of the group the user has picked, as they travel: one entry per value, which is the
+     * `value` its checkbox carries and the cell it takes in the query params and in `localStorage`.
+     * Reads `f.active`, the single place the state of a group lives, so a `'select'` group is
+     * indistinguishable from a `'checkboxes'` one for everything that is not the control.
+     */
+    protected _filterActiveValues(f: FilterDef): string[];
+    /**
+     * The tokens a group currently filters by: the values it has active, each split back into the
+     * tokens it declared, so an option like `[false, null]` contributes both.
      */
     protected _filterActiveTokens(f: FilterDef): string[];
     /**
@@ -749,12 +892,203 @@ export default class Timeline {
      */
     protected _filterLabelOf(f: FilterDef, value: string): string;
     /**
-     * Build the checkboxes of every group of the `filters` option out of the values it has:
-     * the ones derived from the items of the active scope in local mode, the ones the server sent
-     * in `GET {url}/facets` in API mode. A group with no container to draw in is skipped, and so
-     * is the whole method when no group was declared at all (nothing to build, nothing to show).
+     * The visible text of one value of a group, whichever control shows it: the label a declared
+     * `items` brings, the fixed one of the `allowEmpty` bucket, or `_filterLabelOf` for a value that
+     * came from the data. Both controls call this so a value never reads differently in a select.
+     */
+    protected _filterOptionLabel(f: FilterDef, token: string): string;
+    /**
+     * Resolve the values of a group and how many items each one holds, the same way for every
+     * control: the declared `items` (counted, in their order), or the ones derived from the items of
+     * the active scope in local mode, or the ones the server sent in `GET {url}/facets` in API mode.
+     *
+     * Returns `null` when the group has nothing to decide and therefore has to hide itself: a
+     * declared group always has something (it exists even with no data behind it), so only a derived
+     * one can end up here. The exception is the `allowEmpty` group whose only value is the empty
+     * bucket — the consumer asked for it, and filtering by it is a decision, not missing data.
+     *
+     * `overflow` is how many values a `'checkboxes'` group hides behind its "Ver más (N)"; it is 0
+     * for a `'select'`, whose list scrolls and searches instead of truncating.
+     */
+    protected _resolveFilterValues(f: FilterDef, scope: TimelineItem[]): {
+        values: string[];
+        counts: Record<string, number>;
+        overflow: number;
+    } | null;
+    /**
+     * Reseed the values a group starts with: the ones persisted by a `persist` group, and otherwise
+     * the `checked` its declared `items` bring. An empty persisted record wins over those defaults,
+     * which is what lets the user clear a group and have it stay cleared across the rebuilds.
+     */
+    protected _seedFilterActive(f: FilterDef, values: string[], savedState: Record<string, string[]>): void;
+    /**
+     * Build the control of every group of the `filters` option out of the values it resolves: the
+     * checkboxes of a `'checkboxes'` group, the trigger and list of a `'select'` one. The values come
+     * from the items of the active scope in local mode, or from the ones the server sent in
+     * `GET {url}/facets` in API mode. A group with no container to draw in is skipped, and so is the
+     * whole method when no group was declared at all (nothing to build, nothing to show).
      */
     protected _buildFilterCheckboxes(): void;
+    /**
+     * Draw the values of a `'checkboxes'` group: one label per value, with its checkbox and its
+     * count, the ones past the cut already marked `filter-option-extra` for `_buildFilterMore` to
+     * hide. The group's active values are already in `f.active` (seeded by `_seedFilterActive`), so a
+     * checkbox only has to mirror them, and its `change` only has to write the new state.
+     */
+    protected _buildFilterCheckboxesGroup(f: FilterDef, resolved: {
+        values: string[];
+        counts: Record<string, number>;
+        overflow: number;
+    }): void;
+    /**
+     * Draw the control of a `'select'` group: the chips (or the placeholder) of its active values,
+     * the search box when it has enough values to earn one, and the footer.
+     *
+     * The list of values is **not** built here: `values` and `counts` are handed to the `FilterSelect`
+     * and `_ensureSelectOptions` turns them into DOM on the first open. That is the whole reason the
+     * control exists — a field with hundreds of values would otherwise put hundreds of nodes in the
+     * document on every rebuild (the API facets, a taxonomy re-scope) whether the user ever opens it
+     * or not.
+     */
+    protected _buildFilterSelect(f: FilterDef, resolved: {
+        values: string[];
+        counts: Record<string, number>;
+        overflow: number;
+    }): void;
+    /**
+     * Forget everything a built list of a `'select'` group holds, leaving the control as if it had
+     * never been opened. Called on every rebuild (the values may have changed) and when the group
+     * hides itself, which is also when its DOM has to stop being clickable.
+     */
+    protected _resetFilterSelect(select: FilterSelect): void;
+    /**
+     * Write on the trigger of a `'select'` group what the user has picked: the placeholder when
+     * nothing is, and a removable chip per active value. Rebuilt with `createElement` because the
+     * chips are text that came from the data.
+     */
+    protected _renderSelectTrigger(f: FilterDef): void;
+    /**
+     * Build one chip of the trigger of a `'select'` group: the label, cut with `…` by CSS when it is
+     * long, plus the button that drops the value.
+     *
+     * The button is nested inside the trigger, which is valid because the trigger is a
+     * `div[role="combobox"]` and not a `<button>` (a button inside a button is not). It is
+     * `tabindex="-1"` on purpose: a group can carry hundreds of values, and one tab stop per chip
+     * would bury everything that comes after the trigger. Removing from the keyboard goes through the
+     * list, which is the accessible path for it anyway.
+     *
+     * The label is its own span because the `…` has to be: `text-overflow: ellipsis` only works on a
+     * block with a direct text node, and once the chip holds a button it is a flex container.
+     */
+    protected _createSelectChip(f: FilterDef, token: string): HTMLElement;
+    /**
+     * Write the footer of a `'select'` group: how many values are picked, and the "Limpiar" button
+     * that drops them all. The count is left empty in a `multiple: false` group, where one is the most
+     * there can ever be and the trigger already says it.
+     */
+    protected _renderSelectFooter(f: FilterDef): void;
+    /**
+     * Build what a `'select'` group needs to show its list, on its first open: the label and the
+     * `haystack` of **every** value, and then the first window of rows.
+     *
+     * The index pass covers all the values but only builds nodes for `FILTER_SELECT_WINDOW` of them,
+     * and that is the whole difference between a dropdown that works on a field with hundreds of
+     * values and one that does not: 400 rows are 1.600 noditos para mirar y para scrollear, mientras
+     * que el `haystack` de 400 valores es un array de strings. Los nodos de la cola se crean después,
+     * al scrollear (`_appendSelectRows`).
+     *
+     * This is also where a remote value list would be requested (one day a `loadOptions` option would
+     * fetch instead of reading `select.values`): the trigger has already shown the values it had, and
+     * the request would not block the panel.
+     */
+    protected _ensureSelectOptions(f: FilterDef): void;
+    /**
+     * Narrow the values of a `'select'` group to the ones the query matches, and lay out the first
+     * window of them. The match is a substring of the folded label and token, so it forgives case and
+     * accents.
+     *
+     * It goes over `haystacks` (all the values) and not over the rows (the ones in the window), which
+     * is what lets a match that is not rendered yet be found and brought into the window. It does
+     * rebuild the window from scratch, instead of hiding rows in place, because the number of matches
+     * changes: hiding would leave a list of 50 rows con 400 en el medio y 3 al final.
+     */
+    protected _filterSelectOptions(f: FilterDef, query: string): void;
+    /**
+     * Lay out the window of a `'select'` list: the rows of `matches[0..shown]` and the "Sin
+     * resultados" line when nothing matched. Rebuilds the list node, so the caller is the one who
+     * decides the scroll: the search wants the top, and the extension path appends instead of calling
+     * this.
+     */
+    protected _renderSelectWindow(f: FilterDef): void;
+    /** Add one row of a `'select'` list at its end, and remember it as rendered */
+    protected _appendSelectRow(f: FilterDef, token: string): void;
+    /**
+     * Grow the window of a `'select'` list by another `FILTER_SELECT_WINDOW` matches. It **appends**
+     * instead of rebuilding, so the rows that were already there keep their identity and, more
+     * importantly, the list keeps its `scrollTop`: rebuilding a long list while the scrollbar is at
+     * the end would throw the viewport back to the top on every extension.
+     */
+    protected _extendSelectWindow(f: FilterDef): void;
+    /**
+     * Grow the window when the list is scrolled to its end, so reaching the bottom of a long list
+     * brings the next values instead of dead-ending. When there are more matches than the window
+     * covers, the list always overflows (50 rows against a ~220px box), so the scroll is the mouse
+     * path to every value; the keyboard reaches them too, through `_revealSelectCursor()`.
+     */
+    protected _maybeExtendSelectWindow(f: FilterDef): void;
+    /**
+     * Add or drop one value of a `'select'` group, and apply. In a `multiple: false` group picking a
+     * value replaces the previous one, and picking the one that is already active clears it: that is
+     * what makes it behave like the classic `<select>`.
+     */
+    protected _toggleSelectValue(f: FilterDef, token: string): void;
+    /**
+     * A `multiple: false` group keeps one active value, so choosing another one has to drop the row
+     * of the one that was active: nothing else knows about it, since no checkbox holds it.
+     */
+    protected _syncSingleSelect(f: FilterDef): void;
+    /** Drop every active value of a `'select'` group and apply */
+    protected _clearSelectValues(f: FilterDef): void;
+    /** Open the list of a `'select'` group, building it the first time */
+    protected _openSelect(f: FilterDef): void;
+    /** Close the list of a `'select'` group and send the focus back to its trigger */
+    protected _closeSelect(f: FilterDef): void;
+    /**
+     * Bind the listeners of a `'select'` group, once. The trigger, the panel, the search box and the
+     * footer are markup from `_buildLayout` that is never replaced, so binding them on the first build
+     * is enough and the rebuilds of the values do not stack listeners.
+     *
+     * Keyboard: the trigger opens with `Enter` / `Space` / `↓`, the list walks with the arrows and
+     * toggles with `Enter`, and `Escape` closes the list without closing the whole panel (which is
+     * what it would do otherwise, since the key bubbles to the same handler that closes the menu).
+     */
+    protected _bindSelectEvents(f: FilterDef): void;
+    /**
+     * Draw the keyboard cursor of a `'select'` group. It is a class and not a focus, because the
+     * cursor only exists while the list is open and the rows are `div`s: moving it has to be visible,
+     * or walking the list with the arrows would look like nothing happened.
+     */
+    protected _renderSelectCursor(f: FilterDef): void;
+    /**
+     * Move the cursor of a `'select'` group along the values that **match**, so the arrows walk what
+     * the search left and never land on a value the search hid.
+     */
+    protected _moveSelectCursor(f: FilterDef, step: number): void;
+    /**
+     * Put the cursor on the first or the last matching value (<kbd>Home</kbd> / <kbd>End</kbd>).
+     * Without these, a group with hundreds of values is only reachable with hundreds of <kbd>↓</kbd>:
+     * the same dead-end the window avoids for the mouse, and this is the listbox behavior people
+     * expect from the keys.
+     */
+    protected _jumpSelectCursor(f: FilterDef, last: boolean): void;
+    /**
+     * Make sure the row the cursor is on **exists**, growing the window until it does, and then draw
+     * the cursor on it. The window always covers a prefix of `matches`, so a cursor past its end is
+     * brought in by extending; the row is then scrolled into view, so the cursor is never off-screen.
+     */
+    protected _revealSelectCursor(f: FilterDef): void;
+    /** The value the cursor of a `'select'` group is on, or `null` when it is not on any */
+    protected _selectCursorToken(f: FilterDef): string | null;
     /**
      * Add the "Ver más (N)" toggle at the end of a collapsed filter group and put the group in
      * its initial state. The hidden values are the `overflow` labels at the tail of
@@ -777,7 +1111,7 @@ export default class Timeline {
      * facets, a taxonomy re-scope) start over on those instead of silently keeping a value.
      */
     protected _loadPersistedFilterState(): Record<string, string[]>;
-    /** Persist the checked values of every group marked `persist` to localStorage */
+    /** Persist the active values of every group marked `persist` to localStorage */
     protected _savePersistedFilterState(): void;
     /** Normalize a string for accent- and case-insensitive search matching */
     protected _normalizeSearch(value: string | null | undefined): string;

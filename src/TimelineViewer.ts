@@ -46,8 +46,23 @@ const TAXONOMY_VISIBLE_LINKS = 3;
  */
 const DEFAULT_FILTER_MAX_VISIBLE = 5;
 
-/** Control types a filter group can declare. Checkboxes are the only one implemented so far. */
-const SUPPORTED_FILTER_TYPES: FilterType[] = ['checkboxes'];
+/** Control types a filter group can declare */
+const SUPPORTED_FILTER_TYPES: FilterType[] = ['checkboxes', 'select'];
+
+/**
+ * Values a `'select'` group needs before it shows the search box of its list. Below it the list is
+ * short enough to scan, and a search box would be noise; a `searchable` option overrides the cutoff
+ * in either direction.
+ */
+const FILTER_SELECT_SEARCH_MIN = 8;
+
+/**
+ * Rows a `'select'` list has at any moment. The list of a field with hundreds of values cannot be
+ * all of it at once: a dropdown with 400 rows is a wall to scroll, and 400 rows of DOM is a cost on
+ * the first open for no gain. So the list shows a window of it and grows it as the user scrolls (or
+ * asks for more), while the *search* runs over every value, rendered or not.
+ */
+const FILTER_SELECT_WINDOW = 50;
 
 /**
  * Token of the items that carry no value for a field (`null`, or the field missing): what
@@ -78,6 +93,19 @@ const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
 const PERSISTED_FILTER_STORAGE_KEY = 'tv-filtros-internos-filters';
 
 const TONE_LABEL: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+
+/**
+ * Normalize a text so it can be searched as a plain substring: without accents and without case,
+ * so "politica" finds "Política" and the other way around. Done **once per value**, when the list
+ * of a `'select'` group is built, which is what keeps typing in the search box cheap on a field
+ * with hundreds of values.
+ */
+function foldForSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
 
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 
@@ -230,8 +258,9 @@ export interface TimelineOptions {
    * hardcoded, so a new filter is added here —or sent by a backend through `GET {url}/facets`—
    * without rebuilding the library.
    *
-   * Each entry needs a `field` and a `label`; `type` only accepts `'checkboxes'` today and
-   * defaults to it. A group that declares `items` shows exactly those values, in that order, and
+   * Each entry needs a `field` and a `label`; `type` picks the control (`'checkboxes'` by
+   * default, or `'select'` for a field with many values, which takes the full width of the panel).
+   * A group that declares `items` shows exactly those values, in that order, and
    * can preset them with `checked`; a group without them derives the values from the data (the
    * items of the selected taxonomy, or the facets in API mode). In both modes the values travel in
    * API mode as `field=<csv>` with the very tokens the checkboxes carry in the DOM. See
@@ -280,8 +309,18 @@ interface LinkInfo {
   type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
 }
 
-/** Controls a filter group can be rendered with. Only checkboxes are supported today. */
-export type FilterType = 'checkboxes';
+/**
+ * Controls a filter group can be rendered with.
+ *
+ * - `'checkboxes'`: one checkbox per value, with the "Ver más (N)" cut for the long lists.
+ * - `'select'`: a trigger that carries the selected values and a searchable list opening below it.
+ *   It takes the full width of the menu, above the columns, and it is the control to declare for a
+ *   field with a long or open value list (hundreds of values).
+ *
+ * Both render the same values, resolved the same way (see `TimelineFilter`): only the control
+ * changes. `maxVisible` is the one option that only applies to `'checkboxes'`.
+ */
+export type FilterType = 'checkboxes' | 'select';
 
 /** Where a filter group is rendered: a column of the panel, or the internal-filters flyout */
 export type FilterGroup = 'menu' | 'filtros_internos';
@@ -337,6 +376,23 @@ export interface TimelineFilter {
   /** Control of the group. Defaults to `'checkboxes'`; any other value drops the group. */
   type?: FilterType;
   /**
+   * Accept several values at once in a `'select'` group (default: true). With `false` it is a
+   * classic single-value select: picking a value replaces the previous one, and picking it again
+   * clears it.
+   *
+   * Only applies to `'select'`; a `'checkboxes'` group is multi-value by construction.
+   */
+  multiple?: boolean;
+  /**
+   * Search box on the list of a `'select'` group. By default it appears only when the group has
+   * more values than `FILTER_SELECT_SEARCH_MIN`, which is the point of the control: with hundreds
+   * of values the list is unusable without it. Force it either way with `true` / `false`.
+   *
+   * The search filters the values already in memory, so it costs nothing on a long list. Ignored
+   * by a `'checkboxes'` group.
+   */
+  searchable?: boolean;
+  /**
    * `'menu'` (default) renders the group in a column of the panel, `'filtros_internos'` renders it
    * in the internal-filters flyout, which is part of the internal toolbar and therefore needs
    * `internalButtons: true`. A `'filtros_internos'` group without it is not rendered.
@@ -366,7 +422,10 @@ export interface TimelineFilter {
    * the rebuilds of the checkboxes (the API facets, a taxonomy re-scope) and the page loads.
    */
   persist?: boolean;
-  /** Values shown before the "Ver más (N)" toggle appears (default: 5). Below 2: all of them. */
+  /**
+   * Values shown before the "Ver más (N)" toggle appears (default: 5). Below 2: all of them.
+   * Ignored by a `'select'` group: its list scrolls and searches instead of truncating.
+   */
   maxVisible?: number;
   /**
    * Values of the group carried by an item. Defaults to reading `item[field]`: arrays are
@@ -399,19 +458,93 @@ interface FilterDefItem {
 }
 
 /** A `TimelineFilter` normalized for rendering: defaults resolved and the DOM slot attached */
-interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label'> {
+interface FilterDef extends Omit<
+  TimelineFilter,
+  'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label' | 'multiple' | 'searchable'
+> {
+  type: FilterType;
   group: FilterGroup;
   persist: boolean;
   /** The header of the group, normalized: `''` when the declaration brings none (so no header renders) */
   label: string;
   /** Add the "Sin valor" option to a group that derives its values (see `TimelineFilter`) */
   allowEmpty: boolean;
-  /** Column of the panel the group is rendered in. `0` for the `'filtros_internos'` flyout, ignored there. */
+  /** Several values at once in a `'select'` group. A no-op for `'checkboxes'`. */
+  multiple: boolean;
+  /** Search box of a `'select'` list. `undefined` = auto (only above `FILTER_SELECT_SEARCH_MIN`) */
+  searchable: boolean | undefined;
+  /** Column of the panel the group is rendered in. `0` for the `'filtros_internos'` flyout, ignored there */
   column: number;
+  /** The `.filter-options` box of a `'checkboxes'` group, its container to draw the values in */
   options: HTMLElement;
+  /**
+   * Tokens of the group the user has picked, and the **only** source of truth for "is anything
+   * active": the query params, the persisted state, the local match and the lit toggles all read
+   * this, so a `'select'` group participates in them without pretending to have checkboxes.
+   */
+  active: Set<string>;
+  /** The checkboxes of a `'checkboxes'` group, empty in a `'select'` one (whose control is not a list of boxes) */
   checkboxes: HTMLInputElement[];
   /** The declared options resolved, or `undefined` for a group that derives its values */
   declared?: FilterDefItem[];
+  /** The control of a `'select'` group, or `null` for a `'checkboxes'` one */
+  select: FilterSelect | null;
+}
+
+/**
+ * One row of the list of a `'select'` group. Just the node: what the search matches against is
+ * `FilterSelect.haystacks`, which covers every value and not only the rendered ones.
+ */
+interface FilterSelectOption {
+  el: HTMLElement;
+}
+
+/** The DOM of a `'select'` group, plus the state that only it uses */
+interface FilterSelect {
+  /** The `.filter-select` box, the handle the component looks its group up by */
+  root: HTMLElement;
+  /** The button that opens the list and carries the chips of the active values */
+  trigger: HTMLElement;
+  /** Where the chips go, so `_renderSelectTrigger` only has to rewrite one box */
+  value: HTMLElement;
+  panel: HTMLElement;
+  /**
+   * The rendered rows, by token. **Not** every value: only the ones inside the window (see
+   * `matches` / `shown`), because that is the point of the window.
+   */
+  options: Map<string, FilterSelectOption>;
+  /** The list of the values, built on the first open instead of with the panel */
+  list: HTMLElement;
+  /** The search box, when the group has enough values for it to earn its place */
+  search: HTMLInputElement;
+  /** The "Limpiar" button and the "N seleccionados" text */
+  clear: HTMLButtonElement;
+  footerCount: HTMLElement;
+  /** The "Sin resultados" line, shown when the search leaves nothing */
+  empty: HTMLElement;
+  /** Values to show, by token, from the last resolution. Held here because the list is lazy */
+  values: string[];
+  counts: Record<string, number>;
+  /**
+   * Folded `label + ' ' + token` of every value, parallel to `values`. Built on the first open and
+   * kept for the whole life of the list, which is what lets the search match values that are not
+   * rendered: without it, a match outside the window would be invisible to the search.
+   */
+  haystacks: string[];
+  /** Values that match the current search, in display order. The window is a slice of this */
+  matches: string[];
+  /** How many of `matches` are rendered right now */
+  shown: number;
+  /** Labels of `values`, resolved on demand instead of up front */
+  labels: Map<string, string>;
+  /** False until the first open. The whole point of the control: 500 rows are not in the DOM yet */
+  built: boolean;
+  /** False until the listeners of the control are bound, which happens on the first build only */
+  bound: boolean;
+  /** The current search, so a rebuild of the list can apply it again */
+  query: string;
+  /** Token of the option the arrow keys are on, or `''` when they are not on any */
+  cursor: string;
 }
 
 export default class Timeline {
@@ -602,7 +735,9 @@ export default class Timeline {
    *
    * The `'menu'` groups are then dealt out to the columns of the panel: the first half goes to
    * the first column and the rest to the second, which reads a declaration top to bottom down
-   * the first column and then along the second.
+   * the first column and then along the second. A `'select'` group is left out of that deal: it
+   * does not live in a column but takes the full width above them, so the cut does not shift
+   * because of it.
    */
   protected _normalizeFilters(filters: TimelineFilter[] | undefined): FilterDef[] {
     if (!Array.isArray(filters) || filters.length === 0) return [];
@@ -642,9 +777,12 @@ export default class Timeline {
         field: f.field.trim(),
         // `label` es opcional y se normaliza a `''` (sin header) en vez de descartar el grupo.
         label: typeof f.label === 'string' ? f.label.trim() : '',
+        type: f.type && SUPPORTED_FILTER_TYPES.includes(f.type) ? f.type : 'checkboxes',
         group: f.group === 'filtros_internos' ? 'filtros_internos' : 'menu',
         persist: f.persist === true,
         allowEmpty: f.allowEmpty === true,
+        multiple: f.multiple !== false,
+        searchable: typeof f.searchable === 'boolean' ? f.searchable : undefined,
         column: 0,
         extract: f.extract,
         formatLabel: f.formatLabel,
@@ -652,10 +790,15 @@ export default class Timeline {
         declared: declaredItems,
         maxVisible: typeof f.maxVisible === 'number' ? f.maxVisible : undefined,
         options: null as unknown as HTMLElement,
-        checkboxes: []
+        active: new Set<string>(),
+        checkboxes: [],
+        select: null
       });
     });
-    const menuGroups = defs.filter((f) => f.group === 'menu');
+    // Solo las columnas se reparten: un `'select'` va a su propio bloque de ancho completo arriba
+    // de ellas (ver `_buildFilterMenuHtml`), así que no puede ocupar media columna ni correrse el
+    // corte de los grupos que sí van en columnas.
+    const menuGroups = defs.filter((f) => f.group === 'menu' && f.type !== 'select');
     const half = Math.ceil(menuGroups.length / 2);
     menuGroups.forEach((f, i) => {
       f.column = i < half ? 0 : 1;
@@ -761,9 +904,16 @@ export default class Timeline {
    * `data-filter-field` attribute, so a `field` with characters that are not valid in a CSS
    * selector cannot break the wiring. `data-filter-field` is also the stable hook for a
    * consumer's own tests.
+   *
+   * A `'select'` group keeps the same `.filter-section` and the same header — it is the *control*
+   * that changes, not how the group reads — and replaces the `.filter-options` box by the
+   * `.filter-select` one, whose list is built later (`_ensureSelectOptions`).
    */
   protected _buildFilterOptionsHtml(f: FilterDef): string {
-    const slot = `<div class="filter-options" id="filter-options-${this._escapeHtml(f.field)}" data-filter-field="${this._escapeHtml(f.field)}"></div>`;
+    const slot =
+      f.type === 'select'
+        ? this._buildFilterSelectHtml(f)
+        : `<div class="filter-options" id="filter-options-${this._escapeHtml(f.field)}" data-filter-field="${this._escapeHtml(f.field)}"></div>`;
     const header = f.label === '' ? '' : `<div class="filter-header">${this._escapeHtml(f.label)}</div>`;
     return `<div class="filter-section">
               ${header}
@@ -772,23 +922,63 @@ export default class Timeline {
   }
 
   /**
+   * Markup of the control of a `'select'` group: the trigger that opens the list and carries the
+   * values the user picked, and the panel that holds the search box, the values and the footer.
+   *
+   * The list itself is **not** in here: a field with hundreds of values would put hundreds of
+   * nodes in the DOM from the start, and they would sit there on every rebuild. `_ensureSelectOptions`
+   * builds them on the first open, which is also why `f.values`/`f.counts` are held on the
+   * `FilterSelect` and not re-derived from the DOM.
+   *
+   * `aria` is wired as a combobox that owns a listbox: the trigger says if it is open, and the
+   * active values are `aria-selected` options. The search box is emitted without its own value
+   * because whether it appears depends on how many values the group ends up with, which is only
+   * known once they are resolved (`_setupSelectSearch`).
+   */
+  protected _buildFilterSelectHtml(f: FilterDef): string {
+    const id = this._escapeHtml(f.field);
+    const label = f.label === '' ? 'Seleccionar' : f.label;
+    return `<div class="filter-select" id="filter-select-${id}" data-filter-field="${id}">
+              <div class="filter-select-trigger" role="combobox" tabindex="0" aria-haspopup="listbox" aria-expanded="false" aria-controls="filter-select-list-${id}" aria-label="${this._escapeHtml(label)}">
+                <span class="filter-select-value"></span>
+                <svg class="filter-select-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="filter-select-panel" hidden>
+                <input class="filter-select-search" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar ${this._escapeHtml(label)}" hidden />
+                <div class="filter-select-list" id="filter-select-list-${id}" role="listbox"${f.multiple ? ' aria-multiselectable="true"' : ''}></div>
+                <div class="filter-select-empty" hidden>Sin resultados</div>
+                <div class="filter-select-footer">
+                  <button class="filter-select-clear" type="button">Limpiar</button>
+                  <span class="filter-select-count"></span>
+                </div>
+              </div>
+            </div>`;
+  }
+
+  /**
    * Markup of the filter panel, or an empty string when no group is declared for it: with no
    * `filters` option the component has no filter UI at all, not a hidden one.
    * The columns come from the `column` that `_normalizeFilters` dealt out, in the order the
    * groups were declared, so the declaration reads down the first column and then along the
-   * second.
+   * second. A `'select'` group is not in a column: it goes in a full-width block above them, in
+   * the order it was declared, because it is the control for a field with many values and it has
+   * to read as the first thing in the panel rather than as one more group among the others.
    */
   protected _buildFilterMenuHtml(): string {
-    const columns = this.filters.filter((f) => f.group === 'menu');
-    if (columns.length === 0) return '';
+    const menuGroups = this.filters.filter((f) => f.group === 'menu');
+    if (menuGroups.length === 0) return '';
+    const selects = menuGroups.filter((f) => f.type === 'select');
+    const columns = menuGroups.filter((f) => f.type !== 'select');
     const groups = [0, 1]
       .map((column) => columns.filter((f) => f.column === column).map((f) => this._buildFilterOptionsHtml(f)))
       .filter((sections) => sections.length > 0);
+    const selectsHtml = selects.map((f) => this._buildFilterOptionsHtml(f)).join('');
     return `<div class="filter-wrap">
               <button class="filter-toggle" id="filter-toggle" title="Filtrar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
               <div class="filter-menu" id="filter-menu">
+                ${selectsHtml ? `<div class="filter-selects">${selectsHtml}</div>` : ''}
                 ${groups.map((sections) => `<div class="filter-column">${sections.join('')}</div>`).join('')}
               </div>
             </div>`;
@@ -798,6 +988,9 @@ export default class Timeline {
    * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
    * declared for it, the `filtros_internos` flyout. Without the latter the button would open an
    * empty menu, so both of them are conditional on the `filters` option as well.
+   *
+   * A `'select'` group of the flyout gets the same full-width block above the checkbox groups
+   * that it gets in the panel: the layout is a property of the control, not of the destination.
    */
   protected _buildInternalButtonsHtml(): string {
     if (!this.internalButtons) return '';
@@ -806,12 +999,18 @@ export default class Timeline {
             </button>`;
     const internalGroups = this.filters.filter((f) => f.group === 'filtros_internos');
     if (internalGroups.length === 0) return workNotesButton;
+    const internalSelects = internalGroups.filter((f) => f.type === 'select');
+    const internalChecks = internalGroups.filter((f) => f.type !== 'select');
+    const selectsHtml = internalSelects.map((f) => this._buildFilterOptionsHtml(f)).join('');
     return `${workNotesButton}
             <div class="filtros-internos-wrap" id="filtros-internos-wrap">
               <button class="filtros-internos-toggle" id="filtros-internos-toggle" title="Filtros internos">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
-              <div class="filtros-internos-menu" id="filtros-internos-menu">${internalGroups.map((f) => this._buildFilterOptionsHtml(f)).join('')}</div>
+              <div class="filtros-internos-menu" id="filtros-internos-menu">
+                ${selectsHtml ? `<div class="filter-selects">${selectsHtml}</div>` : ''}
+                ${internalChecks.map((f) => this._buildFilterOptionsHtml(f)).join('')}
+              </div>
             </div>`;
   }
 
@@ -905,6 +1104,10 @@ export default class Timeline {
    * The lookup goes through the `data-filter-field` attribute rather than the id, so a `field`
    * that is not a valid CSS selector identifier still finds its box.
    *
+   * The two controls are found the same way and land in different fields: a `'checkboxes'` group
+   * in `f.options` (the box it fills with checkboxes), a `'select'` one in `f.select` (the DOM of
+   * its control, cached once because every later step of it reads those refs).
+   *
    * A group with no box is one whose container was not rendered: a `'filtros_internos'` group
    * without `internalButtons`, for instance. It keeps its configuration (so a later
    * `_buildFilterCheckboxes` just skips it) but has nowhere to draw, exactly as when the flyout did
@@ -916,9 +1119,46 @@ export default class Timeline {
       const field = el.dataset.filterField;
       if (field) slots.set(field, el);
     });
-    this.filters.forEach((f) => {
-      f.options = slots.get(f.field) as HTMLElement;
+    this.container.querySelectorAll<HTMLElement>('.filter-select[data-filter-field]').forEach((el) => {
+      const field = el.dataset.filterField;
+      if (field) slots.set(field, el);
     });
+    this.filters.forEach((f) => {
+      const slot = slots.get(f.field);
+      if (f.type === 'select') f.select = slot ? this._initFilterSelect(slot) : null;
+      else f.options = slot as HTMLElement;
+    });
+  }
+
+  /**
+   * Collect the refs of the control of a `'select'` group out of its markup, right after the
+   * layout is built. They live on `f.select` instead of being looked up again on every keystroke
+   * or click, because the box is never rebuilt: only its list is.
+   */
+  protected _initFilterSelect(root: HTMLElement): FilterSelect {
+    const panel = root.querySelector('.filter-select-panel') as HTMLElement;
+    return {
+      root,
+      trigger: root.querySelector('.filter-select-trigger') as HTMLElement,
+      value: root.querySelector('.filter-select-value') as HTMLElement,
+      panel,
+      options: new Map<string, FilterSelectOption>(),
+      list: root.querySelector('.filter-select-list') as HTMLElement,
+      search: root.querySelector('.filter-select-search') as HTMLInputElement,
+      clear: root.querySelector('.filter-select-clear') as HTMLButtonElement,
+      footerCount: root.querySelector('.filter-select-count') as HTMLElement,
+      empty: root.querySelector('.filter-select-empty') as HTMLElement,
+      values: [],
+      counts: {},
+      haystacks: [],
+      matches: [],
+      shown: 0,
+      labels: new Map<string, string>(),
+      built: false,
+      bound: false,
+      query: '',
+      cursor: ''
+    };
   }
 
   /**
@@ -2299,11 +2539,21 @@ export default class Timeline {
   }
 
   /**
-   * The tokens the checkboxes of the group currently filter by: the ones checked, each split back
-   * into the values it declared, so an option like `[false, null]` contributes both.
+   * The values of the group the user has picked, as they travel: one entry per value, which is the
+   * `value` its checkbox carries and the cell it takes in the query params and in `localStorage`.
+   * Reads `f.active`, the single place the state of a group lives, so a `'select'` group is
+   * indistinguishable from a `'checkboxes'` one for everything that is not the control.
+   */
+  protected _filterActiveValues(f: FilterDef): string[] {
+    return [...f.active];
+  }
+
+  /**
+   * The tokens a group currently filters by: the values it has active, each split back into the
+   * tokens it declared, so an option like `[false, null]` contributes both.
    */
   protected _filterActiveTokens(f: FilterDef): string[] {
-    return f.checkboxes.filter((cb) => cb.checked).flatMap((cb) => cb.value.split(','));
+    return this._filterActiveValues(f).flatMap((token) => token.split(','));
   }
 
   /**
@@ -2320,10 +2570,124 @@ export default class Timeline {
   }
 
   /**
-   * Build the checkboxes of every group of the `filters` option out of the values it has:
-   * the ones derived from the items of the active scope in local mode, the ones the server sent
-   * in `GET {url}/facets` in API mode. A group with no container to draw in is skipped, and so
-   * is the whole method when no group was declared at all (nothing to build, nothing to show).
+   * The visible text of one value of a group, whichever control shows it: the label a declared
+   * `items` brings, the fixed one of the `allowEmpty` bucket, or `_filterLabelOf` for a value that
+   * came from the data. Both controls call this so a value never reads differently in a select.
+   */
+  protected _filterOptionLabel(f: FilterDef, token: string): string {
+    const declaredItem = f.declared?.find((d) => d.token === token);
+    if (declaredItem) return declaredItem.label;
+    // El bucket vacío de un grupo `allowEmpty` tiene label fijo (y no pasa por `formatLabel`,
+    // que es para los valores que el dato trae).
+    if (f.allowEmpty && token === FILTER_EMPTY_VALUE) return FILTER_EMPTY_LABEL;
+    return this._filterLabelOf(f, token);
+  }
+
+  /**
+   * Resolve the values of a group and how many items each one holds, the same way for every
+   * control: the declared `items` (counted, in their order), or the ones derived from the items of
+   * the active scope in local mode, or the ones the server sent in `GET {url}/facets` in API mode.
+   *
+   * Returns `null` when the group has nothing to decide and therefore has to hide itself: a
+   * declared group always has something (it exists even with no data behind it), so only a derived
+   * one can end up here. The exception is the `allowEmpty` group whose only value is the empty
+   * bucket — the consumer asked for it, and filtering by it is a decision, not missing data.
+   *
+   * `overflow` is how many values a `'checkboxes'` group hides behind its "Ver más (N)"; it is 0
+   * for a `'select'`, whose list scrolls and searches instead of truncating.
+   */
+  protected _resolveFilterValues(
+    f: FilterDef,
+    scope: TimelineItem[]
+  ): { values: string[]; counts: Record<string, number>; overflow: number } | null {
+    const declared = f.declared;
+    let values: string[];
+    let counts: Record<string, number>;
+    if (declared) {
+      // Los valores ya están declarados: solo falta contarlos. En API mode salen de los facets
+      // (y un valor que el server todavía no mandó cuenta 0 en vez de desaparecer).
+      values = declared.map((d) => d.token);
+      const facets = this.api ? this._apiFacets[f.field] || {} : null;
+      counts = {};
+      values.forEach((token) => {
+        const item = declared.find((d) => d.token === token);
+        if (facets) {
+          // Los facets son por token crudo, así que un valor declarado con varios tokens
+          // (`[false, null]`) no tiene una clave propia: se suman las de cada token, que es
+          // exacto mientras el campo tenga un solo valor por ítem (el caso normal) y cuenta de
+          // más solo cuando un ítem responde más de una vez al mismo checkbox.
+          counts[token] = (item?.tokens || []).reduce((sum, t) => sum + (facets[t] || 0), 0);
+        } else {
+          counts[token] = scope.filter((c) => this._filterValuesOf(f, c).some((x) => item?.tokens.includes(x))).length;
+        }
+      });
+    } else if (this.api) {
+      // Derivados en API: las claves del facet que tienen algo detrás. El bucket vacío se
+      // descarta igual que en local, salvo que el grupo lo pida con `allowEmpty`: los facets son
+      // por token, así que la clave `"null"` es la que lo representa.
+      const facetCounts = this._apiFacets[f.field] || {};
+      values = Object.keys(facetCounts).filter(
+        (v) => (facetCounts[v] || 0) > 0 && (f.allowEmpty || v !== FILTER_EMPTY_VALUE)
+      );
+      counts = facetCounts;
+    } else {
+      // Derivados: los tokens que traen los items. El bucket vacío (`'null'`) y `''` no generan
+      // una opción por su cuenta: en un grupo sin `items` no hay a quién atribuírsela, salvo que
+      // el grupo lo pida con `allowEmpty` (y entonces lo ofrece como "Sin valor").
+      const tokens = [...new Set(scope.flatMap((c) => this._filterValuesOf(f, c)))].filter((v) => v !== '');
+      values = f.allowEmpty ? tokens : tokens.filter((v) => v !== FILTER_EMPTY_VALUE);
+      counts = {};
+      values.forEach((val) => {
+        counts[val] = scope.filter((c) => this._filterValuesOf(f, c).includes(val)).length;
+      });
+    }
+    // Solo un grupo que deriva sus valores se puede quedar sin nada que decidir: uno declarado
+    // existe siempre, aunque ningún item (o ningún facet) traiga sus valores. La excepción es el
+    // grupo con `allowEmpty` que solo encontró el bucket vacío: el consumidor lo pidió, y filtrar
+    // por él (dejar fuera los que sí tienen valor) es una decisión, no un dato vacío.
+    const onlyEmpty = values.length === 1 && values[0] === FILTER_EMPTY_VALUE;
+    if (!declared && values.length <= 1 && !(f.allowEmpty && onlyEmpty)) return null;
+    if (f.sortValues) values.sort(f.sortValues);
+    // A group longer than its cut shows the first values of its declared order (or the one
+    // `sortValues` gives it) and hides the rest behind a "Ver más (N)" toggle. Only a group that
+    // declares neither is reordered by count, because that order is the useful one when the
+    // values came from the data. `sort` is stable, so ties keep the order they had.
+    // Un `'select'` no tiene corte, pero con cientos de valores el orden del pool es inútil, así que
+    // aplica la misma regla sin que el corte la condicione: primero los que más filtran.
+    const limit = f.type === 'select' ? Number.POSITIVE_INFINITY : this._filterMaxVisible(f);
+    const overflow = limit >= 2 ? Math.max(0, values.length - limit) : 0;
+    const reorderByCount =
+      f.type === 'select' ? !declared && !f.sortValues : overflow > 0 && !declared && !f.sortValues;
+    if (reorderByCount) values.sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
+    // El bucket vacío va siempre al final, después de cualquier orden (declarado, `sortValues` o
+    // por conteo): es la ausencia de un valor, no un valor más, y al final se lee como la
+    // ás la excepción que es. El corte no cambia (mide cuántos valores hay, no cuáles), así que el
+    // bucket puede caer en la cola del "Ver más (N)" — y si el usuario lo tilda, el grupo se abre solo.
+    if (f.allowEmpty) {
+      const emptyIndex = values.indexOf(FILTER_EMPTY_VALUE);
+      if (emptyIndex > -1 && emptyIndex < values.length - 1) values.push(...values.splice(emptyIndex, 1));
+    }
+    return { values, counts, overflow };
+  }
+
+  /**
+   * Reseed the values a group starts with: the ones persisted by a `persist` group, and otherwise
+   * the `checked` its declared `items` bring. An empty persisted record wins over those defaults,
+   * which is what lets the user clear a group and have it stay cleared across the rebuilds.
+   */
+  protected _seedFilterActive(f: FilterDef, values: string[], savedState: Record<string, string[]>): void {
+    const saved = f.persist ? savedState[f.field] : undefined;
+    f.active = new Set(
+      values.filter((val) => (saved ? saved.includes(val) : f.declared?.find((d) => d.token === val)?.checked === true))
+    );
+  }
+
+  /**
+   * Build the control of every group of the `filters` option out of the values it resolves: the
+   * checkboxes of a `'checkboxes'` group, the trigger and list of a `'select'` one. The values come
+   * from the items of the active scope in local mode, or from the ones the server sent in
+   * `GET {url}/facets` in API mode. A group with no container to draw in is skipped, and so is the
+   * whole method when no group was declared at all (nothing to build, nothing to show).
    */
   protected _buildFilterCheckboxes(): void {
     if (this.filters.length === 0) return;
@@ -2331,127 +2695,35 @@ export default class Timeline {
     const scope = this._scopeItems();
     let anyFilterVisible = false;
     this.filters.forEach((f) => {
-      if (!f.options) return;
-      const inInternos = f.group === 'filtros_internos';
-      const declared = f.declared;
-      let values: string[];
-      let counts: Record<string, number>;
-      if (declared) {
-        // Los valores ya están declarados: solo falta contarlos. En API mode salen de los facets
-        // (y un valor que el server todavía no mandó cuenta 0 en vez de desaparecer).
-        values = declared.map((d) => d.token);
-        const facets = this.api ? this._apiFacets[f.field] || {} : null;
-        counts = {};
-        values.forEach((token) => {
-          const item = declared.find((d) => d.token === token);
-          if (facets) {
-            // Los facets son por token crudo, así que un valor declarado con varios tokens
-            // (`[false, null]`) no tiene una clave propia: se suman las de cada token, que es
-            // exacto mientras el campo tenga un solo valor por ítem (el caso normal) y cuenta de
-            // más solo cuando un ítem responde más de una vez al mismo checkbox.
-            counts[token] = (item?.tokens || []).reduce((sum, t) => sum + (facets[t] || 0), 0);
-          } else {
-            counts[token] = scope.filter((c) =>
-              this._filterValuesOf(f, c).some((x) => item?.tokens.includes(x))
-            ).length;
-          }
-        });
-      } else if (this.api) {
-        // Derivados en API: las claves del facet que tienen algo detrás. El bucket vacío se
-        // descarta igual que en local, salvo que el grupo lo pida con `allowEmpty`: los facets son
-        // por token, así que la clave `"null"` es la que lo representa.
-        const facetCounts = this._apiFacets[f.field] || {};
-        values = Object.keys(facetCounts).filter(
-          (v) => (facetCounts[v] || 0) > 0 && (f.allowEmpty || v !== FILTER_EMPTY_VALUE)
-        );
-        counts = facetCounts;
-      } else {
-        // Derivados: los tokens que traen los items. El bucket vacío (`'null'`) y `''` no generan
-        // una opción por su cuenta: en un grupo sin `items` no hay a quién atribuírsela, salvo que
-        // el grupo lo pida con `allowEmpty` (y entonces lo ofrece como "Sin valor").
-        const tokens = [...new Set(scope.flatMap((c) => this._filterValuesOf(f, c)))].filter((v) => v !== '');
-        values = f.allowEmpty ? tokens : tokens.filter((v) => v !== FILTER_EMPTY_VALUE);
-        counts = {};
-        values.forEach((val) => {
-          counts[val] = scope.filter((c) => this._filterValuesOf(f, c).includes(val)).length;
-        });
-      }
-      // Solo un grupo que deriva sus valores se puede quedar sin nada que decidir: uno declarado
-      // existe siempre, aunque ningún item (o ningún facet) traiga sus valores. La excepción es el
-      // grupo con `allowEmpty` que solo encontró el bucket vacío: el consumidor lo pidió, y filtrar
-      // por él (dejar fuera los que sí tienen valor) es una decisión, no un dato vacío.
-      const onlyEmpty = values.length === 1 && values[0] === FILTER_EMPTY_VALUE;
-      if (!declared && values.length <= 1 && !(f.allowEmpty && onlyEmpty)) {
-        f.checkboxes = [];
-        f.options.hidden = true;
+      const container = f.type === 'select' ? f.select?.root : f.options;
+      if (!container) return;
+      const resolved = this._resolveFilterValues(f, scope);
+      if (!resolved) {
+        // El grupo no tiene nada que decidir: se esconde entero, y en un select también se descarta
+        // la lista, porque sus valores ya no son los que había (un rebuild los vuelve a resolver).
+        if (f.type === 'select' && f.select) this._resetFilterSelect(f.select);
+        container.hidden = true;
         return;
       }
-      f.options.hidden = false;
+      container.hidden = false;
       // The `filtros_internos` groups live in the internal-filters flyout, which has a button of
       // its own: they must not be the reason the filter button of the panel shows up.
-      if (!inInternos) anyFilterVisible = true;
-      if (f.sortValues) values.sort(f.sortValues);
-      // A group longer than its cut shows the first values of its declared order (or the one
-      // `sortValues` gives it) and hides the rest behind a "Ver más (N)" toggle. Only a group that
-      // declares neither is reordered by count, because that order is the useful one when the
-      // values came from the data. `sort` is stable, so ties keep the order they had.
-      const limit = this._filterMaxVisible(f);
-      const overflow = limit >= 2 ? Math.max(0, values.length - limit) : 0;
-      if (overflow && !declared && !f.sortValues) values.sort((a, b) => (counts[b] || 0) - (counts[a] || 0));
-      // El bucket vacío va siempre al final, después de cualquier orden (declarado, `sortValues` o
-      // por conteo): es la ausencia de un valor, no un valor más, y al final se lee como la
-      // ás la excepción que es. El corte no cambia (mide cuántos valores hay, no cuáles), así que el
-      // bucket puede caer en la cola del "Ver más (N)" — y si el usuario lo tilda, el grupo se abre solo.
-      if (f.allowEmpty) {
-        const emptyIndex = values.indexOf(FILTER_EMPTY_VALUE);
-        if (emptyIndex > -1 && emptyIndex < values.length - 1) values.push(...values.splice(emptyIndex, 1));
-      }
-      f.options.innerHTML = '';
-      f.options.classList.remove('expanded');
-      f.checkboxes = [];
-      values.forEach((val, i) => {
-        const declaredItem = declared?.find((d) => d.token === val);
-        const isExtra = overflow > 0 && i >= values.length - overflow;
-        const label = document.createElement('label');
-        label.className = isExtra ? 'filter-option filter-option-extra' : 'filter-option';
-        // Kept in sync with the class below for the case where the stylesheet is not loaded.
-        label.hidden = isExtra;
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.value = val;
-        const savedValues = f.persist ? savedState[f.field] : undefined;
-        cb.checked = savedValues ? savedValues.includes(val) : declaredItem?.checked === true;
-        const span = document.createElement('span');
-        span.className = 'filter-option-label';
-        // El bucket vacío de un grupo `allowEmpty` tiene label fijo (y no pasa por `formatLabel`,
-        // que es para los valores que el dato trae).
-        const display = declaredItem
-          ? declaredItem.label
-          : f.allowEmpty && val === FILTER_EMPTY_VALUE
-            ? FILTER_EMPTY_LABEL
-            : this._filterLabelOf(f, val);
-        span.textContent = display;
-        const countSpan = document.createElement('span');
-        countSpan.className = 'filter-option-count';
-        countSpan.textContent = `(${counts[val] || 0})`;
-        label.title = display;
-        label.appendChild(cb);
-        label.appendChild(span);
-        label.appendChild(countSpan);
-        cb.addEventListener('change', () => {
-          if (f.persist) this._savePersistedFilterState();
-          this._applyFilters(true);
-        });
-        f.options.appendChild(label);
-        f.checkboxes.push(cb);
-      });
-      if (overflow) this._buildFilterMore(f, overflow);
+      if (f.group !== 'filtros_internos') anyFilterVisible = true;
+      this._seedFilterActive(f, resolved.values, savedState);
+      if (f.type === 'select') this._buildFilterSelect(f, resolved);
+      else this._buildFilterCheckboxesGroup(f, resolved);
     });
     this.container.querySelectorAll('.filter-section').forEach((sectionEl) => {
       const section = sectionEl as HTMLElement;
-      const opts = Array.from(section.querySelectorAll<HTMLElement>('.filter-options'));
-      const hasOptions = opts.some((o) => this.filters.some((ef) => ef.options === o && ef.checkboxes.length > 0));
-      section.hidden = opts.length > 0 && !hasOptions;
+      const containers = Array.from(section.querySelectorAll<HTMLElement>('[data-filter-field]'));
+      const hasOptions = containers.some((box) =>
+        this.filters.some(
+          (ef) =>
+            (ef.options === box || ef.select?.root === box) &&
+            (ef.checkboxes.length > 0 || (ef.select?.values.length ?? 0) > 0)
+        )
+      );
+      section.hidden = containers.length > 0 && !hasOptions;
     });
     if (this.filtrosInternosWrap) {
       this.filtrosInternosWrap.style.display = '';
@@ -2471,6 +2743,549 @@ export default class Timeline {
   }
 
   /**
+   * Draw the values of a `'checkboxes'` group: one label per value, with its checkbox and its
+   * count, the ones past the cut already marked `filter-option-extra` for `_buildFilterMore` to
+   * hide. The group's active values are already in `f.active` (seeded by `_seedFilterActive`), so a
+   * checkbox only has to mirror them, and its `change` only has to write the new state.
+   */
+  protected _buildFilterCheckboxesGroup(
+    f: FilterDef,
+    resolved: { values: string[]; counts: Record<string, number>; overflow: number }
+  ): void {
+    const { values, counts, overflow } = resolved;
+    f.options.innerHTML = '';
+    f.options.classList.remove('expanded');
+    f.checkboxes = [];
+    values.forEach((val, i) => {
+      const isExtra = overflow > 0 && i >= values.length - overflow;
+      const label = document.createElement('label');
+      label.className = isExtra ? 'filter-option filter-option-extra' : 'filter-option';
+      // Kept in sync with the class below for the case where the stylesheet is not loaded.
+      label.hidden = isExtra;
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = val;
+      cb.checked = f.active.has(val);
+      const span = document.createElement('span');
+      span.className = 'filter-option-label';
+      const display = this._filterOptionLabel(f, val);
+      span.textContent = display;
+      const countSpan = document.createElement('span');
+      countSpan.className = 'filter-option-count';
+      countSpan.textContent = `(${counts[val] || 0})`;
+      label.title = display;
+      label.appendChild(cb);
+      label.appendChild(span);
+      label.appendChild(countSpan);
+      cb.addEventListener('change', () => {
+        if (cb.checked) f.active.add(val);
+        else f.active.delete(val);
+        if (f.persist) this._savePersistedFilterState();
+        this._applyFilters(true);
+      });
+      f.options.appendChild(label);
+      f.checkboxes.push(cb);
+    });
+    if (overflow) this._buildFilterMore(f, overflow);
+  }
+
+  /**
+   * Draw the control of a `'select'` group: the chips (or the placeholder) of its active values,
+   * the search box when it has enough values to earn one, and the footer.
+   *
+   * The list of values is **not** built here: `values` and `counts` are handed to the `FilterSelect`
+   * and `_ensureSelectOptions` turns them into DOM on the first open. That is the whole reason the
+   * control exists — a field with hundreds of values would otherwise put hundreds of nodes in the
+   * document on every rebuild (the API facets, a taxonomy re-scope) whether the user ever opens it
+   * or not.
+   */
+  protected _buildFilterSelect(
+    f: FilterDef,
+    resolved: { values: string[]; counts: Record<string, number>; overflow: number }
+  ): void {
+    const select = f.select;
+    if (!select) return;
+    select.values = resolved.values;
+    select.counts = resolved.counts;
+    // El rebuild tiene que reiniciar la lista: los valores pueden ser otros, así que lo que quedó
+    // de la resolución anterior ya no corresponde.
+    this._resetFilterSelect(select);
+    // La caja de búsqueda se decide por la cantidad de valores, que es el dato que la justifica:
+    // con ocho o menos la lista se escanea sin ella, y con cientos es la única forma de usarla.
+    const searchable = f.searchable ?? resolved.values.length > FILTER_SELECT_SEARCH_MIN;
+    select.search.hidden = !searchable;
+    if (!searchable && select.search.value) select.search.value = '';
+    this._renderSelectTrigger(f);
+    this._bindSelectEvents(f);
+  }
+
+  /**
+   * Forget everything a built list of a `'select'` group holds, leaving the control as if it had
+   * never been opened. Called on every rebuild (the values may have changed) and when the group
+   * hides itself, which is also when its DOM has to stop being clickable.
+   */
+  protected _resetFilterSelect(select: FilterSelect): void {
+    select.built = false;
+    select.query = '';
+    select.cursor = '';
+    select.options.clear();
+    select.matches = [];
+    select.shown = 0;
+    select.haystacks = [];
+    select.labels.clear();
+    select.list.innerHTML = '';
+    select.search.value = '';
+    select.empty.hidden = true;
+    select.panel.hidden = true;
+    select.trigger.classList.remove('open');
+    select.trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  /**
+   * Write on the trigger of a `'select'` group what the user has picked: the placeholder when
+   * nothing is, and a removable chip per active value. Rebuilt with `createElement` because the
+   * chips are text that came from the data.
+   */
+  protected _renderSelectTrigger(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    const box = select.value;
+    box.innerHTML = '';
+    const active = [...f.active];
+    if (active.length === 0) {
+      const placeholder = document.createElement('span');
+      placeholder.className = 'filter-select-placeholder';
+      placeholder.textContent = f.label === '' ? 'Seleccionar' : f.label;
+      box.appendChild(placeholder);
+    } else {
+      // Todos los chips, sin un "+N" que resuma la cola: la selección completa tiene que poder leerse
+      // (y deshacerse valor por valor) sin abrir la lista. El área de chips lleva su propio tope de
+      // altura (`.filter-select-value`), así que una selección larga scrollea en vez de empujar el
+      // panel entero hacia abajo.
+      active.forEach((token) => box.appendChild(this._createSelectChip(f, token)));
+    }
+    // El trigger es el resumen, pero el texto largo también va en `title` para que el grupo se
+    // pueda leer con el mouse cuando los chips no entran.
+    box.title = active.map((token) => select.labels.get(token) ?? this._filterOptionLabel(f, token)).join(', ');
+    this._renderSelectFooter(f);
+  }
+
+  /**
+   * Build one chip of the trigger of a `'select'` group: the label, cut with `…` by CSS when it is
+   * long, plus the button that drops the value.
+   *
+   * The button is nested inside the trigger, which is valid because the trigger is a
+   * `div[role="combobox"]` and not a `<button>` (a button inside a button is not). It is
+   * `tabindex="-1"` on purpose: a group can carry hundreds of values, and one tab stop per chip
+   * would bury everything that comes after the trigger. Removing from the keyboard goes through the
+   * list, which is the accessible path for it anyway.
+   *
+   * The label is its own span because the `…` has to be: `text-overflow: ellipsis` only works on a
+   * block with a direct text node, and once the chip holds a button it is a flex container.
+   */
+  protected _createSelectChip(f: FilterDef, token: string): HTMLElement {
+    const text = f.select?.labels.get(token) ?? this._filterOptionLabel(f, token);
+    const chip = document.createElement('span');
+    chip.className = 'filter-select-chip';
+    const label = document.createElement('span');
+    label.className = 'filter-select-chip-label';
+    label.textContent = text;
+    label.title = text;
+    const remove = document.createElement('button');
+    remove.className = 'filter-select-chip-remove';
+    remove.type = 'button';
+    remove.tabIndex = -1;
+    remove.setAttribute('aria-label', `Quitar ${text}`);
+    remove.title = `Quitar ${text}`;
+    remove.innerHTML =
+      '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    remove.addEventListener('click', (e: Event) => {
+      // Sin este corte el click sube al trigger, cuyo listener abre o cierra la lista: quitar un
+      // valor desde el chip terminaría abriendo el desplegable.
+      e.stopPropagation();
+      this._toggleSelectValue(f, token);
+    });
+    chip.appendChild(label);
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  /**
+   * Write the footer of a `'select'` group: how many values are picked, and the "Limpiar" button
+   * that drops them all. The count is left empty in a `multiple: false` group, where one is the most
+   * there can ever be and the trigger already says it.
+   */
+  protected _renderSelectFooter(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    const count = f.active.size;
+    select.clear.disabled = count === 0;
+    select.footerCount.textContent = f.multiple ? `${count} ${count === 1 ? 'seleccionado' : 'seleccionados'}` : '';
+  }
+
+  /**
+   * Build what a `'select'` group needs to show its list, on its first open: the label and the
+   * `haystack` of **every** value, and then the first window of rows.
+   *
+   * The index pass covers all the values but only builds nodes for `FILTER_SELECT_WINDOW` of them,
+   * and that is the whole difference between a dropdown that works on a field with hundreds of
+   * values and one that does not: 400 rows are 1.600 noditos para mirar y para scrollear, mientras
+   * que el `haystack` de 400 valores es un array de strings. Los nodos de la cola se crean después,
+   * al scrollear (`_appendSelectRows`).
+   *
+   * This is also where a remote value list would be requested (one day a `loadOptions` option would
+   * fetch instead of reading `select.values`): the trigger has already shown the values it had, and
+   * the request would not block the panel.
+   */
+  protected _ensureSelectOptions(f: FilterDef): void {
+    const select = f.select;
+    if (!select || select.built) return;
+    // Los labels declarados se indexan una vez: `_filterOptionLabel` los busca con un `find` por
+    // token, que con cientos de valores declarados sería un `O(n²)` en el primer click.
+    const declaredLabels = f.declared ? new Map(f.declared.map((d) => [d.token, d.label])) : null;
+    select.labels.clear();
+    select.haystacks = select.values.map((token) => {
+      const display = declaredLabels?.get(token) ?? this._filterOptionLabel(f, token);
+      select.labels.set(token, display);
+      // El token entra en el `haystack` además de la etiqueta para que un valor con el label feo
+      // ("Sí", "Sin valor", el id crudo) se encuentre también por el dato que representa.
+      return foldForSearch(`${display} ${token}`);
+    });
+    select.built = true;
+    this._filterSelectOptions(f, select.query);
+    // Los valores ya puestos tienen que verse al abrir: si no, el trigger dice "2 seleccionados" y
+    // la lista no muestra ninguno. `scrollIntoView` no existe fuera de un browser real (jsdom), así
+    // que se comprueba antes de llamarlo en vez de asumirlo.
+    select.options.forEach((opt, token) => {
+      if (f.active.has(token) && typeof opt.el.scrollIntoView === 'function')
+        opt.el.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  /**
+   * Narrow the values of a `'select'` group to the ones the query matches, and lay out the first
+   * window of them. The match is a substring of the folded label and token, so it forgives case and
+   * accents.
+   *
+   * It goes over `haystacks` (all the values) and not over the rows (the ones in the window), which
+   * is what lets a match that is not rendered yet be found and brought into the window. It does
+   * rebuild the window from scratch, instead of hiding rows in place, because the number of matches
+   * changes: hiding would leave a list of 50 rows con 400 en el medio y 3 al final.
+   */
+  protected _filterSelectOptions(f: FilterDef, query: string): void {
+    const select = f.select;
+    if (!select) return;
+    select.query = query;
+    const needle = foldForSearch(query.trim());
+    select.matches = needle
+      ? select.values.filter((_, i) => select.haystacks[i].includes(needle))
+      : select.values.slice();
+    select.shown = Math.min(FILTER_SELECT_WINDOW, select.matches.length);
+    // El cursor se descarta con cada búsqueda: la fila que estaba marcada puede ser una de las que
+    // el `needle` acaba de dejar fuera.
+    select.cursor = '';
+    this._renderSelectWindow(f);
+  }
+
+  /**
+   * Lay out the window of a `'select'` list: the rows of `matches[0..shown]` and the "Sin
+   * resultados" line when nothing matched. Rebuilds the list node, so the caller is the one who
+   * decides the scroll: the search wants the top, and the extension path appends instead of calling
+   * this.
+   */
+  protected _renderSelectWindow(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    select.list.innerHTML = '';
+    select.options.clear();
+    for (let i = 0; i < select.shown; i++) this._appendSelectRow(f, select.matches[i]);
+    select.empty.hidden = select.matches.length > 0;
+  }
+
+  /** Add one row of a `'select'` list at its end, and remember it as rendered */
+  protected _appendSelectRow(f: FilterDef, token: string): void {
+    const select = f.select;
+    if (!select || select.options.has(token)) return;
+    const display = select.labels.get(token) ?? this._filterOptionLabel(f, token);
+    const opt = document.createElement('div');
+    opt.className = 'filter-select-option';
+    opt.dataset.token = token;
+    opt.setAttribute('role', 'option');
+    const selected = f.active.has(token);
+    opt.setAttribute('aria-selected', String(selected));
+    if (selected) opt.classList.add('selected');
+    const text = document.createElement('span');
+    text.className = 'filter-select-option-label';
+    text.textContent = display;
+    const count = document.createElement('span');
+    count.className = 'filter-select-option-count';
+    count.textContent = `(${select.counts[token] || 0})`;
+    opt.appendChild(text);
+    opt.appendChild(count);
+    opt.title = display;
+    opt.addEventListener('click', () => this._toggleSelectValue(f, token));
+    select.list.appendChild(opt);
+    select.options.set(token, { el: opt });
+  }
+
+  /**
+   * Grow the window of a `'select'` list by another `FILTER_SELECT_WINDOW` matches. It **appends**
+   * instead of rebuilding, so the rows that were already there keep their identity and, more
+   * importantly, the list keeps its `scrollTop`: rebuilding a long list while the scrollbar is at
+   * the end would throw the viewport back to the top on every extension.
+   */
+  protected _extendSelectWindow(f: FilterDef): void {
+    const select = f.select;
+    if (!select || !select.built) return;
+    const before = select.shown;
+    select.shown = Math.min(select.matches.length, select.shown + FILTER_SELECT_WINDOW);
+    if (select.shown === before) return;
+    for (let i = before; i < select.shown; i++) this._appendSelectRow(f, select.matches[i]);
+  }
+
+  /**
+   * Grow the window when the list is scrolled to its end, so reaching the bottom of a long list
+   * brings the next values instead of dead-ending. When there are more matches than the window
+   * covers, the list always overflows (50 rows against a ~220px box), so the scroll is the mouse
+   * path to every value; the keyboard reaches them too, through `_revealSelectCursor()`.
+   */
+  protected _maybeExtendSelectWindow(f: FilterDef): void {
+    const select = f.select;
+    if (!select || select.shown >= select.matches.length) return;
+    const list = select.list;
+    if (list.scrollTop + list.clientHeight < list.scrollHeight - 24) return;
+    this._extendSelectWindow(f);
+  }
+
+  /**
+   * Add or drop one value of a `'select'` group, and apply. In a `multiple: false` group picking a
+   * value replaces the previous one, and picking the one that is already active clears it: that is
+   * what makes it behave like the classic `<select>`.
+   */
+  protected _toggleSelectValue(f: FilterDef, token: string): void {
+    const select = f.select;
+    if (!select) return;
+    if (f.active.has(token)) {
+      f.active.delete(token);
+    } else {
+      if (!f.multiple) f.active.clear();
+      f.active.add(token);
+    }
+    const opt = select.options.get(token);
+    if (opt) {
+      const selected = f.active.has(token);
+      opt.el.setAttribute('aria-selected', String(selected));
+      opt.el.classList.toggle('selected', selected);
+    }
+    if (!f.multiple && f.active.size === 1) this._syncSingleSelect(f);
+    this._renderSelectTrigger(f);
+    if (f.persist) this._savePersistedFilterState();
+    this._applyFilters(true);
+  }
+
+  /**
+   * A `multiple: false` group keeps one active value, so choosing another one has to drop the row
+   * of the one that was active: nothing else knows about it, since no checkbox holds it.
+   */
+  protected _syncSingleSelect(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    select.options.forEach((opt, token) => {
+      const selected = f.active.has(token);
+      opt.el.setAttribute('aria-selected', String(selected));
+      opt.el.classList.toggle('selected', selected);
+    });
+  }
+
+  /** Drop every active value of a `'select'` group and apply */
+  protected _clearSelectValues(f: FilterDef): void {
+    const select = f.select;
+    if (!select || f.active.size === 0) return;
+    f.active.clear();
+    this._syncSingleSelect(f);
+    this._renderSelectTrigger(f);
+    if (f.persist) this._savePersistedFilterState();
+    this._applyFilters(true);
+  }
+
+  /** Open the list of a `'select'` group, building it the first time */
+  protected _openSelect(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    this._ensureSelectOptions(f);
+    select.panel.hidden = false;
+    select.trigger.classList.add('open');
+    select.trigger.setAttribute('aria-expanded', 'true');
+    if (!select.search.hidden) {
+      select.search.focus();
+      select.search.select();
+    }
+  }
+
+  /** Close the list of a `'select'` group and send the focus back to its trigger */
+  protected _closeSelect(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    select.panel.hidden = true;
+    select.trigger.classList.remove('open');
+    select.trigger.setAttribute('aria-expanded', 'false');
+    select.cursor = '';
+  }
+
+  /**
+   * Bind the listeners of a `'select'` group, once. The trigger, the panel, the search box and the
+   * footer are markup from `_buildLayout` that is never replaced, so binding them on the first build
+   * is enough and the rebuilds of the values do not stack listeners.
+   *
+   * Keyboard: the trigger opens with `Enter` / `Space` / `↓`, the list walks with the arrows and
+   * toggles with `Enter`, and `Escape` closes the list without closing the whole panel (which is
+   * what it would do otherwise, since the key bubbles to the same handler that closes the menu).
+   */
+  protected _bindSelectEvents(f: FilterDef): void {
+    const select = f.select;
+    if (!select || select.bound) return;
+    select.bound = true;
+    select.trigger.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      if (select.panel.hidden) this._openSelect(f);
+      else this._closeSelect(f);
+    });
+    select.trigger.addEventListener('keydown', (e: KeyboardEvent) => {
+      // La "x" de los chips es un <button> dentro del trigger. Después de un click queda enfocada en
+      // algunos browsers, y el <kbd>Enter</kbd> que se le manda subiría hasta acá y reabriría la
+      // lista. Cortar por `target` cubre ese caso y cualquier control anidado futuro, en vez de
+      // parchear botón por botón.
+      if (e.target !== select.trigger) return;
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        this._openSelect(f);
+      }
+    });
+    select.panel.addEventListener('click', (e: Event) => e.stopPropagation());
+    select.search.addEventListener('input', () => this._filterSelectOptions(f, select.search.value));
+    select.search.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        select.search.value = '';
+        this._filterSelectOptions(f, '');
+        select.trigger.focus();
+        this._closeSelect(f);
+      }
+    });
+    select.clear.addEventListener('click', () => this._clearSelectValues(f));
+    // Scrollear al final de la lista agranda la ventana. Sin esto, una lista de cientos de valores
+    // termina en un fondo sin nada: el scroll llega al tope de los 50 y no hay a dónde ir.
+    select.list.addEventListener('scroll', () => this._maybeExtendSelectWindow(f));
+    select.panel.addEventListener('keydown', (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        select.trigger.focus();
+        this._closeSelect(f);
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        this._moveSelectCursor(f, e.key === 'ArrowDown' ? 1 : -1);
+        return;
+      }
+      // <kbd>Home</kbd> / <kbd>End</kbd> van al primer y al último valor que matchea, sin tener que
+      // recorrer los cientos de la lista de a un <kbd>↓</kbd>.
+      if (e.key === 'Home' || e.key === 'End') {
+        e.preventDefault();
+        this._jumpSelectCursor(f, e.key === 'End');
+        return;
+      }
+      if (e.key === 'Enter') {
+        const token = this._selectCursorToken(f);
+        if (token !== null) {
+          e.preventDefault();
+          this._toggleSelectValue(f, token);
+        }
+        return;
+      }
+      // <kbd>Espacio</kbd> también alterna, como en cualquier listbox, pero solo cuando no hay
+      // buscador: con la caja de búsqueda enfocada la barra espaciadora es una barra espaciadora.
+      if (e.key === ' ' && select.search.hidden) {
+        const token = this._selectCursorToken(f);
+        if (token !== null) {
+          e.preventDefault();
+          this._toggleSelectValue(f, token);
+        }
+      }
+    });
+  }
+
+  /**
+   * Draw the keyboard cursor of a `'select'` group. It is a class and not a focus, because the
+   * cursor only exists while the list is open and the rows are `div`s: moving it has to be visible,
+   * or walking the list with the arrows would look like nothing happened.
+   */
+  protected _renderSelectCursor(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    select.options.forEach((opt, token) => opt.el.classList.toggle('cursor', token === select.cursor));
+  }
+
+  /**
+   * Move the cursor of a `'select'` group along the values that **match**, so the arrows walk what
+   * the search left and never land on a value the search hid.
+   */
+  protected _moveSelectCursor(f: FilterDef, step: number): void {
+    const select = f.select;
+    if (!select || !select.built) return;
+    const total = select.matches.length;
+    if (total === 0) return;
+    const at = select.matches.indexOf(select.cursor);
+    const next = at === -1 ? (step > 0 ? 0 : total - 1) : (at + step + total) % total;
+    select.cursor = select.matches[next];
+    this._revealSelectCursor(f);
+  }
+
+  /**
+   * Put the cursor on the first or the last matching value (<kbd>Home</kbd> / <kbd>End</kbd>).
+   * Without these, a group with hundreds of values is only reachable with hundreds of <kbd>↓</kbd>:
+   * the same dead-end the window avoids for the mouse, and this is the listbox behavior people
+   * expect from the keys.
+   */
+  protected _jumpSelectCursor(f: FilterDef, last: boolean): void {
+    const select = f.select;
+    if (!select || !select.built || select.matches.length === 0) return;
+    select.cursor = select.matches[last ? select.matches.length - 1 : 0];
+    this._revealSelectCursor(f);
+  }
+
+  /**
+   * Make sure the row the cursor is on **exists**, growing the window until it does, and then draw
+   * the cursor on it. The window always covers a prefix of `matches`, so a cursor past its end is
+   * brought in by extending; the row is then scrolled into view, so the cursor is never off-screen.
+   */
+  protected _revealSelectCursor(f: FilterDef): void {
+    const select = f.select;
+    if (!select) return;
+    if (!select.options.has(select.cursor)) {
+      const target = select.matches.indexOf(select.cursor);
+      while (select.shown < target && select.shown < select.matches.length) {
+        const before = select.shown;
+        this._extendSelectWindow(f);
+        if (select.shown === before) break;
+      }
+      if (!select.options.has(select.cursor)) this._appendSelectRow(f, select.cursor);
+    }
+    this._renderSelectCursor(f);
+    // `scrollIntoView` no existe fuera de un browser real (jsdom), igual que en `_ensureSelectOptions`.
+    const el = select.options.get(select.cursor)?.el;
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+  }
+
+  /** The value the cursor of a `'select'` group is on, or `null` when it is not on any */
+  protected _selectCursorToken(f: FilterDef): string | null {
+    return f.select?.cursor || null;
+  }
+
+  /**
    * Add the "Ver más (N)" toggle at the end of a collapsed filter group and put the group in
    * its initial state. The hidden values are the `overflow` labels at the tail of
    * `f.options`, already marked `filter-option-extra`; what this decides is only whether
@@ -2486,7 +3301,7 @@ export default class Timeline {
    * re-render.
    */
   protected _buildFilterMore(f: FilterDef, overflow: number): void {
-    const expanded = this._filterExpanded.has(f.field) || f.checkboxes.some((cb) => cb.checked);
+    const expanded = this._filterExpanded.has(f.field) || f.active.size > 0;
     const more = document.createElement('button');
     more.type = 'button';
     more.className = 'filter-more';
@@ -2526,13 +3341,13 @@ export default class Timeline {
     }
   }
 
-  /** Persist the checked values of every group marked `persist` to localStorage */
+  /** Persist the active values of every group marked `persist` to localStorage */
   protected _savePersistedFilterState(): void {
     const state: Record<string, string[]> = {};
     this.filters
       .filter((f) => f.persist)
       .forEach((f) => {
-        state[f.field] = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+        state[f.field] = this._filterActiveValues(f);
       });
     try {
       window.localStorage.setItem(PERSISTED_FILTER_STORAGE_KEY, JSON.stringify(state));
@@ -2630,7 +3445,7 @@ export default class Timeline {
     };
     if (this.searchTerm.trim()) params.q = this.searchTerm.trim();
     this.filters.forEach((f) => {
-      const active = f.checkboxes.filter((cb) => cb.checked).map((cb) => cb.value);
+      const active = this._filterActiveValues(f);
       if (active.length === 0) return;
       params[f.field] = active.join(',');
     });
@@ -3014,7 +3829,7 @@ export default class Timeline {
    * groups live in the flyout, so they only light the flyout button and never the one of the panel.
    */
   protected _syncFilterToggleState(): void {
-    const isActive = (f: FilterDef) => f.checkboxes.some((cb) => cb.checked);
+    const isActive = (f: FilterDef) => f.active.size > 0;
     if (this.filterToggle)
       this.filterToggle.classList.toggle(
         'active',
@@ -3537,6 +4352,15 @@ export default class Timeline {
       }
       if (!(e.target as HTMLElement).closest('.card-adjuntos-btn, .card-adjuntos-menu')) {
         this.container.querySelectorAll('.card-adjuntos-menu.open').forEach((m) => m.classList.remove('open'));
+      }
+      // Una lista de `select` abierta se cierra al clickear fuera de su propio grupo. Va antes que
+      // el cierre del panel para que el click que cae en otra parte del panel (otra columna, el
+      // buscador) no deje una lista colgando: el `hidden` lo pone `_closeSelect` y el `focus` no hace
+      // falta, porque el click ya se está llevando la atención.
+      if (!(e.target as HTMLElement).closest('.filter-select')) {
+        this.filters.forEach((f) => {
+          if (f.select && !f.select.panel.hidden) this._closeSelect(f);
+        });
       }
       if (this.filterMenu && !(e.target as HTMLElement).closest('.filter-wrap')) {
         this.filterMenu.classList.remove('open');

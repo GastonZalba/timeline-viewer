@@ -715,6 +715,347 @@
     }
   }
 
+  // Bloque de los grupos `select`: ocupa una fila propia, arriba de las columnas del panel (y arriba
+  // de los grupos del flyout, que es el mismo layout). `flex: 1 0 100%` es lo que lo saca de la
+  // repartición en dos columnas, que es donde `display: flex; flex-wrap: wrap` lo pondría en
+  // cualquier otro caso. El `border-bottom` separa el bloque de las columnas de abajo, que ya no
+  // reciben el separador de `.filter-section + .filter-section` (ya no son hermanas de él).
+  .filter-selects {
+    flex: 1 0 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 8px;
+    margin-bottom: 2px;
+    border-bottom: 1px solid var(--tv-border-card);
+  }
+
+  .filter-select {
+    position: relative;
+  }
+
+  // El trigger es un `<div>` (no un `<button>`) porque su estado lo escribe `_renderSelectTrigger`
+  // entero en cada cambio, y el rol de combobox lo anuncia igual. Toma el ancho completo porque
+  // es el control principal del panel: un filtro con muchos valores se elige desde acá, no desde
+  // una lista de checkboxes de dos renglones.
+  .filter-select-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 34px;
+    padding: 6px 10px;
+    border: 1px solid var(--tv-accent);
+    border-radius: 8px;
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--tv-text-primary);
+    font-family: inherit;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    cursor: pointer;
+    transition:
+      background 0.2s,
+      border-color 0.2s;
+
+    &:hover,
+    &.open {
+      background: rgba(59, 130, 246, 0.3);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--tv-accent);
+      outline-offset: 2px;
+    }
+
+    .filter-select-caret {
+      flex-shrink: 0;
+      margin-left: auto;
+      color: var(--tv-text-muted);
+      transition: transform 0.2s ease;
+    }
+
+    &.open .filter-select-caret {
+      transform: rotate(180deg);
+    }
+  }
+
+  // El área de chips lleva su propio tope de altura: se muestran **todos** los valores elegidos
+  // (no hay un "+N" que resuma la cola), así que una selección larga tiene que scrollear acá en vez
+  // de alargar el trigger y empujar el panel hacia abajo. El `max-height` es un tope, no una altura:
+  // el caso normal de una o dos líneas no cambia de tamaño. El `align-content: flex-start` (y no
+  // `align-items: center`) es lo que evita el bug de flex + `overflow` que recorta la primera fila.
+  .filter-select-value {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    align-content: flex-start;
+    gap: 6px;
+    max-height: 72px;
+    min-width: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--tv-accent) var(--tv-scrollbar-track);
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--tv-scrollbar-track);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--tv-accent);
+      border-radius: 3px;
+      min-height: 40px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--tv-accent-light);
+    }
+  }
+
+  .filter-select-placeholder {
+    color: var(--tv-text-muted);
+    font-style: italic;
+  }
+
+  // Los chips son los valores que ya se elegieron. El `max-width` los mantiene de un tamaño legible
+  // cuando el texto es largo, y el `…` lo pone el span del label: el `text-overflow` solo funciona
+  // sobre un bloque con un nodo de texto directo, y el chip es flex porque lleva la "x" adentro.
+  // El `title` del label tiene el valor entero.
+  .filter-select-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    max-width: 200px;
+    padding: 2px 4px 2px 8px;
+    border: 1px solid var(--tv-accent);
+    border-radius: 20px;
+    background: var(--tv-accent);
+    color: var(--tv-text-on-primary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    vertical-align: middle;
+  }
+
+  .filter-select-chip-label {
+    overflow: hidden;
+    min-width: 0;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  // La "x" que saca un valor. Es `tabindex="-1"`: quitarla desde el teclado se hace en la lista, así
+  // que un tab stop por chip taparía el resto del panel. Por eso el `title` (que sí ve el mouse)
+  // es la parte que explica qué hace, y el `aria-label` lo cubre para quien recorre la página.
+  .filter-select-chip-remove {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: inherit;
+    font-family: inherit;
+    line-height: 0;
+    cursor: pointer;
+    opacity: 0.75;
+    transition:
+      background 0.15s,
+      opacity 0.15s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.25);
+      opacity: 1;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--tv-text-on-primary);
+      outline-offset: 1px;
+    }
+  }
+
+  // El panel se arma con la lista ya resuelta, así que no tiene `overflow` propio: crece hacia
+  // abajo y lo acotado es `.filter-select-list`, que scrollea. El `background: inherit` es lo que
+  // hace que el mismo bloque sirva en los dos destinos sin dos estilos: toma el del menú que lo
+  // contiene (`#1e2a3a` en el panel, el tono rojo en el flyout) en vez de un color fijo.
+  .filter-select-panel {
+    margin-top: 6px;
+    padding: 6px;
+    border: 1px solid var(--tv-accent);
+    border-radius: 8px;
+    background: inherit;
+  }
+
+  .filter-select-search {
+    width: 100%;
+    margin-bottom: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--tv-border-card);
+    border-radius: 20px;
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--tv-text-primary);
+    font-family: inherit;
+    font-size: 0.7rem;
+    outline: none;
+
+    &::placeholder {
+      color: var(--tv-text-muted);
+    }
+
+    &:focus {
+      border-color: var(--tv-accent-light);
+    }
+  }
+
+  .filter-select-list {
+    // El tope de altura es lo que hace que un grupo con cientos de valores no empuje el resto del
+    // panel fuera de la pantalla: la lista scrollea, y el buscador la acota a unos pocos resultados.
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--tv-accent) var(--tv-scrollbar-track);
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: var(--tv-scrollbar-track);
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--tv-accent);
+      border-radius: 3px;
+      min-height: 40px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+      background: var(--tv-accent-light);
+    }
+  }
+
+  .filter-select-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: var(--tv-text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    // Guarda, no mecanismo: la ventana se reconstruye en vez de esconder filas, así que hoy nada
+    // marca una fila como `hidden`. Queda igual porque la regla `[hidden]` de la UA cede ante el
+    // `display: flex` de autor, y sin esto cualquier `hidden` que se ponga sobre una fila la
+    // dejaría visible. Mismo motivo que en `.filter-option-extra`.
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .filter-select-option-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  // El conteo de cada fila: cuántos ítems hay detrás de ese valor. Es un dato de la opción, así que
+  // se llama distinto del resumen del pie (`.filter-select-count`): con el mismo nombre, un selector
+  // por clase matcheaba las dos cosas y no había forma de apuntar al pie sin pisar las filas.
+  .filter-select-option-count {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    color: var(--tv-text-muted);
+    white-space: nowrap;
+  }
+
+  // El resumen del pie: cuántos valores están elegidos. Con `multiple: false` queda vacío.
+  .filter-select-count {
+    flex-shrink: 0;
+    font-size: 0.65rem;
+    color: var(--tv-text-muted);
+    white-space: nowrap;
+  }
+
+  .filter-select-option.selected {
+    background: rgba(59, 130, 246, 0.25);
+
+    .filter-select-option-label {
+      font-weight: 600;
+    }
+  }
+
+  // La fila sobre la que está el cursor del teclado. Vive **después** de `.selected` a propósito:
+  // una fila elegida y la que está marcada pueden ser la misma, y el cursor tiene que ganar para
+  // que se vea dónde va <kbd>Enter</kbd>.
+  .filter-select-option.cursor {
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 2px 0 0 var(--tv-accent-light);
+  }
+
+  .filter-select-empty {
+    padding: 6px;
+    color: var(--tv-text-muted);
+    font-size: 0.65rem;
+    font-style: italic;
+    text-align: center;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  .filter-select-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid var(--tv-border-card);
+  }
+
+  .filter-select-clear {
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    font-size: 0.65rem;
+    font-style: italic;
+    color: var(--tv-text-muted);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      color: var(--tv-accent);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--tv-accent);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+  }
+
   .filtros-internos-wrap {
     position: relative;
   }

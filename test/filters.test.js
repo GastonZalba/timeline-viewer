@@ -26,11 +26,16 @@ function captureWarnings(run) {
   return warnings;
 }
 
-/** Labels of the group headers of a column, top to bottom */
+/**
+ * Labels of the group headers of a column, top to bottom.
+ *
+ * Indexa sobre el NodeList de `.filter-column` y no con `:nth-child()`, que cuenta **todos** los
+ * hermanos: desde que el bloque `.filter-selects` va arriba del panel, la primera columna ya no es
+ * el primer hijo y `:nth-child(1)` no matchearía nada.
+ */
 function columnLabels(container, index) {
-  return Array.from(
-    container.querySelectorAll(`.filter-menu .filter-column:nth-child(${index + 1}) .filter-header`)
-  ).map((el) => el.textContent);
+  const column = container.querySelectorAll('.filter-menu .filter-column')[index];
+  return column ? Array.from(column.querySelectorAll('.filter-header')).map((el) => el.textContent) : [];
 }
 
 /** The "Tipo de fuente" values the mock brings, as a declaration with `items` (the demo derives them) */
@@ -82,8 +87,14 @@ test('la opción `filters` arma los grupos del panel, en el orden declarado', ()
   const menu = container.querySelector('.filter-menu');
   assert.ok(menu, 'debería existir el panel de filtros');
   assert.equal(container.querySelectorAll('.filter-column').length, 2, 'esperaba 2 columnas');
+  // Los grupos `select` no entran en la repartición de columnas: van en su propio bloque de ancho
+  // completo. Por eso el "Tono social" (el único `select` del demo) no aparece acá, y los cuatro
+  // grupos `menu` que quedan se reparten por mitades.
+  const selects = menu.querySelectorAll('.filter-selects .filter-select');
+  assert.equal(selects.length, 1, 'esperaba el bloque de selects del panel');
+  assert.equal(selects[0].dataset.filterField, 'tonos_sociales');
   // La primera mitad de los grupos `menu` va en la primera columna, el resto en la segunda.
-  assert.deepEqual(columnLabels(container, 0), ['Tono social', 'Año publicación', 'Contenido']);
+  assert.deepEqual(columnLabels(container, 0), ['Año publicación', 'Contenido']);
   assert.deepEqual(columnLabels(container, 1), ['Tipo de fuente', 'Fuente oficial']);
 
   const internos = container.querySelector('#filtros-internos-menu');
@@ -93,7 +104,7 @@ test('la opción `filters` arma los grupos del panel, en el orden declarado', ()
     ['validado', 'capturado', 'descartado']
   );
   // El estado vive en su propio botón: no ensucia el panel.
-  assert.equal(container.querySelectorAll('.filter-menu .filter-options').length, 5);
+  assert.equal(container.querySelectorAll('.filter-menu .filter-options').length, 4);
 });
 
 test('sin la opción `filters` no hay panel, ni botón, ni estado interno', () => {
@@ -174,7 +185,7 @@ test('un `type` no soportado descarta el grupo con un warning y deja armado el r
       container,
       items: mockData.items,
       filters: [
-        { field: 'tipo_fuente', label: 'Tipo de fuente', type: 'select' },
+        { field: 'tipo_fuente', label: 'Tipo de fuente', type: 'radio' },
         { field: 'tonos_sociales', label: 'Tono social' }
       ]
     });
@@ -185,7 +196,7 @@ test('un `type` no soportado descarta el grupo con un warning y deja armado el r
     );
   });
   assert.equal(warnings.length, 1, 'esperaba un warning por el grupo descartado');
-  assert.match(warnings[0], /type "select"/);
+  assert.match(warnings[0], /type "radio"/);
   assert.match(warnings[0], /tipo_fuente/);
   // El resto del panel se arma igual.
   assert.deepEqual(columnLabels(container, 0), ['Tono social']);

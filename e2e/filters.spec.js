@@ -103,17 +103,13 @@ test.describe('filtros configurables en el navegador', () => {
   test('modo local: el panel arma dos columnas y el flyout de filtros internos', async ({ page }) => {
     await openDemo(page, 'flat&expanded');
 
-    const cols = await page.locator('.filter-menu .filter-column').count();
-    expect(cols).toBe(2);
-    expect(await page.locator('.filter-menu .filter-column:nth-child(1) .filter-header').allTextContents()).toEqual([
-      'Tono social',
-      'Año publicación',
-      'Contenido'
-    ]);
-    expect(await page.locator('.filter-menu .filter-column:nth-child(2) .filter-header').allTextContents()).toEqual([
-      'Tipo de fuente',
-      'Fuente oficial'
-    ]);
+    const cols = page.locator('.filter-menu .filter-column');
+    expect(await cols.count()).toBe(2);
+    // `.filter-column` por posición en el NodeList, y no con `:nth-child()`: este cuenta todos los
+    // hermanos, y desde que el bloque `.filter-selects` va arriba del panel la primera columna ya
+    // no es el primer hijo.
+    expect(await cols.nth(0).locator('.filter-header').allTextContents()).toEqual(['Año publicación', 'Contenido']);
+    expect(await cols.nth(1).locator('.filter-header').allTextContents()).toEqual(['Tipo de fuente', 'Fuente oficial']);
     // Los grupos de filtros internos viven en el flyout del botón interno, no en el panel.
     expect(
       await page

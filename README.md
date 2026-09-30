@@ -410,12 +410,14 @@ new Timeline({
 |------------------|---------------------------------------------|------------|------------------------------------------|
 | `field`          | `string`                                    | **required** | Name of the field the group filters by. In local mode it is read from each item (or produced by `extract`); in API mode it is the key the server uses in `GET {url}/facets`, which is also the query parameter the active values are sent in |
 | `label` | `string \| null` | — | Header of the group, in the panel or in the `filtros_internos` flyout alike: both render every group as a `.filter-section` with its own `.filter-header`. Escaped before being injected. Optional: `null`, `''` or only whitespace renders the group without a header (useful for a group whose values speak for themselves), and it is never an error |
-| `type`           | `'checkboxes'`                              | `'checkboxes'` | Control of the group. Only checkboxes exist today; a different value drops the group with a `console.warn` |
+| `type`           | `'checkboxes' \| 'select'`                 | `'checkboxes'` | Control of the group. `'checkboxes'` is the one-column-of-checkboxes list; `'select'` is a searchable multi-select for a field with **many** values, which takes the full width of the panel (see [Filter `select`](#filter-select)). Any other value drops the group with a `console.warn` |
+| `multiple` | `boolean` | `true` | Only for `type: 'select'`. `true` keeps every selected value in the list (an OR inside the group, like a checkbox group). `false` makes it single-choice: picking a value replaces the previous one, and picking the selected one again clears it (so the group filters on nothing instead of on a value you cannot see) |
+| `searchable` | `boolean` | auto | Only for `type: 'select'`. Shows the search box above the list. Defaults to `true` when the group has more than 8 values, which is the whole point of the control; set it to `false` to always show the box on a short list, or to `true` to always hide it |
 | `group` | `'menu' \| 'filtros_internos'` | `'menu'` | `'menu'` renders the group in a column of the panel; `'filtros_internos'` renders it in the internal-filters flyout, which is part of the internal toolbar and needs `internalButtons: true`. Any other value is treated as `'menu'` |
 | `items` | `{ value, label, checked? }[]` | — | The values of the group, in display order. When given, the group exists even if no item (or no facet) carries a value for it, and the list is the order the panel shows (and the one the "Ver más" cut truncates). Without it, the values come from the data: in local mode the unique `extract`/`field` values of the active scope, in API mode the keys of `facets[field]` |
 | `allowEmpty` | `boolean` | `false` | Offers the items that carry **no value** for the field (`null`, or the field missing) as one more value of a group **without** `items`, labelled `"Sin valor"`, and always as its **last** value (whatever the order of the others). It appears only when the data —or the `facets`, in API mode— has such items, and it travels like any other value (`?campo=null`). Ignored when `items` declares the values: there the empty bucket is one declared item, `{ value: null, label: 'Sin tipo' }` |
 | `persist`        | `boolean`                                   | `false`    | Keeps the checked values of the group in `localStorage`, so they survive the checkbox rebuilds (the API facets, a taxonomy re-scope) and the page loads. Saving only happens on a user gesture |
-| `maxVisible` | `number` | `5` | Values shown before the "Ver más (N)" toggle of the group. Below 2 the group never collapses |
+| `maxVisible` | `number` | `5` | Values shown before the "Ver más (N)" toggle of the group. Below 2 the group never collapses. Ignored by `type: 'select'`, which scrolls and searches instead of cutting |
 | `extract` | `(item) => string \| string[]` | — | Values a single item carries. Defaults to reading `item[field]`: arrays are expanded and `null` / `undefined` count as the `'null'` token. Use it for fields that need a canonical value (a boolean split in two, a date reduced to its year) or a synthetic field that is not a property of the item |
 | `formatLabel` | `(val: string) => string` | — | Label shown for a value of a group **without** `items` (one that derives them). Defaults to the value itself, except `true` → "Sí" and `false` → "No" so a boolean field does not read as raw `true` / `false`. A declared value carries its own `label`, so it never goes through here |
 | `sortValues` | `(a: string, b: string) => number` | — | Deliberate order of the values. A group without `items` that declares one keeps it when the long list is truncated, instead of leading with the values that filter the most |
@@ -469,7 +471,41 @@ The cut is **per group**, through `maxVisible`, and it keeps the order the group
 - A group that derives its values from the data leads with the **ones that filter the most** (the counts come from the items of the active taxonomy, or from the facets in API mode). Give it a `sortValues` comparator to lead with a deliberate order instead — that is how a year list can start at the newest year.
 - **A group with a checked value never collapses**, so a filter you applied is never hidden behind the toggle. It also reopens by itself on the rebuilds (when the API facets land, and when you switch taxonomy).
 - **The toggle is not a filter**: it does not touch the results and does not re-render the timeline, so opening and closing it is instant. Whether the group is open is kept in memory for the session (not in `localStorage`; only the groups with `persist: true` are persisted).
-- A group that derives its values is hidden entirely when the data has one or zero of them. A group with `items` never hides itself: it is a decision the consumer took, and it keeps being offered even with nothing behind it.
+- A group with `items` never hides itself: it is a decision the consumer took, and it keeps being offered even with nothing behind it.
+
+### Filter `select`
+
+`type: 'select'` is the control for a field with **many** values — the ones where a column of checkboxes stops being usable, either because the list is long or because it keeps growing on its own (a tone, a topic, a tag).
+
+```js
+new Timeline({
+  container: '#noticias-container',
+  content: [/* ContentGroup[] */],
+  filters: [
+    {
+      // Full-width, at the top of the panel, above the two columns of checkbox groups.
+      field: 'tonos_sociales',
+      label: 'Tono social',
+      type: 'select',
+      multiple: true, // the default
+      searchable: true // the default once the group has more than 8 values
+    }
+  ]
+});
+```
+
+Everything else is the same as a checkbox group, and deliberately so: the values come from the same place (the items of the active taxonomy in local mode, `GET {url}/facets` in API mode), `items` declares them, `allowEmpty` adds the empty bucket last, `persist` survives the rebuilds, and the active values travel to the server as the same `field=<csv>`. Which means a `select` works against a backend that was built for the checkbox groups, with no server change.
+
+What the control does differently:
+
+- **It takes the full width, at the top.** Select groups leave the two-column split and go into their own `.filter-selects` block above the columns, in both destinations (the panel and the "Filtros internos" flyout). The panel does not scroll to reach them.
+- **It shows what is selected, not just a count.** The trigger carries **every** selected value as a chip — no "+N" that hides the tail, so the whole selection is legible without opening anything. Each chip has a small **×** that drops that value, so you can trim a selection without going back to the list; the chips row caps at ~3 lines and scrolls past that, and a chip whose label does not fit is cut with `…` (the full value stays in its `title`). Clicking the × does not open the list, and it does not close an open one either. The × is mouse-only (`tabindex="-1"`): with hundreds of values, one tab stop per chip would bury the rest of the panel, so the keyboard path to remove a value is the list itself.
+- **The list is built lazily and windowed.** The first open renders the first 50 matching values, and the next ones come in as you scroll to the end. The search runs over **all** values, even those outside the window, so typing brings in matches instantly; the keyboard arrows grow the window if you walk past the boundary, and the list keeps its `scrollTop` as it grows. Rendering a large pool this way keeps the first click cheap (we measured ~70–90 ms with 400 values).
+- **The search is a substring match, accent- and case-insensitive**, and it narrows the list in place without touching the selection: a value already picked stays picked and still appears as a chip even if the search no longer matches it. That is deliberate — searching is how you find the value to *add*, and hiding what you already filtered by would be a trap.
+- **`multiple: false` clears instead of collapsing.** In single-choice, picking the selected value deselects it, so the group ends up filtering on nothing rather than on a value the trigger can no longer show.
+- **Keyboard.** The trigger is a combobox: <kbd>Enter</kbd> / <kbd>Space</kbd> / <kbd>↓</kbd> open it, the arrows move a highlighted row over what the search left, <kbd>Home</kbd> / <kbd>End</kbd> jump to the first and last match, <kbd>Enter</kbd> toggles it, and <kbd>Esc</kbd> closes the list without closing the panel around it. A click anywhere outside closes it too. The cursor is a highlight on the row (it is a `div`, so it cannot take focus) and walking past the window grows it.
+- **`maxVisible` is ignored**: the list scrolls and searches instead of cutting behind a "Ver más (N)", which would be redundant.
+- **Values are lazy, but the *filters* are not.** There is no server-side loading of the options (no query for them at all): the group resolves its values exactly like a checkbox group. That is also the seam where an on-demand source would go — the list is built by one method, and a server-backed variant would fill that method instead.
 
 ## Build
 
@@ -515,6 +551,7 @@ Query flags of the demo page:
 | `?full` | Fullpage mode (`fullpage: true`): always expanded, no resize handle, the page does the scrolling and the toolbar sticks to the top. Subsumes `?expanded`. Combinable with the other flags |
 | `?api` | API mode against the mock server (`example/server.js`): no taxonomy selector, server-side filters |
 | `?pagination` | Numeric pagination (`pagination: true`): replaces "Cargar más" with ‹ Previous \| Page X of Y \| Next ›. Note that without `?flat` the first taxonomy has 9 items against `itemsPerPage: 10`, which is a single page, so no paginator is rendered — combine it with `?flat` or pick "Ver todo" in the selector |
+| `?many` | Adds a synthetic `topicos_demo` field with **400 values** to every item and injects a `select` filter for it (local mode only, combinable with `?flat`/`?expanded`/`?full`). It is the stress test for the lazy windowed list: shows the search box, renders 50 per window, grows by scrolling, and lets you try the keyboard navigation and the accent/case-insensitive search |
 | `?id=FUE-00001` | Single mode: renders just that card, already expanded, with the navigation block from the item's `taxonomias` (FUE-00001 has the three groups, one of them with 7 links to exercise the "Ver más (4)" toggle; FUE-00002 exercises the incomplete-group filtering, FUE-00005 a single column, the rest have no `taxonomias` and render no block) |
 
 ## Tests
