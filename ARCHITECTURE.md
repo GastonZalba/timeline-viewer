@@ -63,13 +63,15 @@ new Timeline({ container, items, ... })
 | `_renderTimeline(cards)` | 1885 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`) |
 | `_appendTimelineItems(items, startIndex)` | 1916 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
 | `_createTimelineItem(card, index)` | 1248 | Crea una tarjeta individual con todos sus event listeners |
-| `_renderLoadMoreButton()` | 3109 | Agrega el botón "Cargar más" al final del timeline |
+| `_renderLoadMoreButton()` | 3165 | Agrega el botón "Cargar más" al final del timeline. Su rama local también llama a `_renderStatus()`: es el único click que hace crecer la lista sin pasar por `_renderAll()`, así que sin eso el conteo se quedaría en el rango anterior |
 | `_insertBeforeFooter(el)` | 1857 | Helper: inserta antes del footer o al final si no hay footer |
 | `_insertBeforeTrailing(el)` | 1873 | Helper: inserta al final de las tarjetas, antes del bloque final (load-more / status / footer) |
 | `_appendPageItems()` | 2729 | Modo API: pide la página siguiente y **agrega** las tarjetas nuevas, sin rebuild. Saca el botón de "Cargar más" si `_hasMorePages()` pasa a `false` |
 | `_renderApiLoading()` | 2848 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
 | `_clearApiLoading()` | 2914 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
-| `_renderStatus()` | 2929 | Fila de status al pie de la lista: cargando / error / "Mostrando X de Y". Se abstiene mientras hay skeletons |
+| `_pageSize()` | 2580 | Tamaño de página del modo actual: `_apiPageSize()` en API, `itemsPerPage` en local (0 = sin paginación). Lo que usan `_pageCount()` y `_statusCountText()` |
+| `_statusCountText()` | 2963 | Texto del conteo de la fila de status: "Mostrando A-B de Y publicaciones". El total y el "cuánto hay en pantalla" los saca de `_apiTotal`/`allCards` en API y de `allCards`/`_localDisplayCards()` en local; el `start` sale de `_currentPage()` con el paginador y es 1 fijo con "Cargar más" |
+| `_renderStatus()` | 2985 | Fila de status al pie de la lista: cargando / error / conteo. El error y la carga son exclusivos de API; el conteo se emite en los dos modos y también con `pagination: true`, cuyo rango es el de la página en pantalla. Se abstiene mientras hay skeletons |
 | `_renderSingleCard()` | 3312 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
 | `_buildTaxonomies(taxonomias)` | 1554 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
 | `_bindTaxonomyToggles(root)` | 1593 | Modo single: bindea los "Ver más (N)" del bloque de links, en los grupos que superan `TAXONOMY_VISIBLE_LINKS`. Cada toggle es independiente: alterna la clase `expanded` de su `ul.card-taxonomy-list` (y su `aria-expanded`) |
@@ -125,7 +127,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │   │   ├── button.filter-toggle (#filter-toggle)
   │   │   │   └── div.filter-menu (#filter-menu)
   │   │   │       ├── .filter-column × 2 (la declaración se parte por la mitad)
-  │   │   │       │   └── .filter-section > .filter-header + .filter-options[data-filter-field] × N
+  │   │   │       │   └── .filter-section > .filter-header (si el grupo declara `label`) + .filter-options[data-filter-field] × N
   │   │   │       │       └── label.filter-option (+ .filter-option-extra ocultas) > input + span.filter-option-label + span.filter-option-count
   │   │   └── button.sort-toggle (#sort-toggle)
   │   │   └── (toolbar interno, solo `internalButtons: true`)
@@ -133,7 +135,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │       └── .filtros-internos-wrap (#filtros-internos-wrap, solo si hay grupos `group: 'filtros_internos'`)
   │   │           ├── button.filtros-internos-toggle (#filtros-internos-toggle)
   │   │           └── div.filtros-internos-menu (#filtros-internos-menu)
-  │   │               └── .filter-options[data-filter-field] × N (validado / capturado / descartado)
+  │   │               └── .filter-section × N (validado / capturado / descartado) > .filter-header (si el grupo declara `label`) + .filter-options[data-filter-field]
   │   └── .featured-cards (#featured-cards)
   │       └── .featured-card × N (generados por _renderFeatured)
   │           ├── .card-image-wrap > img.card-image
@@ -284,7 +286,7 @@ El rebuild es lo correcto cuando lo que hay en pantalla ya no son los artículos
 Detalles del append:
 
 - El orden del DOM queda igual que con `_renderAll()`: `[tarjetas…, nuevas…, loadMore, status, footer]`. Para eso `_insertBeforeTrailing()` inserta antes del **primer** elemento del bloque final (`.timeline-load-more-item`, `.timeline-status-item` o `.timeline-footer-item`), mientras que `_insertBeforeFooter()` —usado por la fila de status y por el botón— solo mira el footer.
-- El botón de "Cargar más" **se conserva** entre páginas: su handler lee `this._apiPage` y `this._apiLoading` en el momento del click, no por closure, así que un solo nodo sirve para todas. Solo se elimina cuando `_hasMorePages()` pasa a `false`. (En modo local sí hay que re-crearlo, porque ahí el handler captura `start`/`end`.)
+- El botón de "Cargar más" **se conserva** entre páginas: su handler lee `this._apiPage` y `this._apiLoading` en el momento del click, no por closure, así que un solo nodo sirve para todas. Solo se elimina cuando `_hasMorePages()` pasa a `false`. (En modo local sí hay que re-crearlo, porque ahí el handler captura `start`/`end`; y su rama local es la que refresca el conteo de la fila de status, porque el click no pasa por `_renderAll()`.)
 - Las tarjetas nuevas se pasan solas a `_setupTimelineObserver(added)`, que acepta un scope opcional: las viejas ya están `visible` y las observable su propio observer, así que no hay que re-observarlas.
 - El stack de featured **no** se re-renderiza: solo se ve con el timeline colapsado, y el botón "Cargar más" vive adentro del timeline (`max-height: 0` + `overflow: hidden` cuando está colapsado), así que es inalcanzable en ese estado. Además el stack debería reflejar la página 1, no la última.
 
@@ -301,7 +303,7 @@ Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** 
 | Request fallido | lista vacía + la fila de error | — |
 
 - Un solo trigger: `_renderApiLoading()` se llama desde `_fetchPage()`, o sea en **todo** request que reemplaza la lista. `_init()` y `_applyFilters()` también la llaman, pero por comodidad: para que los placeholders ya estén en pantalla antes de que el request salga (el primero) y antes de que abra la ventana de debounce (el segundo).
-- `_renderApiLoading()` es **idempotente**: se llama en cada tecla y varias veces sobre la misma carga, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons. Con `pagination: true` esto también elimina la fila de carga del cambio de página (el "Cargando página N..." que se veía al pie con las cartas de la página anterior todavía en pantalla): los skeletons la reemplazan, así que `_renderStatus()` ya solo puede emitir el error.
+- `_renderApiLoading()` es **idempotente**: se llama en cada tecla y varias veces sobre la misma carga, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons. Con `pagination: true` esto también elimina la fila de carga del cambio de página (el "Cargando página N..." que se veía al pie con las cartas de la página anterior todavía en pantalla): los skeletons la reemplazan, así que `_renderStatus()` no vuelve a emitir una línea de carga. Lo que queda de esa fila con el paginador son el error y el conteo ("Mostrando 11-20 de 55"), porque el paginator no reemplaza al conteo: dice cuál es la página, no qué tranche del resultado está en pantalla.
 - `_schedulePageReload(immediate)` tiene dos formas porque los disparadores no son alike. Un trigger que cae dentro de una ventana abierta **siempre** rearma la ventana **con** request, así que el último estado de una ráfaga es siempre el último que llega. Con `immediate` (acciones discretas: checkbox, toggle de orden, Escape) el request sale en el acto y la ventana solo traga lo que venga; sin él (escribir en el buscador) es el debounce de cola clásico, porque un request por tecla le pediría al servidor todos los prefijos del término.
 - El skeleton no es texto: son elementos `.timeline-skeleton-item` / `.featured-skeleton` con `aria-hidden="true"` y `aria-busy="true"` en `#timeline-cards`, animados con el mismo `@keyframes shimmer` de `.card-iframe-shimmer`. Llevan la clase `visible` desde el markup, que es lo que evita que esperen al IntersectionObserver.
 
@@ -315,15 +317,15 @@ El bucket vacío de los filtros es el único valor que **nadie declara**: los í
 - Es la **única excepción** a la regla de ocultar los grupos derivados con un solo valor: sin `allowEmpty`, un grupo cuyo único valor sería el vacío no se muestra (no hay nada que filtrar); con `allowEmpty` se muestra y filtrar por él deja solo los ítems sin valor.
 - **Con `items` declarado se ignora en silencio**: ahí el bucket vacío es un valor declarado más (`{ value: null, label: 'Sin tipo' }`), con el label que el consumidor quiera.
 
-El demo declara los 8 grupos en `example/filters.js`, **todos con `items`**: los cinco del panel (`tonos_sociales`, `anio_publicacion` con `null` = "Sin fecha", `contenido`, `tipo_fuente` con `maxVisible: 4`, `es_oficial`) y los tres del flyout (`validado`, `capturado`, `descartado`, los tres con `persist: true`). El mock trae los campos ya clasificados (`contenido`, `anio_publicacion`, `tipo_fuente: null`), así que ni el demo ni `example/server.js` tienen lógica por campo.
+El demo declara 8 grupos en `example/filters.js`, la mayoría derivados del dato (y ordenados por conteo cuando hay que truncarlos), con `allowEmpty: true` en los que ofrecen el bucket vacío: los cinco del panel (`tonos_sociales`, `anio_publicacion`, `contenido`, `tipo_fuente` con `maxVisible: 4`, `es_oficial`) y los tres del flyout (`validado`, `capturado`, `descartado`, los tres con `persist: true`). Un grupo derivado **nunca** puede venir tildado (`checked` solo existe en un ítem declarado), así que el recorte por estado lo aplica el usuario desde el flyout; el demo declara `items` —con o sin `checked`— en los grupos que quieren labels propios ("Sin descartar", "Sin fecha"...). El mock trae los campos ya clasificados (`contenido`, `anio_publicacion`, `tipo_fuente`), así que ni el demo ni `example/server.js` tienen lógica por campo.
 
 Mapa de métodos (líneas actuales):
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_normalizeFilters(filters)` | 595 | Valida la opción `filters`, resuelve defaults (`group`, `persist`, `allowEmpty`, `column`), resuelve los `items` de cada grupo y reparte los grupos `'menu'` en dos columnas (la primera mitad de la declaración a la columna 0, el resto a la 1) |
+| `_normalizeFilters(filters)` | 595 | Valida la opción `filters`, resuelve defaults (`group`, `persist`, `allowEmpty`, `column`) y normaliza el `label` a string (ausente / `null` / en blanco queda `''`, sin descartar el grupo), resuelve los `items` de cada grupo y reparte los grupos `'menu'` en dos columnas (la primera mitad de la declaración a la columna 0, el resto a la 1) |
 | `_resolveFilterItems(field, items)` | 666 | Convierte los `items` declarados en los tokens de los checkboxes: `token` (los valores unidos por comas, que es el `input.value` y el query param) + `tokens` (uno por valor, para comparar contra el ítem), más `label` y `checked`. Devuelve `null` con warning si la declaración no se puede usar (vacía, un ítem sin `label` / sin `value`, tokens repetidos, un valor con coma) |
-| `_buildFilterOptionsHtml(f)` | 752 | Markup del slot de un grupo: `.filter-section` + `.filter-header` (label) + `.filter-options[data-filter-field]` para los `'menu'`; un `.filter-options` pelado para los `'filtros_internos'` (el flyout no tiene headers). El `id` es solo un handle de debug: el wiring va por `data-filter-field`, así un `field` inválido como selector CSS no rompe nada |
+| `_buildFilterOptionsHtml(f)` | 752 | Markup del slot de un grupo: `.filter-section` + `.filter-header` (solo si `f.label` no está vacío) + `.filter-options[data-filter-field]`, **idéntico para los dos destinos**: el flyout de `filtros_internos` también muestra headers, y un grupo sin `label` se dibuja igual, solo que sin header. El `id` es solo un handle de debug: el wiring va por `data-filter-field`, así un `field` inválido como selector CSS no rompe nada |
 | `_buildFilterMenuHtml()` | 768 | Markup del panel `.filter-wrap` (botón `#filter-toggle` + `#filter-menu`) con las dos columnas. `''` si no hay grupos `'menu'` |
 | `_buildInternalButtonsHtml()` | 789 | Markup del toolbar interno: toggle de notas de trabajo +, si hay grupos `'filtros_internos'`, el `.filtros-internos-wrap` con `#filtros-internos-toggle` y `#filtros-internos-menu`. Ambos condicionales a `internalButtons` y a la opción `filters` |
 | `_attachFilterOptions()` | 900 | Apunta cada `FilterDef.options` al slot que `_buildLayout` le renderizó (lookup por `data-filter-field`). Un grupo sin slot (ej. `'filtros_internos'` sin `internalButtons`) conserva su config y `_buildFilterCheckboxes` simplemente lo esquiva |

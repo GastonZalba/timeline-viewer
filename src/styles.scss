@@ -603,14 +603,6 @@
       padding-top: 4px;
     }
 
-    .filter-header {
-      font-size: 0.6rem;
-      color: var(--tv-text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 2px 6px 4px;
-    }
-
     .filter-options + .filter-options {
       margin-top: 6px;
       padding-top: 6px;
@@ -630,6 +622,17 @@
         overflow-y: auto;
       }
     }
+  }
+
+  // El header de un grupo de filtros. Vive en los dos menús porque un grupo `filtros_internos`
+  // también es un `.filter-section`: el `label` es opcional, y cuando falta no se emite el header.
+  .filter-menu .filter-header,
+  .filtros-internos-menu .filter-header {
+    font-size: 0.6rem;
+    color: var(--tv-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 6px 4px;
   }
 
   .filter-menu .filter-option,
@@ -733,7 +736,9 @@
       display: block;
     }
 
-    .filter-options + .filter-options {
+    // Cada grupo del flyout es un `.filter-section`, así que el separador entre grupos es el mismo
+    // que en el panel. Sin `label` el header no se emite y la sección son solo sus valores.
+    .filter-section + .filter-section {
       margin-top: 6px;
       padding-top: 6px;
       border-top: 1px solid var(--tv-border-card);

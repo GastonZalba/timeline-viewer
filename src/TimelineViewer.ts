@@ -325,8 +325,15 @@ export interface TimelineFilter {
    * `GET {url}/facets`, which is also the query param the active values are sent in.
    */
   field: string;
-  /** Header of the group. Escaped before being injected into the markup. */
-  label: string;
+  /**
+   * Header of the group. Escaped before being injected into the markup.
+   *
+   * Optional: `null`, `''` and a blank string are the same thing — the group is declared and
+   * rendered all the same, just without a header. A `'filtros_internos'` group with no label is
+   * the normal case for a flyout that holds a single group (its values are self-explanatory, or
+   * the button title already says what the flyout is).
+   */
+  label?: string | null;
   /** Control of the group. Defaults to `'checkboxes'`; any other value drops the group. */
   type?: FilterType;
   /**
@@ -392,9 +399,11 @@ interface FilterDefItem {
 }
 
 /** A `TimelineFilter` normalized for rendering: defaults resolved and the DOM slot attached */
-interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty'> {
+interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label'> {
   group: FilterGroup;
   persist: boolean;
+  /** The header of the group, normalized: `''` when the declaration brings none (so no header renders) */
+  label: string;
   /** Add the "Sin valor" option to a group that derives its values (see `TimelineFilter`) */
   allowEmpty: boolean;
   /** Column of the panel the group is rendered in. `0` for the `'filtros_internos'` flyout, ignored there. */
@@ -584,9 +593,12 @@ export default class Timeline {
    *
    * Nothing is hardcoded, so an absent or invalid option simply yields no groups: the panel and
    * its button are not rendered at all, and in API mode no filter param is sent. Entries that
-   * cannot be rendered —no `field`, no `label`, a `type` that is not supported yet, or a `field`
-   * already declared— are dropped with a warning instead of breaking the mount, because a group
-   * that renders nothing is far harder to notice than a line in the console.
+   * cannot be rendered —no `field`, a `type` that is not supported yet, or a `field` already
+   * declared— are dropped with a warning instead of breaking the mount, because a group that
+   * renders nothing is far harder to notice than a line in the console.
+   *
+   * A missing or blank `label` is not one of them: the group is rendered without a header, which
+   * is a decision the consumer took and not a broken declaration.
    *
    * The `'menu'` groups are then dealt out to the columns of the panel: the first half goes to
    * the first column and the rest to the second, which reads a declaration top to bottom down
@@ -603,10 +615,6 @@ export default class Timeline {
       }
       if (typeof f.field !== 'string' || f.field.trim() === '') {
         this._warnFilter(i, 'no tiene `field`');
-        return;
-      }
-      if (typeof f.label !== 'string' || f.label.trim() === '') {
-        this._warnFilter(i, `"${f.field}" no tiene \`label\``);
         return;
       }
       if (f.type !== undefined && !SUPPORTED_FILTER_TYPES.includes(f.type)) {
@@ -632,7 +640,8 @@ export default class Timeline {
       declared.add(f.field);
       defs.push({
         field: f.field.trim(),
-        label: f.label.trim(),
+        // `label` es opcional y se normaliza a `''` (sin header) en vez de descartar el grupo.
+        label: typeof f.label === 'string' ? f.label.trim() : '',
         group: f.group === 'filtros_internos' ? 'filtros_internos' : 'menu',
         persist: f.persist === true,
         allowEmpty: f.allowEmpty === true,
@@ -738,22 +747,26 @@ export default class Timeline {
   }
 
   /**
-   * Markup of a group of the `filters` option: an empty `.filter-options` box the checkboxes
-   * are built into, tagged with the field it belongs to.
+   * Markup of a group of the `filters` option: a `.filter-section` with its optional header and
+   * the empty `.filter-options` box the checkboxes are built into, tagged with the field it
+   * belongs to.
+   *
+   * Both groups of the panel (`.filter-menu`) and the ones of the internal-filters flyout
+   * (`.filtros-internos-menu`) render the same section, so a `filtros_internos` group shows its
+   * `label` like a `'menu'` one. The header is emitted only when the declaration brings a label:
+   * with `label: null` / `''` the group is drawn without it, which is what a single-group flyout
+   * wants (the values speak for themselves under a button that already says what it is).
    *
    * The `id` is only a handle for debugging: the component looks the box up by the
    * `data-filter-field` attribute, so a `field` with characters that are not valid in a CSS
    * selector cannot break the wiring. `data-filter-field` is also the stable hook for a
    * consumer's own tests.
-   *
-   * A `'menu'` group is a section with its header inside the panel; a `'filtros_internos'` one is a
-   * bare box, because the flyout has no headers of its own.
    */
   protected _buildFilterOptionsHtml(f: FilterDef): string {
     const slot = `<div class="filter-options" id="filter-options-${this._escapeHtml(f.field)}" data-filter-field="${this._escapeHtml(f.field)}"></div>`;
-    if (f.group === 'filtros_internos') return slot;
+    const header = f.label === '' ? '' : `<div class="filter-header">${this._escapeHtml(f.label)}</div>`;
     return `<div class="filter-section">
-              <div class="filter-header">${this._escapeHtml(f.label)}</div>
+              ${header}
               ${slot}
             </div>`;
   }
@@ -2560,12 +2573,21 @@ export default class Timeline {
   }
 
   /**
-   * Number of pages the current result set is split into, always at least 1. It counts up to the
-   * total the mode knows about: the `total` the server sent in API mode, the filtered pool in
+   * Page size of the current mode: API mode asks the server for `_apiPageSize`, local mode slices
+   * the pool it already holds. It is 0 in local mode with `itemsPerPage: 0`, which is how "no
+   * pagination at all" is spelled there.
+   */
+  protected _pageSize(): number {
+    return this.api ? this._apiPageSize() : this.itemsPerPage;
+  }
+
+  /**
+   * Number of pages the current result set is split into, always at least 1. It counts up to
+   * the total the mode knows about: the `total` the server sent in API mode, the filtered pool in
    * local mode.
    */
   protected _pageCount(): number {
-    const size = this.api ? this._apiPageSize() : this.itemsPerPage;
+    const size = this._pageSize();
     const total = this.api ? this._apiTotal : this.allCards.length;
     if (size <= 0) return 1;
     return Math.max(1, Math.ceil(total / size));
@@ -2916,13 +2938,49 @@ export default class Timeline {
   }
 
   /**
-   * Render the API status row (error / loading / count) at the end of the timeline.
+   * The count line of the status row: "Mostrando 11-20 de 55 publicaciones", or `''` when there is
+   * nothing to count. A **range** of positions rather than a bare amount, because what is on screen
+   * is always a slice of the result set and never the whole thing.
    *
-   * With the numeric paginator only the **error** can reach this row: the request that changes the
-   * page is one of the replacing ones (`_fetchPage`), so it shows the skeletons instead, which
-   * also keeps `_renderStatus` out of the way. The count line is gone for a second reason —
-   * "Mostrando 10 de 87" counts the page on screen, not everything the user went through, and the
-   * paginator already says which page it is and how many there are.
+   * Where the two numbers come from is the only real difference between the modes:
+   *
+   * - the **total**: in API mode the `total` the server sent (`_apiTotal`, i.e. search + filters),
+   *   in local mode `allCards.length`, which is the filtered pool in its entirety.
+   * - how much of it is on screen: in API mode `allCards` **is** the page (or everything loaded so
+   *   far, with "Cargar más"), but in local mode `allCards` always holds the whole pool, so what is
+   *   on screen is what `_localDisplayCards` returns — the same list `_renderTimeline` was given.
+   * - where the range **starts**: with the paginator, the position the current page begins at, and
+   *   with "Cargar más" always 1, since the list only grows downward. `itemsPerPage: 0` (no
+   *   pagination) makes the page size 0, which collapses the start to 1 and puts the whole list on
+   *   screen.
+   *
+   * The end is `start` plus what is in memory, clamped to the total because a server can return
+   * more items than the page size asked for, and a range past the total reads as a bug. The two
+   * guards are not decoration either: without the first a page that came back empty would render an
+   * impossible range like "12-10/19", and without the second a result set of zero has no count to
+   * show. The caller skips the row when this returns `''`.
+   */
+  protected _statusCountText(): string {
+    const total = this.api ? this._apiTotal : this.allCards.length;
+    const count = this.api ? this.allCards.length : this._localDisplayCards().length;
+    if (total <= 0 || count === 0) return '';
+    const start = this.pagination ? (this._currentPage() - 1) * this._pageSize() + 1 : 1;
+    const end = Math.min(start + count - 1, total);
+    return `Mostrando ${start}-${end} de ${total} publicaciones`;
+  }
+
+  /**
+   * Render the status row (error / loading / count) at the end of the timeline.
+   *
+   * The error and the loading lines are API-only: the local mode has no request of its own to fail
+   * or to wait for, so all it ever renders here is the count.
+   *
+   * With the numeric paginator the **loading** line never reaches this row even in API mode: the
+   * request that changes the page is one of the replacing ones (`_fetchPage`), so it shows the
+   * skeletons instead, and the guard below keeps `_renderStatus` out of the way while they are up.
+   * What is left is the count, which the paginator does not replace: the paginator says which page
+   * it is and how many pages there are, while the count says which slice of the filtered result is
+   * on screen.
    */
   protected _renderStatus(): void {
     // The skeletons are the loading feedback while the list is being replaced, and their count
@@ -2937,8 +2995,7 @@ export default class Timeline {
     // Only "Cargar más" (`_appendPageItems`) gets here with cards on screen, and it only exists
     // without the paginator: there the page being fetched is genuinely "more" of the current one.
     else if (this._apiLoading && this.allCards.length > 0) text = 'Cargando más publicaciones...';
-    else if (!this.pagination && this._apiTotal > 0)
-      text = `Mostrando ${this.allCards.length} de ${this._apiTotal} publicaciones`;
+    else text = this._statusCountText();
     if (!text) return;
     const el = document.createElement('div');
     el.className = 'timeline-item timeline-status-item';
@@ -3062,6 +3119,7 @@ export default class Timeline {
     } else if (this.itemsPerPage > 0 && this._displayedCount < this.allCards.length) {
       this._renderLoadMoreButton();
     }
+    this._renderStatus();
     requestAnimationFrame(() => {
       this.featuredContainer.querySelectorAll('.featured-card').forEach((c) => c.classList.add('visible'));
     });
@@ -3135,6 +3193,9 @@ export default class Timeline {
       if (this._displayedCount < this.allCards.length) {
         this._renderLoadMoreButton();
       }
+      // The range grew with the list, and only the button is re-rendered by the click itself, so
+      // the count row would keep saying "1-10 de 19" until the next full render.
+      this._renderStatus();
 
       if (this.isExpanded) {
         requestAnimationFrame(() => this._setupTimelineObserver());

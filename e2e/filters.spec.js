@@ -1,6 +1,7 @@
 ﻿import { test, expect } from '@playwright/test';
 import { openDemo, sel, ARTICLE_ROWS } from './helpers/demo.js';
 import mockData from '../example/mock-data.js';
+import demoFilters from '../example/filters.js';
 
 /**
  * The configurable filters (`TimelineOptions.filters`) in the real browser.
@@ -18,12 +19,16 @@ import mockData from '../example/mock-data.js';
  * - The inputs of a group are visually hidden (the styled box is the checkmark), so the clicks
  *   land on the `.filter-option` label, and state is asserted on the input underneath.
  * - The demo renders `itemsPerPage` 10 rows, so a page of results is the first 10 of the list.
+ *
+ * The example *does* declare checked values (the "Sin descartar" cut of the internal flyout), so
+ * nothing here may assume an untouched pool: the state the page opens in is read from the config
+ * (`declaredDefaults`) instead of being hardcoded, and a test that needs the bare pool clears the
+ * defaults first.
  */
 
-/** Filter the pool with the same defaults the demo declares and sort it like the component: date desc, no-date last. */
-function enUso(predicate = () => true) {
+/** Filter the pool and sort it the way the component does: date desc, no-date last. */
+function delPool(predicate = () => true) {
   return mockData.items
-    .filter((i) => i.descartado !== true && i.capturado === true)
     .filter(predicate)
     .sort((a, b) => {
       if (!a.fecha_publicacion) return 1;
@@ -32,6 +37,51 @@ function enUso(predicate = () => true) {
     })
     .map((i) => String(i.id));
 }
+
+/**
+ * Every token an item answers for a field, the way `_filterToken()` reads it: `String(value)`, with
+ * `null` / `undefined` / a missing field all being the `'null'` token, and arrays expanded.
+ */
+function tokensOf(item, field) {
+  const value = item[field];
+  if (value === null || value === undefined) return ['null'];
+  return [].concat(value).map((v) => (v === null || v === undefined ? 'null' : String(v)));
+}
+
+/**
+ * The tokens the example declares `checked`, grouped by field: `Map<field, tokens[]>`. A declared
+ * value can be a list (like `[null, false]` for "Sin descartar"), and inside a group the values are
+ * OR'd, which is why they end up in one entry per field — that entry is also exactly the CSV the
+ * component sends. This is the state the page opens with, so the expectations below are built from
+ * it instead of a hardcoded "nothing is checked".
+ */
+function declaredDefaults(group) {
+  const porCampo = new Map();
+  for (const filtro of demoFilters.filter((f) => (f.group ?? 'menu') === group)) {
+    for (const item of (filtro.items ?? []).filter((i) => i.checked)) {
+      porCampo.set(filtro.field, [...(porCampo.get(filtro.field) ?? []), ...[].concat(item.value).map(String)]);
+    }
+  }
+  return porCampo;
+}
+
+/** The CSV the component sends for a field: its checked values joined by commas */
+const csvOf = (tokens) => tokens.join(',');
+
+/** The pool as the page opens: every article that survives the declared defaults (AND between groups) */
+function poolPorDefecto(predicate = () => true) {
+  const defaults = [...declaredDefaults('filtros_internos')];
+  return delPool(
+    (item) =>
+      predicate(item) && defaults.every(([field, tokens]) => tokensOf(item, field).some((t) => tokens.includes(t)))
+  );
+}
+
+/** The internal groups the example leaves unchecked, which therefore travel as no param at all */
+const internalFieldsSinDefault = () => {
+  const conDefault = [...declaredDefaults('filtros_internos').keys()];
+  return demoFilters.filter((f) => f.group === 'filtros_internos' && !conDefault.includes(f.field)).map((f) => f.field);
+};
 
 /** The example limits each page to `itemsPerPage` (10) rows */
 const firstPageOf = (list) => list.slice(0, 10);
@@ -70,22 +120,35 @@ test.describe('filtros configurables en el navegador', () => {
         .locator('#filtros-internos-menu .filter-options')
         .evaluateAll((els) => els.map((e) => e.dataset.filterField))
     ).toEqual(['validado', 'capturado', 'descartado']);
-    // El default del demo (`descartado` = sin descartar + pendiente) enciende solo el botón del flyout.
-    await expect(page.locator('#filtros-internos-toggle')).toHaveClass(/active/);
+    // Cada grupo del flyout es una sección, y lleva su `label` como header cuando lo declara (sin
+    // él no se sabría qué grupo es cuál): el que no lo declara se dibuda igual, solo que sin header.
+    // Los textos exactos son los del ejemplo, así que el assert mira la estructura y no los clava.
+    expect(await page.locator('#filtros-internos-menu .filter-section').count()).toBe(3);
+    const headers = await page.locator('#filtros-internos-menu .filter-header').allTextContents();
+    expect(headers.length).toBeGreaterThan(0);
+    expect(headers.length).toBeLessThanOrEqual(3);
+    expect(headers.every((t) => t.trim().length > 0)).toBe(true);
+    // Y el panel conserva los suyos, uno por grupo, sin mezclarse con los del flyout.
+    expect(await page.locator('.filter-menu .filter-header').count()).toBe(5);
+    // Un botón se enciende con los valores de su propio destino: el del flyout, si el ejemplo
+    // declara algún default ahí; el del panel, si alguno fuera en el panel (hoy no).
+    const conDefaults = declaredDefaults('filtros_internos').size > 0;
+    if (conDefaults) await expect(page.locator('#filtros-internos-toggle')).toHaveClass(/active/);
+    else await expect(page.locator('#filtros-internos-toggle')).not.toHaveClass(/active/);
     await expect(page.locator('#filter-toggle')).not.toHaveClass(/active/);
-    // Y la lista ya viene con ese recorte aplicado (la primera página, ordenada por fecha).
+    // Y la lista arranca con lo que sobrevive a esos defaults, no con el pool entero.
     expect(
       await page.$$eval(ARTICLE_ROWS, (rows) =>
         rows.map((r) => r.querySelector('.timeline-card')?.getAttribute('data-card-id'))
       )
-    ).toEqual(firstPageOf(enUso()));
+    ).toEqual(firstPageOf(poolPorDefecto()));
   });
 
   test('modo local: tildar un valor del panel filtra la lista', async ({ page }) => {
     await openDemo(page, 'flat&expanded');
     await openPanel(page);
 
-    const sitios = enUso((i) => i.tipo_fuente === 'Sitio web o portal');
+    const sitios = delPool((i) => i.tipo_fuente === 'Sitio web o portal');
     expect(sitios.length).toBeGreaterThan(0);
 
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
@@ -98,17 +161,19 @@ test.describe('filtros configurables en el navegador', () => {
     // El botón del panel se enciende con filtros del panel.
     await expect(page.locator('#filter-toggle')).toHaveClass(/active/);
 
-    // Destildar devuelve la lista (la primera página del mismo recorte).
+    // Destildar devuelve la lista al estado en que se abrió: la primera página de lo que sobrevive
+    // a los defaults del ejemplo (que son del flyout, así que no se tocan acá).
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
-    await expect(page.locator(ARTICLE_ROWS)).toHaveCount(firstPageOf(enUso()).length);
+    await expect(page.locator(ARTICLE_ROWS)).toHaveCount(firstPageOf(poolPorDefecto()).length);
   });
 
   test('modo local: el corte "Ver más" de un grupo colapsa y expande', async ({ page }) => {
     await openDemo(page, 'flat&expanded');
     await openPanel(page);
 
-    // `tipo_fuente` declara 7 valores en el demo y los corta con su propio `maxVisible: 4`, así
-    // que el "Ver más" muestra la cola declarada (los 3 últimos) y no los que más filtran.
+    // `tipo_fuente` deriva sus 7 valores del dato (6 tipos más el bucket de `allowEmpty`) y los corta
+    // con su propio `maxVisible: 4`. Como el grupo es derivado, el corte ordena por conteo: los 4
+    // visibles son los que más ítems agrupan y el "Ver más" muestra la cola menos frecuente.
     const group = page.locator('[data-filter-field="tipo_fuente"]');
     await expect(group.locator('.filter-option')).toHaveCount(7);
     await expect(group.locator('.filter-option:visible')).toHaveCount(4);
@@ -129,11 +194,14 @@ test.describe('filtros configurables en el navegador', () => {
   test('modo local: el estado de los grupos con `persist` sobrevive a la recarga', async ({ page }) => {
     await openDemo(page, 'flat&expanded');
 
-    // Aflojar `capturado` (persiste, vive en el flyout de filtros internos): el checkbox queda
-    // destildado y así se guarda.
+    // Tildar `capturado` (persiste, vive en el flyout de filtros internos): se suma al estado con
+    // el que se abrió la página, y eso es lo que se guarda.
     await openInternos(page);
     await page.click(optionLabel('capturado', 'true'));
-    await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).not.toBeChecked();
+    await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).toBeChecked();
+    // Con un grupo del flyout tildado se enciende su botón, no el del panel.
+    await expect(page.locator('#filtros-internos-toggle')).toHaveClass(/active/);
+    await expect(page.locator('#filter-toggle')).not.toHaveClass(/active/);
 
     // `tipo_fuente` no persiste: tildar un valor del panel es un estado efímero.
     await openPanel(page);
@@ -142,9 +210,9 @@ test.describe('filtros configurables en el navegador', () => {
     await page.reload();
     await page.waitForSelector('.publicaciones-section .timeline-card', { state: 'attached' });
 
-    // El estado interno vuelve destildado (persistió el cambio) y el del panel con su default
-    // (sin chequear, porque `tipo_fuente` no persiste).
-    await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).not.toBeChecked();
+    // El estado interno vuelve tildado (persistió) y el del panel con su default (sin chequear,
+    // porque `tipo_fuente` no persiste).
+    await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).toBeChecked();
     await expect(page.locator('[data-filter-field="tipo_fuente"] input[value="Sitio web o portal"]')).not.toBeChecked();
   });
 
@@ -157,7 +225,7 @@ test.describe('filtros configurables en el navegador', () => {
 
     await openDemo(page, 'api&expanded');
 
-    // Los counts vienen del endpoint (mismo recorte de los filtros internos que en local).
+    // Los counts vienen del endpoint.
     const grupo = page.locator('[data-filter-field="tipo_fuente"]');
     const count = grupo
       .locator('.filter-option')
@@ -168,22 +236,40 @@ test.describe('filtros configurables en el navegador', () => {
     await openPanel(page);
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
 
-    // La última request de la lista lleva el filtro como `tipo_fuente=<valor>`, junto a los
-    // Los defaults de los filtros internos viajan desde el arranque. Los grupos que declaran varios
-    // valores mandan uno por param, CSV: los que declara el consumidor, tal cual y con el `null`
-    // incluido.
+    // La última request de la lista lleva el filtro como `tipo_fuente=<valor>`, y los grupos de
+    // estado viajan lo que el ejemplo declara tildado: un valor declarado es un CSV de sus tokens
+    // (`descartado=true,null,false` con el "Sin descartar" de `[null, false]`), y un grupo sin
+    // defaults no viaja.
     const last = requests[requests.length - 1];
     expect(last.get('tipo_fuente')).toBe('Sitio web o portal');
-    expect(last.get('descartado')).toBe('false,null');
-    expect(last.get('capturado')).toBe('true');
-    expect(last.get('validado')).toBe('true,false,null');
+    for (const [field, tokens] of declaredDefaults('filtros_internos')) {
+      expect(last.get(field), `el default de ${field} debería viajar`).toBe(csvOf(tokens));
+    }
+    for (const field of internalFieldsSinDefault()) {
+      expect(last.get(field), `${field} no declara default, así que no debería viajar`).toBe(null);
+    }
+
+    // Tildar en el flyout lo manda como CSV, tal cual lo declara el consumidor, sin perder los
+    // defaults que ya venían. El click cae dentro de la ventana de debounce que dejó el filtro
+    // anterior, así que la request sale un poco después.
+    await openInternos(page);
+    await page.click(optionLabel('capturado', 'true'));
+    await expect.poll(() => requests[requests.length - 1].get('capturado')).toBe('true');
+    const conEstado = requests[requests.length - 1];
+    expect(conEstado.get('capturado')).toBe('true');
+    expect(conEstado.get('tipo_fuente')).toBe('Sitio web o portal');
+    for (const [field, tokens] of declaredDefaults('filtros_internos')) {
+      if (field !== 'capturado') expect(conEstado.get(field)).toBe(csvOf(tokens));
+    }
   });
 
   test('modo API: el resultado vuelve filtrado por el servidor', async ({ page }) => {
     await openDemo(page, 'api&expanded');
     expect(await page.$$eval(ARTICLE_ROWS, (rows) => rows.length)).toBeGreaterThan(0);
 
-    const sitios = enUso((i) => i.tipo_fuente === 'Sitio web o portal');
+    // El servidor ANDea los params, así que el resultado son los sitios que además sobreviven a los
+    // defaults del ejemplo (los mismos que viajan en la request del test anterior).
+    const sitios = poolPorDefecto((i) => i.tipo_fuente === 'Sitio web o portal');
     await openPanel(page);
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
 

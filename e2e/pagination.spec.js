@@ -150,8 +150,10 @@ test.describe('paginador en modo API: el estado de carga', () => {
     const second = await articleIds(page);
     expect(second.length).toBeGreaterThan(0);
     expect(second).not.toEqual(first);
-    // And the count row is still not there: with the paginator only the error reaches that row.
-    await expect(page.locator(sel.status)).toHaveCount(0);
+    // And the count row comes back with the page: the paginator says which page it is, the count
+    // says which slice of the filtered result it holds. Page 2 of the 19-item mock starts at 11.
+    await expect(page.locator(sel.status)).toHaveCount(1);
+    await expect(page.locator(sel.status)).toContainText(`Mostrando 11-${10 + second.length} de 19 publicaciones`);
   });
 
   test('si el request de la pagina falla, la lista queda vacia con el error', async ({ page }) => {

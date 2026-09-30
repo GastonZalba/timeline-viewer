@@ -33,14 +33,28 @@ function columnLabels(container, index) {
   ).map((el) => el.textContent);
 }
 
-/** The "Tipo de fuente" group as the demo declares it, reused by the tests that filter by it */
-const tipoFuenteDemo = demoFilters.find((f) => f.field === 'tipo_fuente');
+/** The "Tipo de fuente" values the mock brings, as a declaration with `items` (the demo derives them) */
+const tipoFuenteDeclarado = [
+  { value: 'Sitio web o portal', label: 'Sitio web o portal' },
+  { value: 'Gacetilla o comunicado de prensa', label: 'Gacetilla o comunicado de prensa' },
+  { value: 'Decreto o norma', label: 'Decreto o norma' },
+  { value: 'Libro o publicación', label: 'Libro o publicación' },
+  { value: 'Video', label: 'Video' },
+  { value: 'Red Social', label: 'Red Social' },
+  { value: null, label: 'Sin tipo' }
+];
 
 /** The values rendered in a group, as `[value, visibleLabel]` pairs */
 function groupValues(container, field) {
   return Array.from(container.querySelectorAll(`.filter-options[data-filter-field="${field}"] .filter-option`)).map(
     (el) => [el.querySelector('input').value, el.querySelector('.filter-option-label').textContent]
   );
+}
+
+/** The count rendered next to one value of a group */
+function groupCount(container, field, value) {
+  return container.querySelector(`[data-filter-field="${field}"] input[value="${value}"] ~ .filter-option-count`)
+    .textContent;
 }
 
 /**
@@ -94,6 +108,63 @@ test('sin la opción `filters` no hay panel, ni botón, ni estado interno', () =
   assert.ok(container.querySelector('#work-notes-toggle'), 'el toggle de notas debería estar');
   assert.equal(container.querySelector('#filtros-internos-wrap'), null, 'sin grupos internos no hay flyout');
   assert.equal(tl.allCards.length, mockData.items.length, 'la lista se sigue mostrando entera');
+});
+
+test('los grupos `filtros_internos` también muestran su `label` como header del flyout', () => {
+  const container = resetDom();
+  new Timeline({
+    container,
+    items: mockData.items,
+    internalButtons: true,
+    filters: [
+      { field: 'validado', label: 'Validado', group: 'filtros_internos', persist: true },
+      { field: 'capturado', label: 'Capturado', group: 'filtros_internos', persist: true },
+      { field: 'descartado', label: 'Descartado', group: 'filtros_internos', persist: true }
+    ]
+  });
+  // Cada grupo del flyout es un `.filter-section` con su header, igual que en el panel: sin él no
+  // se sabría qué grupo es cuál, que es justo lo que pasa con valores derivados ("Sí"/"No").
+  const menu = container.querySelector('#filtros-internos-menu');
+  assert.equal(menu.querySelectorAll('.filter-section').length, 3);
+  assert.deepEqual(
+    Array.from(menu.querySelectorAll('.filter-header')).map((el) => el.textContent),
+    ['Validado', 'Capturado', 'Descartado']
+  );
+  // Y los headers del panel no se mezclan con los del flyout: viven en menús distintos.
+  assert.equal(container.querySelectorAll('.filter-menu .filter-header').length, 0);
+});
+
+test('un grupo sin `label` se dibuja igual, solo que sin header (y sin warning)', () => {
+  const container = resetDom();
+  const warnings = captureWarnings(() => {
+    new Timeline({
+      container,
+      items: mockData.items,
+      internalButtons: true,
+      filters: [
+        // `label: ''`, `label: null` y `label` ausente son lo mismo: sin header. El panel también
+        // lo acepta, no solo el flyout.
+        { field: 'tipo_fuente' },
+        { field: 'es_oficial', label: '' },
+        { field: 'capturado', label: null, group: 'filtros_internos' }
+      ]
+    });
+  });
+  assert.deepEqual(warnings, [], 'un grupo sin label es una decisión, no una declaración rota');
+  // El panel conserva sus dos grupos, con el header del que sí lo trae.
+  assert.equal(container.querySelectorAll('.filter-menu .filter-section').length, 2);
+  assert.deepEqual(
+    Array.from(container.querySelectorAll('.filter-menu .filter-header')).map((el) => el.textContent),
+    []
+  );
+  assert.equal(container.querySelectorAll('.filter-menu .filter-options').length, 2);
+  // Y el flyout dibuja el suyo sin header, con sus valores.
+  const menu = container.querySelector('#filtros-internos-menu');
+  assert.equal(menu.querySelectorAll('.filter-header').length, 0);
+  assert.deepEqual(groupValues(container, 'capturado'), [
+    ['true', 'Sí'],
+    ['false', 'No']
+  ]);
 });
 
 test('un `type` no soportado descarta el grupo con un warning y deja armado el resto', () => {
@@ -474,47 +545,61 @@ test('un booleano se lee como "Sí"/"No" sin necesidad de `extract`', () => {
 test('tildar un valor filtra la lista, y destildarlo la devuelve', () => {
   window.localStorage.clear();
   const container = resetDom();
-  const tl = new Timeline({ container, items: mockData.items, filters: demoFilters, internalButtons: true });
-  // Los defaults del demo (capturado, y descartado = sin descartar + pendiente) ya recortan la lista.
-  const enUso = () => mockData.items.filter((i) => i.descartado !== true && i.capturado === true).length;
-  // `descartado` parte "sin descartar" (false) y "pendiente" (null) en dos checkboxes: aflojar el
-  // default del grupo es sacar los dos.
-  const setDescartado = (checked) =>
-    ['false', 'null'].forEach((v) => {
-      const cb = container.querySelector(`[data-filter-field="descartado"] input[value="${v}"]`);
-      if (cb.checked !== checked) cb.click();
-    });
-  assert.equal(tl.allCards.length, enUso());
+  // Los tres grupos que este test necesita, declarados acá y no con `demoFilters`: el test va del
+  // ida y vuelta del checkbox, no de lo que el demo tenga tildado hoy (eso lo cubren el test de
+  // arriba y `e2e/filters.spec.js`, que sí se apoyan en la declaración del ejemplo).
+  const tl = new Timeline({
+    container,
+    items: mockData.items,
+    internalButtons: true,
+    filters: [
+      { field: 'tipo_fuente', label: 'Tipo de fuente' },
+      { field: 'descartado', label: 'Descartado', group: 'filtros_internos', allowEmpty: true },
+      { field: 'capturado', label: 'Capturado', group: 'filtros_internos' }
+    ]
+  });
+  // Los tres grupos derivan sus valores del dato y ninguno viene tildado, así que la lista arranca
+  // con el pool completo y el recorte por estado lo aplica el usuario desde el flyout.
+  assert.equal(tl.allCards.length, mockData.items.length, 'sin tildar nada no se descarta nada');
+  const toggle = (field, value) =>
+    container.querySelector(`[data-filter-field="${field}"] input[value="${value}"]`).click();
 
-  // El único ítem de tipo Video está descartado: con el default de estado sigue en uso, el
-  // filtro de tipo lo deja en cero.
-  const video = container.querySelector('[data-filter-field="tipo_fuente"] input[value="Video"]');
-  assert.ok(video, 'debería existir el checkbox de "Video"');
-  video.click();
-  assert.equal(tl.allCards.length, 0);
-
-  // Aflojar el default de descartado deja que `FUE-00014` (el tipo Video) vuelva al pool.
-  setDescartado(false);
-  assert.equal(tl.allCards.length, 1);
-  assert.equal(tl.allCards[0].id, 'FUE-00014');
-
-  // Destildar el tipo vuelve al pool recortado por los defaults de estado.
-  video.click();
-  assert.equal(
-    tl.allCards.length,
-    mockData.items.filter((i) => i.capturado === true).length,
-    'descartado ya no filtra'
+  // El único ítem de tipo Video está descartado, pero sin un default de estado sigue en el pool:
+  // el filtro de tipo lo deja solo.
+  toggle('tipo_fuente', 'Video');
+  assert.deepEqual(
+    tl.allCards.map((c) => c.id),
+    ['FUE-00014']
   );
 
-  // Reponer el default de descartado (capturado sigue solo)...
-  setDescartado(true);
-  assert.equal(tl.allCards.length, 15, 'el default de capturado + el de descartado');
-  // ...sacar capturado deja solo el recorte de descartado...
-  container.querySelector('[data-filter-field="capturado"] input[value="true"]').click();
-  assert.equal(tl.allCards.length, 17, 'solo el default de descartado sigue filtrando');
-  // ...y sacar ese también devuelve el pool completo.
-  setDescartado(false);
-  assert.equal(tl.allCards.length, mockData.items.length, 'sin defaults ni filtros queda la lista completa');
+  // AND entre grupos: el "Sin valor" de `descartado` (el bucket de `allowEmpty`) no incluye ese
+  // ítem, así que la intersección es vacía.
+  assert.deepEqual(groupValues(container, 'descartado'), [
+    ['false', 'No'],
+    ['true', 'Sí'],
+    ['null', 'Sin valor']
+  ]);
+  toggle('descartado', 'null');
+  assert.equal(tl.allCards.length, 0);
+
+  // Aflojar el segundo grupo devuelve el resultado del primero...
+  toggle('descartado', 'null');
+  assert.deepEqual(
+    tl.allCards.map((c) => c.id),
+    ['FUE-00014']
+  );
+  // ...y aflojar el primero, el pool completo.
+  toggle('tipo_fuente', 'Video');
+  assert.equal(tl.allCards.length, mockData.items.length);
+
+  // Un valor derivado del dato filtra por sí solo: los dos ítems sin capturar.
+  toggle('capturado', 'false');
+  assert.deepEqual(
+    tl.allCards.map((c) => c.id),
+    ['FUE-00018', 'FUE-00019']
+  );
+  toggle('capturado', 'false');
+  assert.equal(tl.allCards.length, mockData.items.length, 'sin filtros queda la lista completa');
 });
 
 test('`items` fijo mantiene el grupo visible aunque los datos no traigan esos valores', () => {
@@ -582,9 +667,14 @@ test('el corte "Ver más" ordena por el orden declarado, y por conteo solo en lo
   );
 
   // El mismo grupo DECLARADO se trunca en su propio orden, aunque el conteo diga otra cosa
-  // ("Red Social" tiene 3 ítems y se va detrás del corte, antes que "Decreto o norma").
+  // ("Red Social" tiene 3 ítems y se va detrás del corte, antes que "Decreto o norma"). El demo ya
+  // no declara `tipo_fuente` (lo deriva), así que la declaración va inline acá.
   const container2 = resetDom();
-  new Timeline({ container: container2, items: mockData.items, filters: [tipoFuenteDemo] });
+  new Timeline({
+    container: container2,
+    items: mockData.items,
+    filters: [{ field: 'tipo_fuente', label: 'Tipo de fuente', maxVisible: 4, items: tipoFuenteDeclarado }]
+  });
   const box2 = container2.querySelector('[data-filter-field="tipo_fuente"]');
   assert.equal(box2.querySelectorAll('.filter-option').length, 7, 'los 7 valores declarados');
   assert.equal(box2.querySelectorAll('.filter-option-extra').length, 3);
@@ -693,32 +783,46 @@ test('`group: "filtros_internos"` sin `internalButtons` no se renderiza, y el re
   assert.equal(container.querySelectorAll('.filter-section').length, 5, 'los 5 grupos del panel');
 });
 
-test('el taxónomo activo recalcula los conteos del grupo declarado', () => {
+test('el taxónomo activo recalcula los conteos de los grupos declarados y derivados', () => {
   const container = resetDom();
   const tl = new Timeline({ container, content: mockData.content, filters: demoFilters });
   const select = container.querySelector('#taxonomy-select');
   const primeraTaxonomia = mockData.content[0].items.length;
+  const valoresDe = (field) => groupValues(container, field).map(([v]) => v);
   assert.equal(tl.allCards.length, primeraTaxonomia, 'arranca con la primera taxonomía');
 
-  // Un grupo declarado no pierde valores al cambiar de taxonomía (el `Ver más` sigue mostrando
-  // los mismos), pero sus conteos sí se recalculan sobre el pool activo.
-  assert.deepEqual(
-    Array.from(container.querySelectorAll('[data-filter-field="tipo_fuente"] .filter-option')).map(
-      (el) => el.querySelector('input').value
-    ),
-    demoFilters.find((f) => f.field === 'tipo_fuente').items.map((i) => String(i.value))
-  );
+  // Un grupo DECLARADO (en el demo, `contenido`) no pierde valores al cambiar de taxonomía (el
+  // `Ver más` sigue mostrando los mismos), pero sus conteos sí se recalculan sobre el pool activo.
+  assert.deepEqual(valoresDe('contenido'), ['adjuntos', 'video', 'imagenes']);
+  assert.equal(groupCount(container, 'contenido', 'adjuntos'), '(7)');
 
-  // "Ver todo" recalcula los conteos sobre el pool completo.
+  // Uno DERIVADO cambia con el scope: en esta taxonomía el mock solo trae cuatro tipos.
+  assert.deepEqual(valoresDe('tipo_fuente'), [
+    'Sitio web o portal',
+    'Gacetilla o comunicado de prensa',
+    'Decreto o norma',
+    'Libro o publicación'
+  ]);
+
+  // "Ver todo" recalcula los conteos sobre el pool completo, y el grupo derivado recupera los
+  // valores que en la taxonomía anterior no había (con el bucket de `allowEmpty` al final). Como el
+  // grupo está colapsado (`maxVisible: 4` en el demo), el orden es por conteo.
   select.selectedIndex = select.options.length - 1;
   select.dispatchEvent(new window.Event('change'));
   assert.equal(tl.allCards.length, mockData.items.length);
-  const conTodos = Number(
-    container.querySelector('[data-filter-field="tipo_fuente"] .filter-option-count').textContent.replace(/\D/g, '')
-  );
+  assert.equal(groupCount(container, 'contenido', 'adjuntos'), '(12)');
+  assert.deepEqual(valoresDe('tipo_fuente'), [
+    'Sitio web o portal',
+    'Gacetilla o comunicado de prensa',
+    'Red Social',
+    'Decreto o norma',
+    'Libro o publicación',
+    'Video',
+    'null'
+  ]);
   assert.equal(
-    conTodos,
-    mockData.items.filter((i) => i.tipo_fuente === 'Sitio web o portal').length,
+    groupCount(container, 'tipo_fuente', 'Sitio web o portal'),
+    `(${mockData.items.filter((i) => i.tipo_fuente === 'Sitio web o portal').length})`,
     'el conteo debería ser el del pool completo'
   );
 });
