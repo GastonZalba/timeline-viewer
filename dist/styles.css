@@ -480,6 +480,7 @@
   border-radius: 8px;
   padding: 6px;
   min-width: 380px;
+  max-width: min(560px, 100vw - 32px);
   z-index: 20;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
@@ -507,7 +508,7 @@
   border-top: 1px solid var(--tv-border-card);
 }
 @media (max-width: 600px) {
-  .publicaciones-section .filter-menu .filter-menu {
+  .publicaciones-section .filter-menu {
     position: fixed;
     top: 56px;
     left: 50%;
@@ -672,6 +673,8 @@
 }
 .publicaciones-section .filter-select {
   position: relative;
+  width: 0;
+  min-width: 100%;
 }
 .publicaciones-section .filter-select-trigger {
   display: flex;
@@ -929,6 +932,7 @@
   border-radius: 8px;
   padding: 6px;
   min-width: 200px;
+  max-width: min(360px, 100vw - 32px);
   z-index: 20;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }

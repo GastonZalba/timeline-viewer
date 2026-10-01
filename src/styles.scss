@@ -595,6 +595,12 @@
     border-radius: 8px;
     padding: 6px;
     min-width: 380px;
+    // Techo del panel. Es `position: absolute` sin `width`, así que su ancho sale del shrink-to-fit
+    // (max-content del contenido): sin tope, un solo valor larguísimo —de un `select` o de un grupo de
+    // checkboxes— lo estiraba hasta salirse de la pantalla, porque el `text-overflow: ellipsis` de las
+    // filas solo corta contra el ancho disponible y acá no había ninguno. El `100vw` es el resguardo
+    // final para un contenedor angosto; el móvil ya trae su propio `width` más abajo.
+    max-width: min(560px, calc(100vw - 32px));
     z-index: 20;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 
@@ -627,17 +633,20 @@
     }
 
     @media (max-width: 600px) {
-      .filter-menu {
-        position: fixed;
-        top: 56px;
-        left: 50%;
-        right: auto;
-        transform: translateX(-50%);
-        width: min(420px, calc(100vw - 24px));
-        min-width: 0;
-        max-height: calc(100vh - 90px);
-        overflow-y: auto;
-      }
+      // Las declaraciones van directo en el `@media`, sin volver a nombrar la regla: anidadas
+      // adentro de `.filter-menu` compilan a `.publicaciones-section .filter-menu .filter-menu`, un
+      // descendiente que ningún nodo puede ser, así que el bloque entero nunca aplicaba y en móvil
+      // el panel conservaba el `min-width` de escritorio (380px), que en una pantalla angosta se
+      // salía de la viewport. Mismo patrón que el `@media` de `.timeline-cards`.
+      position: fixed;
+      top: 56px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+      width: min(420px, calc(100vw - 24px));
+      min-width: 0;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
     }
   }
 
@@ -823,6 +832,14 @@
 
   .filter-select {
     position: relative;
+    // `width: 0` con `min-width: 100%` es lo que le saca este bloque de la cuenta del ancho del
+    // panel: los dos menús son `position: absolute` sin `width`, o sea que se dimensionan por
+    // shrink-to-fit, y un solo `.filter-select-option-label` en `nowrap` los estiraba hasta cientos
+    // de píxeles (medido: 380px → 2069px en el panel y 200px → 3196px en el flyout). Con esto el ancho
+    // sale del padre —el ancho que el panel ya tiene, su `min-width`— y el `ellipsis` de la fila por
+    // fin tiene algo contra qué cortar; el texto entero sigue en el `title` de la fila.
+    width: 0;
+    min-width: 100%;
   }
 
   // El trigger es un `<div>` (no un `<button>`) porque su estado lo escribe `_renderSelectTrigger`
@@ -1161,6 +1178,9 @@
     border-radius: 8px;
     padding: 6px;
     min-width: 200px;
+    // Mismo techo que el panel y por el mismo motivo (shrink-to-fit): acá más alto porque es un
+    // desplegable chico, no un panel de dos columnas.
+    max-width: min(360px, calc(100vw - 32px));
     z-index: 20;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 
