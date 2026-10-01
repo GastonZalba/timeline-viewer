@@ -116,6 +116,17 @@ const LG_WHEEL_ZOOM_LINE_PX = 16;
  */
 const LG_WHEEL_ZOOM_MAX = 4;
 /**
+ * Escala real mínima para que la captura se abra zoomeada. El plugin `zoom` ya no hace nada cuando la
+ * imagen va 1:1 (`setActualSize` termina en `resetZoom()` y `zoomImage` sale por `scaleDiff === 0`),
+ * pero sí haría un zoom visible con una escala real de 1.5 (una foto de 1600x1200 en una caja de
+ * 1083). Con el piso en 2x, lo único que entra por esta vía son las capturas largas.
+ */
+const LG_ZOOM_ACTUAL_MIN_SCALE = 2;
+/** Cada cuánto se reintenta una espera por condición, en ms. */
+const LG_ZOOM_POLL_INTERVAL = 100;
+/** Cuántas esperas por condición se hacen antes de abandonar: `20 x 100ms` = 2s. */
+const LG_ZOOM_POLL_TRIES = 20;
+/**
  * Plugin de lightGallery: **zoom con la rueda** sobre la imagen abierta.
  *
  * lightGallery 2.9 no lo trae. El plugin `zoom` maneja pinch (táctil), drag para panear y los
@@ -160,6 +171,22 @@ class LgWheelZoom {
             if (now - this._lastWheelAt < LG_WHEEL_ZOOM_COOLDOWN)
                 return;
             this._lastWheelAt = now;
+            // Estado "tamaño real": acá el peer dep cambia de representación —el `.lg-image` queda con su
+            // tamaño natural en layout y el `!important` de `lg-zoom.css` le fuerza `scale(1)`— y deja su
+            // `scale` (el de la transformación) sin reconciliar, así que cualquier `zoomImage()` desde este
+            // estado mueve la imagen sin reasonar la escala nueva (se ve como un salto). Por eso la rueda no
+            // hace zoom acá: para arriba no hay nada más que ampliar (ya es 1:1) y para abajo devuelve al
+            // ajuste. El reset es en dos pasos porque `resetZoom()` solo no alcanza: no saca la clase
+            // `reset-transition-y` —el `!important` que manda el tamaño natural— ni los `width`/`height`
+            // inline, y `resetImageTranslate()` solo no alcanza porque no limpia el `transform` inline ni
+            // reinicia `scale`/`left`/`top`.
+            if (this._atActualSize()) {
+                if (delta < 0)
+                    return;
+                zoom.resetImageTranslate(this._core.index);
+                zoom.resetZoom(this._core.index);
+                return;
+            }
             const prev = zoom.scale;
             // Techo: el tamaño real de la imagen, y el piso solo cuando no hay nada que ampliar, que es el
             // caso de una imagen que la galería muestra 1:1 (un screenshot, un thumbnail). `getScale` ya
@@ -187,6 +214,138 @@ class LgWheelZoom {
     destroy() {
         this._core.outer.get().removeEventListener('wheel', this._onWheel);
     }
+    /**
+     * Si el peer dep dejó la imagen en su representación de "tamaño real" (la que describe `_onWheel`).
+     *
+     * La clase `lg-actual-size` del `.lg-outer` es la que pone y saca el plugin, pero **no alcanza
+     * sola**: entre aperturas queda pegada en el contenedor reutilizado, así que un primer tick con la
+     * imagen todavía en su caja de ajuste caería en la rama equivocada. Se confirma con la geometría,
+     * que en ese estado es la única que vale: el elemento con su tamaño natural en layout.
+     */
+    _atActualSize() {
+        const image = this._core.outer.get().querySelector('.lg-current .lg-image');
+        return (this._core.outer.get().classList.contains('lg-actual-size') &&
+            !!image &&
+            image.naturalWidth > 0 &&
+            image.offsetWidth === image.naturalWidth);
+    }
+}
+/**
+ * `LgWheelZoom` + abrir la imagen **a tamaño real y anclada arriba**.
+ *
+ * Existe porque el "tamaño real" de lightGallery deja verticalmente toda imagen vertical: al terminar
+ * el zoom, `setZoomImageSize()` pone el `.lg-image` a sus píxeles naturales y le aplica una de tres
+ * clases del CSS del peer dep según qué ejes desbordan (`lg-zoom.css`), y la de imagen vertical —
+ * `reset-transition-y`, que es el caso de una captura larga— es `top: 50%` con
+ * `translate3d(0, -50%, 0)`. O sea: abrir una captura de 8000px en el medio.
+ *
+ * Por qué el ancla va por JS y no por CSS: esas tres reglas están escritas con `!important`, y además
+ * el modal vive en `document.body` (el core usa `settings.container = document.body`), fuera del
+ * scope `.publicaciones-section` del componente. Lo único permitido es mover el `.lg-img-wrap`, que es
+ * lo que escribe `setZoomStyles()`.
+ *
+ * Las dos esperas son **por condición, no por tiempo**: el peer dep tiene `enableZoomAfter: 300` y
+ * `ZOOM_TRANSITION_DURATION: 500`, y si mañana cambian, esperar por condición deja de anclar en vez de
+ * anclar en cualquier lado.
+ */
+class LgWheelZoomTopAnchored extends LgWheelZoom {
+    constructor() {
+        super(...arguments);
+        /** Una sola corrida por apertura: el listener de `lgSlideItemLoad` dispara por slide */
+        this._started = false;
+        this._onSlideLoad = () => {
+            if (this._started)
+                return;
+            this._started = true;
+            this._arm(0);
+        };
+    }
+    init() {
+        super.init();
+        // Mismo mecanismo que el `lgAfterClose` que escucha `_openLightGallery`: `LGel` es un
+        // `dispatchEvent` sobre `core.el`, así que el nombre del evento es el de `lGEvents` pelado.
+        this._core.el.addEventListener('lgSlideItemLoad', this._onSlideLoad);
+    }
+    destroy() {
+        this._core.el.removeEventListener('lgSlideItemLoad', this._onSlideLoad);
+        super.destroy();
+    }
+    /** Esperar a que el plugin `zoom` se arme, decidir si vale la pena, y pedir el tamaño real */
+    _arm(attempt) {
+        const zoom = this._zoom;
+        const image = this._currentImage();
+        const content = this._viewport();
+        // `containerRect` lo setea `setZoomEssentials()`, que corre recién cuando el plugin se arma (el
+        // default es `enableZoomAfter: 300` después de que cargó la slide): sirve de señal de "listo",
+        // pero **no** de medida (ver `_anchorTop`). La imagen sin `naturalWidth` es que no cargó.
+        if (!zoom || !zoom.containerRect || !image || !image.naturalWidth || !content) {
+            this._retry(attempt, () => this._arm(attempt + 1));
+            return;
+        }
+        if (!this._worthZooming(image, content))
+            return;
+        zoom.setActualSize(this._core.index);
+        this._anchorTop(attempt);
+    }
+    /** Esperar a que la imagen llegue a 1:1 y recién ahí alinearla arriba */
+    _anchorTop(attempt) {
+        const zoom = this._zoom;
+        const image = this._currentImage();
+        const content = this._viewport();
+        // Se cerró la galería o se movió de slide: los nodos ya no están (o no son el de esta slide).
+        if (!zoom || !image || !content)
+            return;
+        // `setActualSize` pasa `resetToMax: true`, que hace que `setZoomImageSize()` ponga el elemento a
+        // `naturalWidth/naturalHeight` en px después de la transición. Antes de eso el elemento sigue con
+        // el tamaño ajustado y escalado por transform, así que el rect todavía no es el natural —y de
+        // paso esta espera también cubre la animación de apertura del modal, que recién termina acá.
+        const imageRect = image.getBoundingClientRect();
+        if (imageRect.height + 1 < image.naturalHeight) {
+            this._retry(attempt, () => this._anchorTop(attempt + 1));
+            return;
+        }
+        if (!this._worthZooming(image, content))
+            return;
+        // Objetivo **absoluto**, no un delta: el alto natural de la imagen contra el alto vivo del visor,
+        // que es la mitad del desborde vertical. Los dos son números estables —no dependen de dónde esté
+        // la imagen en este instante— así que no hay que medir la posición: medirla sí lo يعتمد, y acá
+        // el elemento todavía viene transitioning (el wrap tiene 500ms de transición), con lo cual el
+        // rect daba la posición de un frame antes y el ancla quedaba 99px corrido. Tampoco sirve el
+        // `containerRect` del plugin, que cachea `setZoomEssentials()` al armarse y al reabrir cae dentro
+        // de la animación de apertura del modal (`432px` en vez de `632px`), con lo que daba 3789 en vez de
+        // 3690. Es el mismo `minY` de `getPossibleSwipeDragCords()`, así que el clamp del siguiente zoom
+        // no lo corrige.
+        const y = (image.naturalHeight - content.getBoundingClientRect().height) / 2;
+        // `zoom.top` antes del `setZoomStyles`: el handler de la rueda recalcula el `y` del wrap a partir
+        // del `top` que quedó, así que sin esto el ancla se pierde en el primer tick.
+        zoom.top = y;
+        zoom.setZoomStyles({ x: zoom.left, y, scale: zoom.scale });
+    }
+    /**
+     * Si a 1:1 la imagen se vería lo bastante más grande como para que valga el zoom.
+     *
+     * La cuenta sale de los dos números naturales y del alto **vivo** del visor, y no de
+     * `getCurrentImageActualSizeScale()`, que divide por el `offsetWidth` del elemento: el peer dep deja
+     * `reset-transition-y` pegado en la imagen entre aperturas (`_lgContainer` se reutiliza), con lo
+     * cual al reabrir mide `1` —aunque la captura siga siendo una de 12x— y la captura se salía de esta
+     * vía sin avisar. Con el elemento en su caja de ajuste el valor coincide con el del plugin.
+     */
+    _worthZooming(image, content) {
+        const fitHeight = Math.min(image.naturalHeight, content.getBoundingClientRect().height);
+        return image.naturalHeight / fitHeight >= LG_ZOOM_ACTUAL_MIN_SCALE;
+    }
+    _retry(attempt, step) {
+        if (attempt >= LG_ZOOM_POLL_TRIES)
+            return;
+        setTimeout(step, LG_ZOOM_POLL_INTERVAL);
+    }
+    _currentImage() {
+        return this._core.outer.get().querySelector('.lg-current .lg-image');
+    }
+    /** El `.lg-content`, que es la caja contra la que encaja la imagen y la que scrollea el wrap */
+    _viewport() {
+        return this._core.outer.get().querySelector('.lg-content');
+    }
 }
 export default class Timeline {
     constructor(config) {
@@ -205,6 +364,9 @@ export default class Timeline {
         this.inlineImages = config.inlineImages || false;
         this.inlineAdjuntos = config.inlineAdjuntos || false;
         this.internalButtons = config.internalButtons || false;
+        // Default true: es lo que espera quien abre una captura larga, y el gate por escala real lo deja
+        // sin efecto cuando no hay nada que ganar (ver `LgWheelZoomTopAnchored`).
+        this.screenshotActualSize = config.screenshotActualSize !== false;
         this.fullpage = config.fullpage === true;
         this.filters = this._normalizeFilters(config.filters);
         this._filterExpanded = new Set();
@@ -951,7 +1113,7 @@ export default class Timeline {
         return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`;
     }
     /** Open a lightGallery modal with the provided images */
-    _openLightGallery(images, title, showFileName, startIndex = 0) {
+    _openLightGallery(images, title, showFileName, startIndex = 0, openAtActualSize = false) {
         if (!images || !images.length)
             return;
         if (this._lgInstance) {
@@ -971,9 +1133,8 @@ export default class Timeline {
                     ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>`
                     : ''
             })),
-            plugins: [lgZoom, lgThumbnail, LgWheelZoom],
-            showZoomInOutIcons: true,
-            actualSize: false
+            plugins: [lgZoom, lgThumbnail, openAtActualSize ? LgWheelZoomTopAnchored : LgWheelZoom],
+            showZoomInOutIcons: true
         });
         this._lgContainer.addEventListener('lgAfterClose', () => {
             if (this._lgInstance) {
@@ -1494,7 +1655,7 @@ export default class Timeline {
             if (screenshotBtn) {
                 screenshotBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this._openLightGallery([{ thumb: card.screenshot, full: card.screenshot }], card.nombre_fuente, false);
+                    this._openLightGallery([{ thumb: card.screenshot, full: card.screenshot }], card.nombre_fuente, false, 0, this.screenshotActualSize);
                 });
             }
             const imagesBtn = actionsEl.querySelector('.card-images-btn');

@@ -215,6 +215,19 @@ export interface TimelineOptions {
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
     /**
+     * Open the screenshot gallery at the image's real size, anchored to the top of the viewport
+     * (default `true`).
+     *
+     * lightGallery centers a portrait image vertically when it shows it at 1:1, which is the wrong
+     * place to land on a long screenshot: you open it in the middle. This zooms to the real size and
+     * moves it to the top instead.
+     *
+     * Only applies to the screenshot (the one-image gallery), not to the `imagenes` grid, and only
+     * when there is something to gain: a capture already shown at (or near) its real size — or under
+     * `LG_ZOOM_ACTUAL_MIN_SCALE`, 2x — opens exactly as before.
+     */
+    screenshotActualSize?: boolean;
+    /**
      * Label of the expand toggle for the given count.
      * The count is the total number of publications, independent of the selected taxonomy.
      * The returned string is injected as HTML (it is not escaped), so it can contain markup
@@ -474,6 +487,7 @@ export default class Timeline {
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
+    screenshotActualSize: boolean;
     fullpage: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
@@ -757,7 +771,7 @@ export default class Timeline {
     /** Build the embed markup for a parsed link */
     protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
-    protected _openLightGallery(images: ImageInfo[] | null | undefined, title: string, showFileName: boolean, startIndex?: number): void;
+    protected _openLightGallery(images: ImageInfo[] | null | undefined, title: string, showFileName: boolean, startIndex?: number, openAtActualSize?: boolean): void;
     /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
     protected _oficialIconSvg(): string;
     /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */
