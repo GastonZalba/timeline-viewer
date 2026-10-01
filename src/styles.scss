@@ -245,8 +245,13 @@
       backdrop-filter: blur(10px);
       border: none;
       border: 1px solid var(--tv-accent-dark);
-      border-radius: 10px;
+      border-radius: 50px;
       box-shadow: 4px 7px 6px #00000026;
+
+      @media (max-width: 800px) {
+        border-radius: 10px;
+        max-width: none;
+      }
     }
 
     // El `margin-top: -50px` está calibrado contra el `min-height: 140px` de la fila
@@ -270,6 +275,7 @@
       background: none !important;
       font-size: 0.8em;
       pointer-events: none;
+      padding-left: 0;
       .expand-icon {
         display: none;
       }

@@ -187,8 +187,14 @@
   backdrop-filter: blur(10px);
   border: none;
   border: 1px solid var(--tv-accent-dark);
-  border-radius: 10px;
+  border-radius: 50px;
   box-shadow: 4px 7px 6px rgba(0, 0, 0, 0.1490196078);
+}
+@media (max-width: 800px) {
+  .publicaciones-section.fullpage .featured-row {
+    border-radius: 10px;
+    max-width: none;
+  }
 }
 .publicaciones-section.fullpage .timeline-container {
   margin-top: 0;
@@ -204,6 +210,7 @@
   background: none !important;
   font-size: 0.8em;
   pointer-events: none;
+  padding-left: 0;
 }
 .publicaciones-section.fullpage .expand-toggle .expand-icon {
   display: none;
