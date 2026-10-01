@@ -607,6 +607,108 @@ interface FilterSelect {
   cursor: string;
 }
 
+/**
+ * Cuánto zoomea la rueda por pixel de `deltaY`: el scale se multiplica por `1 - deltaY * RATE`, así
+ * que `0.0015` es ~1.5% por pixel. Es una curva de pinza, no un paso fijo: un trackpad manda
+ * `deltaY` chicos y una rueda de muescas manda ~100 de golpe, y con esta curva las dos se sienten
+ * parecido.
+ */
+const LG_WHEEL_ZOOM_RATE = 0.0015;
+
+/**
+ * Ventana mínima entre dos zoomes de rueda, en ms. El trackpad sigue mandando eventos cuando uno
+ * levanta los dedos (la inercia), y sin este corte un flick se comía los topes de un solo golpe.
+ */
+const LG_WHEEL_ZOOM_COOLDOWN = 60;
+
+/** Cuántos píxeles vale una línea de `deltaY`, para `deltaMode === WheelEvent.DOM_DELTA_LINE` */
+const LG_WHEEL_ZOOM_LINE_PX = 16;
+
+/**
+ * Zoom máximo al que llega la rueda, y a la vez el **piso** del tope.
+ *
+ * El techo solo no alcanza: `getScale()` del plugin `zoom` clampa al tamaño natural de la imagen, y
+ * para una imagen que la galería muestra 1:1 (que es el caso de los screenshots, y de cualquier
+ * thumbnail) ese techo es 1, o sea que la rueda no podría moverla. El piso se aplica solo cuando no
+ * hay nada que ampliar: para una captura chica —que es justo para lo que se abre una captura— 4x
+ * pixelado se sigue leyendo, y para una imagen grande el tope sigue siendo su tamaño real.
+ */
+const LG_WHEEL_ZOOM_MAX = 4;
+
+/**
+ * Plugin de lightGallery: **zoom con la rueda** sobre la imagen abierta.
+ *
+ * lightGallery 2.9 no lo trae. El plugin `zoom` maneja pinch (táctil), drag para panear y los
+ * íconos +/−, pero no escucha `wheel`; y el `settings.mousewheel` del core, que sí escucha, es de
+ * navegación entre slides con un throttle de 1s, no de zoom (por eso queda en `false`).
+ *
+ * En vez de reimplementar el transform, el handler llama la API pública del plugin `zoom`
+ * (`beginZoom` + `zoomImage` + `getScale`), que es la misma que usan los íconos: el wrap y la
+ * imagen los sigue moviendo lightGallery, así que el drag, el pinch y el reset al cambiar de slide
+ * quedan exactamente igual. La instancia del zoom se busca en `core.plugins`, que es un array de
+ * las instancias que el core construye en el constructor; el tipo del peer dep lo declara como
+ * `any[]`, y acá se acota con `instanceof lgZoom`.
+ *
+ * El tope es el tamaño natural de la imagen (`getScale`), y si ese tamaño no es mayor que el que ya
+ * se muestra —una imagen 1:1— el tope pasa a ser `LG_WHEEL_ZOOM_MAX`, para que la captura se pueda
+ * ampliar. Ojo con `getScale()`: si la imagen todavía no tiene layout devuelve `Infinity` (divide
+ * por `offsetWidth === 0`), de ahí el guard de `containerRect` y el chequeo de `Number.isFinite` del
+ * handler.
+ */
+class LgWheelZoom {
+  private _core: LightGallery;
+  private _zoom: InstanceType<typeof lgZoom> | null = null;
+  private _lastWheelAt = 0;
+
+  constructor(core: LightGallery) {
+    this._core = core;
+  }
+
+  /**
+   * El core construye la estructura antes de inicializar los plugins (`initModules()` es lo último
+   * de `buildStructure()`), así que el `.lg-outer` ya existe acá.
+   */
+  init(): void {
+    this._zoom = this._core.plugins.find((plugin) => plugin instanceof lgZoom) ?? null;
+    this._core.outer.get().addEventListener('wheel', this._onWheel, { passive: false });
+  }
+
+  /** Lo llama el core en `destroy()`, vía `destroyModules(true)` */
+  destroy(): void {
+    this._core.outer.get().removeEventListener('wheel', this._onWheel);
+  }
+
+  private _onWheel = (event: WheelEvent): void => {
+    const zoom = this._zoom;
+    if (!zoom || !zoom.isImageSlide(this._core.index)) return;
+    // La imagen todavía sin layout: `getScale()` dividiría por `offsetWidth === 0` y devolvería
+    // Infinity. `containerRect` lo setea `setZoomEssentials()`, que corre cuando la slide carga.
+    if (!zoom.containerRect) return;
+    // Firefox mide la rueda en líneas y no en píxeles: sin esto el zoom de la rueda no se sentiría
+    // igual en los dos navegadores.
+    const delta = event.deltaMode === 1 ? event.deltaY * LG_WHEEL_ZOOM_LINE_PX : event.deltaY;
+    if (!delta) return;
+    // Con la galería abierta la página de atrás no scrollea (`html.lg-on` la congela), pero el
+    // preventDefault evita el scroll-chaining igual, y de paso el zoom del navegador con
+    // ctrl+wheel (pinza del trackpad) sobre el modal.
+    event.preventDefault();
+    const now = Date.now();
+    if (now - this._lastWheelAt < LG_WHEEL_ZOOM_COOLDOWN) return;
+    this._lastWheelAt = now;
+    const prev = zoom.scale;
+    // Techo: el tamaño real de la imagen, y el piso solo cuando no hay nada que ampliar, que es el
+    // caso de una imagen que la galería muestra 1:1 (un screenshot, un thumbnail). `getScale` ya
+    // clampea por abajo en 1, así que el `max(…, 1)` de abajo es por si `prev` viniera < 1.
+    const realMax = zoom.getScale(LG_WHEEL_ZOOM_MAX);
+    const max = realMax > 1 ? realMax : LG_WHEEL_ZOOM_MAX;
+    const next = Math.min(Math.max(prev * (1 - delta * LG_WHEEL_ZOOM_RATE), 1), max);
+    // Ya en el tope, o `zoomImage` no-op con `scaleDiff` 0: no se toca nada.
+    if (!Number.isFinite(next) || Math.abs(next - prev) < 0.001) return;
+    zoom.beginZoom(next);
+    zoom.zoomImage(next, next - prev, true, false);
+  };
+}
+
 export default class Timeline {
   container: HTMLElement;
   items: TimelineItem[];
@@ -1502,7 +1604,7 @@ export default class Timeline {
           ? `<div class="lg-caption">${showFileName ? `<p>${imgInfo.full.split('/').pop()}</p>` : ''}<h4>${title}</h4></div>`
           : ''
       })) as GalleryItem[],
-      plugins: [lgZoom, lgThumbnail],
+      plugins: [lgZoom, lgThumbnail, LgWheelZoom],
       showZoomInOutIcons: true,
       actualSize: false
     });

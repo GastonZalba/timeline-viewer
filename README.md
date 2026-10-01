@@ -589,7 +589,7 @@ To run the server without the file watchers:
 npm start
 ```
 
-The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency.
+The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency. The images open in a lightgallery modal where the wheel zooms in and out over the picture (up to the image's real size, or 4x when the gallery shows it 1:1, which is the case of the article screenshots): zoom is continuous, like a pinch, and the drag pans once zoomed.
 
 The demo declares its filters in `example/filters.js` and passes them through the `filters` option, so the toolbar you see is built from that config — tweak a group there to see the panel change without touching the library. Most groups derive their values from the data and get sorted by number of results when the "Ver más" cut has to truncate them; the ones that need fixed labels or a fixed order declare `items` instead, and several of the derived ones add `allowEmpty: true` so the articles that carry no value are offered as a last "Sin valor". A derived group can never start checked (`checked` only exists in a declared item), so those groups open with nothing applied and the user narrows from there. The mock ships the fields already classified (`tipo_fuente`, `contenido`, `anio_publicacion`), so the demo needs no `extract`: `example/server.js` tokenizes with `String()` and has no per-field logic either.
 
