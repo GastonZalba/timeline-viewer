@@ -17,6 +17,8 @@ import sorters from './sorters.js';
 // control en el caso para el que existe. El mock no lo trae: `tonos_sociales` resuelve a 3
 // valores, muy por debajo del corte que hace aparecer el buscador, así que sin este flag el
 // desplegable se ve como una lista corta y no dice nada sobre cómo se comporta con cientos.
+// Además le deja el campo a dos ítems como `null`, para que el "Sin valor" de `allowEmpty` tenga
+// algo que representar: el bucket vacío solo existe si de verdad hay ítems sin valor.
 // No aplica en modo API (los ítems los manda el servidor, no este archivo).
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
@@ -38,6 +40,10 @@ const singleId = new URLSearchParams(window.location.search).get('id');
  * que existe el `select`. El mock tiene 19 ítems, así que repartir un tema por ítem daría 19 valores
  * y no probaría nada: cada ítem lleva una porción del pool, y entre todos cubren los 400. Los
  * sufijos van con tilde a propósito, para que se vea que el buscador las perdona.
+ *
+ * Los ítems de `MANY_WITHOUT_FIELD` quedan fuera de esa repartición, con el campo en `null`: son los
+ * que hacen existir el bucket vacío del filtro (`allowEmpty`), que de otro modo no tendría nada que
+ * ofrecer.
  */
 const MANY_SUFFIXES = [
   'Ámbito',
@@ -53,24 +59,47 @@ const MANY_SUFFIXES = [
   'Comunicación institucional'
 ];
 const MANY_COUNT = 400;
-/** Temas por ítem: 19 ítems × 21 = los 399 primeros del pool, sin repetir */
-const MANY_PER_ITEM = Math.ceil(MANY_COUNT / mockData.items.length);
+/**
+ * Ítems a los que `?many` deja el campo en `null`: uno en la primera taxonomía —la que abre el demo
+ * en modo `content`— y otro en la última, para que el "Sin valor" se vea sin cambiar de taxonomía.
+ */
+const MANY_WITHOUT_FIELD = ['FUE-00009', 'FUE-00019'];
+/** Temas por ítem, contados solo sobre los que sí llevan el campo: 17 × 24 = 408, que al dar la vuelta cubren los 400 */
+const MANY_PER_ITEM = Math.ceil(MANY_COUNT / (mockData.items.length - MANY_WITHOUT_FIELD.length));
 const manyTopics = Array.from(
   { length: MANY_COUNT },
   (_, i) => `Tema ${String(i + 1).padStart(3, '0')} ${MANY_SUFFIXES[i % MANY_SUFFIXES.length]}`
 );
 
-/** Los ítems del demo con el campo de `?many` ya puesto */
+/**
+ * Los ítems del demo con el campo de `?many` ya puesto. El offset del pool corre sobre un contador
+ * denso de los ítems que sí llevan el campo, y no sobre la posición en el array: como los de
+ * `MANY_WITHOUT_FIELD` están en medio del listado, multiplicar la posición dejaría un hueco de
+ * `MANY_PER_ITEM` temas sin cubrir y el desplegable mostraría menos de 400 valores.
+ */
 function withManyTopics(items) {
-  return items.map((item, i) => ({
-    ...item,
-    topicos_demo: Array.from({ length: MANY_PER_ITEM }, (_, k) => manyTopics[(i * MANY_PER_ITEM + k) % MANY_COUNT])
-  }));
+  let slot = 0;
+  return items.map((item) => {
+    if (MANY_WITHOUT_FIELD.includes(String(item.id))) return { ...item, topicos_demo: null };
+    const topicos_demo = Array.from(
+      { length: MANY_PER_ITEM },
+      (_, k) => manyTopics[(slot * MANY_PER_ITEM + k) % MANY_COUNT]
+    );
+    slot++;
+    return { ...item, topicos_demo };
+  });
 }
 
-/** Los filtros del demo con el grupo de `?many` adelante, para verlo arriba del panel */
+/**
+ * Los filtros del demo con el grupo de `?many` adelante, para verlo arriba del panel. El
+ * `allowEmpty` es lo que le agrega el "Sin valor" al final de los 400 temas: con la ventana de 50
+ * filas queda fuera de la vista, así que se llega con la búsqueda del desplegable o con <kbd>End</kbd>.
+ */
 function withManyFilter(groups) {
-  return [{ field: 'topicos_demo', label: `Temas (${MANY_COUNT} valores)`, type: 'select' }, ...groups];
+  return [
+    { field: 'topicos_demo', label: `Temas (${MANY_COUNT} valores)`, type: 'select', allowEmpty: true },
+    ...groups
+  ];
 }
 
 const baseOptions = {
