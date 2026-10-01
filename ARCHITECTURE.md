@@ -60,7 +60,7 @@ new Timeline({ container, items, ... })
 | `_buildLayout()` | 806 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
 | `_renderAll()` | 3038 | Renderiza featured + timeline + load-more. Método principal de "refresh" (rebuild completo) |
 | `_renderFeatured(cards)` | 1218 | Renderiza el stack de tarjetas superpuestas |
-| `_renderTimeline(cards)` | 1885 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`) |
+| `_renderTimeline(cards, instant = false)` | 1885 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`). Con `instant: true` (rama API con skeletons) las tarjetas nacen con `visible`, sin entrada por slide |
 | `_appendTimelineItems(items, startIndex)` | 1916 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
 | `_createTimelineItem(card, index)` | 1248 | Crea una tarjeta individual con todos sus event listeners |
 | `_renderLoadMoreButton()` | 3165 | Agrega el botón "Cargar más" al final del timeline. Su rama local también llama a `_renderStatus()`: es el único click que hace crecer la lista sin pasar por `_renderAll()`, así que sin eso el conteo se quedaría en el rango anterior |
@@ -91,8 +91,11 @@ new Timeline({ container, items, ... })
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_parseLinkWeb(url)` | 1008 | Detecta URLs de YouTube/Instagram/Twitter/Facebook, retorna `LinkInfo` |
-| `_preloadEmbedLibraries()` | 2000 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook** |
+| `_parseLinkWeb(url)` | 1428 | Detecta URLs de YouTube/Instagram/Twitter/Facebook y archivos de video directo, retorna `LinkInfo` |
+| `_isDirectVideoUrl(url)` | 1455 | True si la URL termina en `.mp4`/`.webm`/`.mov`/`.m4v`/`.ogv` (reusa `_getFileExt`, así el query string del CDN no molesta) |
+| `_buildEmbed(embedUrl)` | 1460 | Arma el markup del embed. Los tipos con SDK llevan shimmer; `video` lleva un `<video controls playsinline preload="metadata" loading="lazy">` sin shimmer |
+| `_processCardEmbeds(cardEl)` | 2192 | Procesa los embeds de la tarjeta al expandir. Para `video` no hay SDK: solo copia el `aspectRatio` real desde `videoWidth`/`videoHeight` en `loadedmetadata` |
+| `_preloadEmbedLibraries()` | 2484 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook**. `video` y `youtube` no cargan nada |
 
 ### Utilidades
 
@@ -185,7 +188,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 
 │   │           ├── .card-protagonista
 │   │           ├── .card-fuente
-│   │           ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook, publicación original)
+│   │           ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook/video, publicación original)
 │   │           └── .card-videos > .card-videos-list > .card-iframe-wrap × N (links_videos)
               │   ├── .timeline-item.timeline-footer-item (si lastUpdated)
               │   ├── .timeline-item.timeline-load-more-item (si hay más páginas)
@@ -306,7 +309,7 @@ Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** 
 - Un solo trigger: `_renderApiLoading()` se llama desde `_fetchPage()`, o sea en **todo** request que reemplaza la lista. `_init()` y `_applyFilters()` también la llaman, pero por comodidad: para que los placeholders ya estén en pantalla antes de que el request salga (el primero) y antes de que abra la ventana de debounce (el segundo).
 - `_renderApiLoading()` es **idempotente**: se llama en cada tecla y varias veces sobre la misma carga, así que una ráfaga muestra el skeleton una sola vez. El estado vive en el DOM (que el placeholder exista), y eso es lo que consulta `_renderStatus()` para no apilar una segunda línea ("Cargando más publicaciones...") debajo de los skeletons. Con `pagination: true` esto también elimina la fila de carga del cambio de página (el "Cargando página N..." que se veía al pie con las cartas de la página anterior todavía en pantalla): los skeletons la reemplazan, así que `_renderStatus()` no vuelve a emitir una línea de carga. Lo que queda de esa fila con el paginador son el error y el conteo ("Mostrando 11-20 de 55"), porque el paginator no reemplaza al conteo: dice cuál es la página, no qué tranche del resultado está en pantalla.
 - `_schedulePageReload(immediate)` tiene dos formas porque los disparadores no son alike. Un trigger que cae dentro de una ventana abierta **siempre** rearma la ventana **con** request, así que el último estado de una ráfaga es siempre el último que llega. Con `immediate` (acciones discretas: checkbox, toggle de orden, Escape) el request sale en el acto y la ventana solo traga lo que venga; sin él (escribir en el buscador) es el debounce de cola clásico, porque un request por tecla le pediría al servidor todos los prefijos del término.
-- El skeleton no es texto: son elementos `.timeline-skeleton-item` / `.featured-skeleton` con `aria-hidden="true"` y `aria-busy="true"` en `#timeline-cards`, animados con el mismo `@keyframes shimmer` de `.card-iframe-shimmer`. Llevan la clase `visible` desde el markup, que es lo que evita que esperen al IntersectionObserver.
+- El skeleton no es texto: son elementos `.timeline-skeleton-item` / `.featured-skeleton` con `aria-hidden="true"` y `aria-busy="true"` en `#timeline-cards`, animados con el mismo `@keyframes shimmer` de `.card-iframe-shimmer`. Llevan la clase `visible` desde el markup, que es lo que evita que esperen al IntersectionObserver — y las cartas que llegan a reemplazarlos también nacen visibles, para que no reentren sobre el lugar que el placeholder ya ocupaba (ver "Animaciones de entrada").
 
 ## Sistema de filtros
 
@@ -369,12 +372,16 @@ Un grupo con muchos valores (`tipo_fuente` con 7 en el demo) puede tener más de
 
 ## Animaciones de entrada
 
+Son transiciones de clase, no `@keyframes`: el elemento nace en su estado inicial y una clase lo lleva al final. `.timeline-item` va de `opacity: 0` + `translateY(30px)` al estado visible en 0.3s; `.featured-card`, de `translateX(-40px) rotateX(8deg)` en 0.6s.
+
 Usan `IntersectionObserver` (sin librerías externas):
 
-- **Featured cards**: Observer en `section.publicaciones-section` con threshold 0.1. Cuando es visible, agrega `.visible` a todas las featured cards.
-- **Timeline items**: Observer individual por cada `.timeline-item` con threshold 0.1 y rootMargin `0px 0px 100px 0px`. Cada item se anima individualmente al entrar en viewport.
+- **Timeline items**: un observer por cada `.timeline-item`, con root en el **viewport** (no lleva `root`, así que `#timeline-cards` sigue siendo su propia caja con scroll), threshold 0.1 y rootMargin `0px 0px 100px 0px`. Agrega `.visible` y se desuscribe: es un latch de una sola vez.
+- **Featured cards**: sin observer — la entrada la dispara un `requestAnimationFrame` en `_renderAll()` / `_init()`. `_setupObserver()` es código muerto. El efecto cascada no es un `index * 0.08s` calculado en JS: es la tabla `@for` de `nth-child` del SCSS, que reparte `transition-delay` (0s…0.9s), `left`, `z-index` y `scale` por posición.
 
-Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para crear un efecto cascada.
+El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente en el mismo frame que la inserción y la transición no correría, porque el navegador no tendría un valor computado previo desde el cual transicionar.
+
+**La excepción: los placeholders y las cartas que los reemplazan.** Los skeletons nacen con `visible` en el markup, así que no se animan. Y cuando `_renderAll()` los baja, `_renderTimeline()` recibe `instant` y las cartas reales nacen **también** con `visible`: el placeholder ya ocupaba ese lugar, así que un slide encima se leía como un glitch. `instant` sale de mirar el DOM antes de `_clearApiLoading()` (el mismo criterio que usa `_renderStatus()`), y cuando va en `true` el observer se saltea, porque su único efecto es agregar `visible`. Alcance: la rama API de `_renderAll()` —primera carga, búsqueda/filtro/orden y salto de página—, o sea todo lo que pasa por `_renderApiLoading()`. El stack featured conserva su slide escalonado, y "Cargar más" y el modo local también, porque ninguno de los dos tuvo skeletons.
 
 ## Propiedades de clase — Referencia
 
@@ -429,7 +436,8 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |
 | `.loaded` | `.card-image` | Imagen cargada (quita shimmer) |
 | `.loaded` | `.card-inline-thumb` | Thumbnail inline cargado (quita shimmer) |
-| `.loaded` | `.card-iframe-wrap` | Iframe/embed cargado |
+| `.loaded` | `.card-iframe-wrap` | Iframe/embed cargado. Un `video` **nunca** recibe esta clase: no tiene shimmer que bajar |
+| *(inline)* | `.card-iframe-video` | `style.aspectRatio` con el ratio real del archivo, copiado de `videoWidth`/`videoHeight` en `_processCardEmbeds()` |
 | `.open` | `.filter-menu` | Menú de filtros abierto |
 | `.open` | `.filtros-internos-menu` | Flyout de estado interno abierto (junto a `.open` en `#filtros-internos-toggle`) |
 | `.expanded` | `.filter-options` | Grupo de filtros con el "Ver más" abierto: muestra los `label.filter-option-extra` (la visibilidad la decide esta clase, no el atributo `hidden`) |

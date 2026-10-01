@@ -13,6 +13,16 @@ const FACEBOOK_POST_REGEX = /(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+
 const FACEBOOK_OTHER_REGEX = /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
+/**
+ * Containers a `<video>` puede reproducir nativamente, para los links que apuntan al archivo y no
+ * a una plataforma.
+ *
+ * `.ogg` queda afuera a propósito: casi siempre es audio (Vorbis), y meterlo en un `<video>` da un
+ * player vacío. `.m3u8` también: es HLS y necesita una librería de streaming, que el módulo no
+ * puede agregar (peer dependencies y cero dependencias runtime) — un `<video>` con un `.m3u8` sería
+ * un reproductor roto.
+ */
+const VIDEO_FILE_EXTS = ['mp4', 'webm', 'mov', 'm4v', 'ogv'];
 /** Window of `_schedulePageReload`: coalesces a burst of search/filter/sort changes into one request */
 const API_RELOAD_DEBOUNCE_MS = 300;
 /**
@@ -808,7 +818,19 @@ export default class Timeline {
         m = url.match(FACEBOOK_OTHER_REGEX);
         if (m)
             return { url: url, type: 'facebook' };
+        // Al final, no al principio: una plataforma reconocida gana siempre. El falso positivo de un
+        // social con `.mp4` en el query ya lo descarta `_getFileExt` (que corta en el `?`), pero el
+        // orden deja la regla semántica: el archivo directo es el fallback, no el detector.
+        if (this._isDirectVideoUrl(url))
+            return { url: url, type: 'video' };
         return null;
+    }
+    /**
+     * True when the link points to a video file the browser can play itself, instead of to a platform
+     * page. Reuses `_getFileExt`, so a CDN query string (`…/clip.mp4?token=…`) does not break it.
+     */
+    _isDirectVideoUrl(url) {
+        return VIDEO_FILE_EXTS.includes(this._getFileExt(url));
     }
     /** Build the embed markup for a parsed link */
     _buildEmbed(embedUrl) {
@@ -820,6 +842,16 @@ export default class Timeline {
         }
         if (embedUrl.type === 'twitter') {
             return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="twitter-tweet" data-dnt="true"><a href="${embedUrl.url}"></a></blockquote></div>`;
+        }
+        if (embedUrl.type === 'video') {
+            // `loading="lazy"` es el que hace el trabajo: el bloque vive en un `display: none` mientras
+            // la tarjeta está colapsada, y un elemento sin caja nunca intersecta, así que el browser
+            // difiere el pedido hasta que la tarjeta se abre — no hace falta diferir el `src` a mano.
+            // `preload="metadata"` trae solo los bytes necesarios para conocer duración y dimensiones
+            // (que es lo que `_processCardEmbeds` usa para el ratio real), nunca el archivo. Sin
+            // `autoplay` y sin `crossorigin`: este último cortaría la reproducción en los CDN que no
+            // mandan headers CORS. El `url` sí se escapa, a diferencia de las ramas de arriba.
+            return `<div class="card-iframe-wrap card-iframe-video"><video class="card-video" src="${this._escapeHtml(embedUrl.url)}" controls playsinline preload="metadata" loading="lazy"></video></div>`;
         }
         return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><iframe src="${embedUrl.url}" frameborder="0" allowfullscreen loading="lazy" title="Contenido embebido"></iframe></div>`;
     }
@@ -1121,6 +1153,9 @@ export default class Timeline {
         cardEl.querySelector('.card-collapse').addEventListener('click', (e) => {
             e.stopPropagation();
             cardEl.classList.remove('expanded');
+            // Colapsar es solo quitar la clase, sin teardown, así que un `<video>` sigue sonando con la
+            // tarjeta cerrada. Los iframes tienen el mismo problema y quedan fuera de alcance.
+            cardEl.querySelectorAll('video').forEach((video) => video.pause());
         });
         cardEl.querySelector('.card-info-btn').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -1167,7 +1202,7 @@ export default class Timeline {
         if (!card.temas || !card.temas.length)
             return '';
         return `<div class="card-temas">
-        <div class="card-subtitle">Temas destacados</div>
+        <div class="card-subtitle">Temas destacados (${card.temas.length})</div>
         <div class="card-temas-list">
         ${card.temas
             .map((t) => `
@@ -1596,6 +1631,28 @@ export default class Timeline {
                 });
             }, 150);
         }
+        const videoWraps = cardEl.querySelectorAll('.card-iframe-video');
+        if (videoWraps.length) {
+            videoWraps.forEach((videoWrap) => {
+                const video = videoWrap.querySelector('video');
+                if (!video)
+                    return;
+                const applyRatio = () => {
+                    const width = video.videoWidth;
+                    const height = video.videoHeight;
+                    if (width > 0 && height > 0) {
+                        videoWrap.style.aspectRatio = `${width} / ${height}`;
+                    }
+                };
+                // El ratio real viene de la metadata, que el browser pide solo cuando el `<video>` se
+                // vuelve visible (por eso el `loading="lazy"` del markup). El `aspect-ratio: 16 / 9` del
+                // SCSS es el fallback mientras tanto, y se pisa acá con el del archivo.
+                if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+                    applyRatio();
+                }
+                video.addEventListener('loadedmetadata', applyRatio, { once: true });
+            });
+        }
     }
     /** Insert an element before the timeline footer, or append if no footer */
     _insertBeforeFooter(el) {
@@ -1623,8 +1680,19 @@ export default class Timeline {
             this.timelineCards.appendChild(el);
         }
     }
-    /** Render the timeline cards list, including the last-updated footer */
-    _renderTimeline(cards) {
+    /**
+     * Render the timeline cards list, including the last-updated footer.
+     *
+     * `instant` is the mode API's: it says the list was replaced by skeleton placeholders that are
+     * being taken down right now, so the cards land on the spot the placeholders already occupied
+     * and must not replay the entrance transition. They are born with `visible`, exactly like the
+     * placeholders are (`_appendTimelineSkeleton`), and because the class is there on their first
+     * style resolution there is no previous computed value to transition from — same reason the
+     * `requestAnimationFrame` in `_renderAll` is what makes the animation happen when it should.
+     * The caller's only job is to not set up the observer for them: its whole effect is adding
+     * `visible`, which they already have.
+     */
+    _renderTimeline(cards, instant = false) {
         this.timelineCards.innerHTML = '';
         if (cards.length === 0) {
             const el = document.createElement('div');
@@ -1637,7 +1705,10 @@ export default class Timeline {
         }
         else {
             cards.forEach((card, i) => {
-                this.timelineCards.appendChild(this._createTimelineItem(card, i));
+                const el = this._createTimelineItem(card, i);
+                if (instant)
+                    el.classList.add('visible');
+                this.timelineCards.appendChild(el);
             });
         }
         this._renderLastUpdated();
@@ -1726,7 +1797,12 @@ export default class Timeline {
             observer.observe(item);
         });
     }
-    /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
+    /**
+     * Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed.
+     *
+     * `'video'` no aparece en ningún branch: no hay SDK que cargar. Entra al set de tipos y ahí se
+     * queda, igual que `'youtube'` (nativo, sin script).
+     */
     _preloadEmbedLibraries() {
         const types = new Set();
         this.allCards.forEach((card) => {
@@ -3433,10 +3509,14 @@ export default class Timeline {
     /** Render featured cards, timeline, and load-more button if needed */
     _renderAll() {
         if (this.api) {
+            // The placeholders are about to come down, so read the state before they do: it says
+            // whether the cards that replace them have to show up in place instead of entering (see
+            // `_renderTimeline`). The DOM is the source of truth for it, like it is for `_renderStatus`.
+            const hadSkeletons = this.timelineCards.querySelector('.timeline-skeleton-item') !== null;
             this._clearApiLoading();
             this._renderRelatedCount();
             this._renderFeatured(this._apiFeatured());
-            this._renderTimeline(this.allCards);
+            this._renderTimeline(this.allCards, hadSkeletons);
             if (this.pagination) {
                 this._renderPaginator();
             }
@@ -3447,7 +3527,7 @@ export default class Timeline {
             requestAnimationFrame(() => {
                 this.featuredContainer.querySelectorAll('.featured-card').forEach((c) => c.classList.add('visible'));
             });
-            if (this.isExpanded) {
+            if (this.isExpanded && !hadSkeletons) {
                 requestAnimationFrame(() => this._setupTimelineObserver());
             }
             return;

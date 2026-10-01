@@ -29,6 +29,7 @@ const allItems = [
     ],
     has_video: true,
     links_videos: [
+      'https://cdn.jwplayer.com/videos/bS96065R-SomplJdm.mp4',
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       'https://www.youtube.com/watch?v=jNQXAC9IVRw',
       'https://www.youtube.com/watch?v=9bZkp7q19f0'

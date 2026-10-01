@@ -230,7 +230,7 @@ interface ImageInfo {
 }
 interface LinkInfo {
     url: string;
-    type: 'youtube' | 'instagram' | 'twitter' | 'facebook';
+    type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video';
 }
 /**
  * Controls a filter group can be rendered with.
@@ -750,6 +750,11 @@ export default class Timeline {
     protected _formatDateTime(dateStr: string): string;
     /** Parse a URL and return embed info based on the supported social platforms */
     protected _parseLinkWeb(url: string): LinkInfo | null;
+    /**
+     * True when the link points to a video file the browser can play itself, instead of to a platform
+     * page. Reuses `_getFileExt`, so a CDN query string (`…/clip.mp4?token=…`) does not break it.
+     */
+    protected _isDirectVideoUrl(url: string): boolean;
     /** Build the embed markup for a parsed link */
     protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
@@ -857,8 +862,19 @@ export default class Timeline {
      * or the paginator wins when one of them is there.
      */
     protected _insertBeforeTrailing(el: HTMLElement): void;
-    /** Render the timeline cards list, including the last-updated footer */
-    protected _renderTimeline(cards: TimelineItem[]): void;
+    /**
+     * Render the timeline cards list, including the last-updated footer.
+     *
+     * `instant` is the mode API's: it says the list was replaced by skeleton placeholders that are
+     * being taken down right now, so the cards land on the spot the placeholders already occupied
+     * and must not replay the entrance transition. They are born with `visible`, exactly like the
+     * placeholders are (`_appendTimelineSkeleton`), and because the class is there on their first
+     * style resolution there is no previous computed value to transition from — same reason the
+     * `requestAnimationFrame` in `_renderAll` is what makes the animation happen when it should.
+     * The caller's only job is to not set up the observer for them: its whole effect is adding
+     * `visible`, which they already have.
+     */
+    protected _renderTimeline(cards: TimelineItem[], instant?: boolean): void;
     /**
      * Add cards at the end of the list **without touching the ones already rendered**, and return
      * the created nodes so the entrance animation can be observed on them alone.
@@ -889,7 +905,12 @@ export default class Timeline {
      * there is nothing to re-observe. Default is every `.timeline-item` in the container.
      */
     protected _setupTimelineObserver(items?: ArrayLike<Element>): void;
-    /** Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed */
+    /**
+     * Dynamically load social media embed scripts (Instagram, Twitter, Facebook) as needed.
+     *
+     * `'video'` no aparece en ningún branch: no hay SDK que cargar. Entra al set de tipos y ahí se
+     * queda, igual que `'youtube'` (nativo, sin script).
+     */
     protected _preloadEmbedLibraries(): void;
     /**
      * Turn the expanded state on (classes, icon and aria) without flipping `isExpanded`.
