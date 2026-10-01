@@ -221,12 +221,11 @@ test.describe('filtros configurables en el navegador', () => {
 
     await openDemo(page, 'api&expanded');
 
-    // Los counts vienen del endpoint.
+    // Los counts vienen del endpoint. Se busca por el texto que muestra el panel, que desde que
+    // `/api/facets` manda `labels` es el label lindo ('Sitio web') y no el token crudo
+    // ('Sitio web o portal'): el token es el del `input[value]`, que es el que viaja al servidor.
     const grupo = page.locator('[data-filter-field="tipo_fuente"]');
-    const count = grupo
-      .locator('.filter-option')
-      .filter({ hasText: 'Sitio web o portal' })
-      .locator('.filter-option-count');
+    const count = grupo.locator('.filter-option').filter({ hasText: 'Sitio web' }).locator('.filter-option-count');
     await expect(count).toHaveText('(5)');
     // Los facets ya llegaron, así que el toggle del panel ya puede abrir.
     await openPanel(page);

@@ -182,11 +182,23 @@ export interface TimelineApiPageResponse {
    * cuando ese endpoint no está disponible, para no romper backends que todavía la mandan.
    */
   facets?: Record<string, Record<string, number>>;
+  /** Legacy, con los facets: los labels que se muestran de cada token (ver `TimelineApiFacetsResponse`) */
+  labels?: Record<string, Record<string, string>>;
 }
 
 /** Respuesta de `GET {url}/facets`: valores estáticos de la colección completa, sin `q` ni filtros */
 export interface TimelineApiFacetsResponse {
   facets: Record<string, Record<string, number>>;
+  /**
+   * Texto a mostrar de cada valor, por campo y por token: la misma clave que en `facets` (el token
+   * crudo que se filtra y viaja en el query param) con el texto lindo en el valor. Es lo que
+   * permite que el backend guarde un código y la UI muestre el nombre.
+   *
+   * Es opcional y no cambia cómo se filtra: sin `labels` cada valor se muestra como su token, que es
+   * lo que se hacía antes. Solo aplica a los valores que el backend aporta (los de un grupo sin
+   * `items`); un valor declarado por el cliente con su propio `label` manda sobre el del backend.
+   */
+  labels?: Record<string, Record<string, string>>;
   /**
    * Total de la colección completa, sin `q` ni filtros: alimenta el contador y el label del
    * botón de expandir (mismo rol que `_allItems().length` en modo local). Es un valor estático,
@@ -666,6 +678,13 @@ export default class Timeline {
   /** Total de la colección sin `q` ni filtros (`total` de `/facets`): contador del botón de expandir */
   _apiCollectionTotal: number;
   _apiFacets: Record<string, Record<string, number>>;
+  /**
+   * Texto a mostrar de cada valor de los facets, por campo y por token (el `labels` de `/facets`).
+   * Vive aparte de `_apiFacets` porque contar y mostrar son dos cosas: el token es la clave que se
+   * filtra y el label solo se lee, así que un backend puede mandar cualquiera de los dos. Vacío en
+   * modo local, donde los labels salen de la declaración del cliente.
+   */
+  _apiFacetLabels: Record<string, Record<string, string>>;
   _apiFacetsPromise: Promise<void> | null;
   _apiLoading: boolean;
   _apiSeq: number;
@@ -745,6 +764,7 @@ export default class Timeline {
     this._apiTotal = 0;
     this._apiCollectionTotal = 0;
     this._apiFacets = {};
+    this._apiFacetLabels = {};
     this._apiFacetsPromise = null;
     this._apiLoading = false;
     this._apiSeq = 0;
@@ -2712,9 +2732,28 @@ export default class Timeline {
   }
 
   /**
+   * The label the backend sent for a token of a field, in API mode, or `''` when there is none.
+   * It is looked up by the same key the facets use —the raw token that gets filtered— so a server
+   * can store a code and show a name without the two ever having to agree. A label that is not a
+   * non-empty string counts as no label, so a backend that sends something else falls back to the
+   * token instead of showing `undefined`.
+   */
+  protected _apiFacetLabel(field: string, token: string): string {
+    const label = this._apiFacetLabels[field]?.[token];
+    if (typeof label !== 'string' || label.trim() === '') return '';
+    return label.trim();
+  }
+
+  /**
    * The visible text of one value of a group, whichever control shows it: the label a declared
-   * `items` brings, the fixed one of the `allowEmpty` bucket, or `_filterLabelOf` for a value that
-   * came from the data. Both controls call this so a value never reads differently in a select.
+   * `items` brings, the fixed one of the `allowEmpty` bucket, the one the backend sent with the
+   * facets in API mode, or `_filterLabelOf` for a value that came from the data. Both controls call
+   * this so a value never reads differently in a select.
+   *
+   * The order is what makes the sources compose instead of fight: what the client declared wins
+   * because it declared it explicitly, then the empty bucket (whose label is fixed in every field),
+   * then the label of the backend —which only reaches the values it brought, so a declared group is
+   * never renamed by it— and finally what the data says.
    */
   protected _filterOptionLabel(f: FilterDef, token: string): string {
     const declaredItem = f.declared?.find((d) => d.token === token);
@@ -2722,6 +2761,8 @@ export default class Timeline {
     // El bucket vacío de un grupo `allowEmpty` tiene label fijo (y no pasa por `formatLabel`,
     // que es para los valores que el dato trae).
     if (f.allowEmpty && token === FILTER_EMPTY_VALUE) return FILTER_EMPTY_LABEL;
+    const facetLabel = this._apiFacetLabel(f.field, token);
+    if (facetLabel) return facetLabel;
     return this._filterLabelOf(f, token);
   }
 
@@ -3606,6 +3647,9 @@ export default class Timeline {
   protected async _loadApiFacets(): Promise<void> {
     try {
       const data = await this._apiFetch<TimelineApiFacetsResponse>('/facets', {});
+      // Los labels se adoptan junto a los conteos, con la misma regla: si el backend no los manda,
+      // cada valor se muestra con su token, que es el comportamiento de siempre.
+      this._apiFacetLabels = (data && data.labels) || {};
       if (data && data.facets) {
         this._apiFacets = data.facets;
         this._apiFacetsLoaded = true;
@@ -3694,10 +3738,13 @@ export default class Timeline {
   /**
    * Fallback for servers that do not implement `GET {url}/facets` and still send the facets
    * inside the list response. Runs at most once: after that `_apiFacets` is never reassigned.
+   * The `labels` ride along here for the same reason `facets` does, so a legacy backend can rename
+   * its values too.
    */
   protected _adoptLegacyApiFacets(data: TimelineApiPageResponse): void {
     if (this._apiFacetsLoaded || !data.facets) return;
     this._apiFacets = data.facets;
+    this._apiFacetLabels = data.labels || {};
     this._apiFacetsLoaded = true;
     this._buildFilterCheckboxes();
     this._syncFilterToggleState();

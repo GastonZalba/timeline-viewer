@@ -128,6 +128,35 @@ const STATIC_FACETS = buildFacets(mockData.items);
 const STATIC_TOTAL = mockData.items.length;
 
 /**
+ * The text to show for some facet values, keyed by field and then by the same token the facets
+ * count: the client filters by the token (it is what travels in the query param) and shows the label
+ * when there is one. A field with no entry here —or a token missing from its entry— falls back to
+ * showing the token itself, which is what the demo did before this table existed.
+ *
+ * It is a static table and not logic per field because the demo vocabulary is small and fixed: the
+ * point is to show the mechanism (a backend storing a long or coded value and displaying a short
+ * one), not to be a real dictionary. Both fields are ones the demo derives from the data (no
+ * `items`), so the labels are what decides the text; `tipo_fuente` is a checkbox group and
+ * `tonos_sociales` the `select`, so the same table covers both controls.
+ */
+const FACET_LABELS = {
+  // El dato guarda la descripción larga del pipeline; el panel muestra el nombre corto.
+  tipo_fuente: {
+    'Sitio web o portal': 'Sitio web',
+    'Gacetilla o comunicado de prensa': 'Gacetilla',
+    'Decreto o norma': 'Decreto',
+    'Libro o publicación': 'Libro',
+    'Red Social': 'Red social'
+  },
+  // El `select` de tonos: el token es el tono, el label lo muestra completo.
+  tonos_sociales: {
+    Positivo: 'Tono positivo',
+    Neutro: 'Tono neutro',
+    Negativo: 'Tono negativo'
+  }
+};
+
+/**
  * Comparable text of an item for the requested sorter. A missing value compares as `''`, the
  * smallest, so an item without the field lands last in `desc` and first in `asc`. This is the
  * server counterpart of the client's `_sortValue`.
@@ -217,6 +246,7 @@ function handleFacets(res) {
   res.end(
     JSON.stringify({
       facets: STATIC_FACETS,
+      labels: FACET_LABELS,
       total: STATIC_TOTAL,
       lastUpdated: mockData.lastUpdated
     })
