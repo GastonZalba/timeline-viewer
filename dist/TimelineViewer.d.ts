@@ -815,7 +815,14 @@ export default class Timeline {
     protected _buildVideosHtml(card: TimelineItem): string;
     /** Build the inline "Imágenes" HTML block */
     protected _buildInlineImagesHtml(card: TimelineItem): string;
-    /** Build the inline "Adjuntos" HTML block */
+    /**
+     * Build the inline "Adjuntos" HTML block.
+     *
+     * El `download` va **sin valor** a propósito (el browser deriva el nombre del último segmento de la
+     * URL, y así el atributo no suma otra interpolación al markup) y solo se respeta same-origin, así
+     * que el `target="_blank"` se queda como fallback. El nombre se escapa siempre: `adjuntos` viene del
+     * pipeline de scraping externo y va a un `title` y a texto de nodo.
+     */
     protected _buildInlineAdjuntosHtml(card: TimelineItem): string;
     /** Build the card actions bar (screenshot, imágenes, adjuntos, abrir, editar) */
     protected _buildActionsHtml(card: TimelineItem): string;

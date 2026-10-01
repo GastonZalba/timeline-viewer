@@ -1330,7 +1330,14 @@ export default class Timeline {
             .map((img, i) => `<button class="card-inline-thumb" data-index="${i}"><img src="${this._encodeFileName(img.thumb)}" alt="" loading="lazy"></button>`)
             .join('')}</div></div>`;
     }
-    /** Build the inline "Adjuntos" HTML block */
+    /**
+     * Build the inline "Adjuntos" HTML block.
+     *
+     * El `download` va **sin valor** a propósito (el browser deriva el nombre del último segmento de la
+     * URL, y así el atributo no suma otra interpolación al markup) y solo se respeta same-origin, así
+     * que el `target="_blank"` se queda como fallback. El nombre se escapa siempre: `adjuntos` viene del
+     * pipeline de scraping externo y va a un `title` y a texto de nodo.
+     */
     _buildInlineAdjuntosHtml(card) {
         if (!this.inlineAdjuntos || !card.adjuntos || !card.adjuntos.length)
             return '';
@@ -1338,7 +1345,7 @@ export default class Timeline {
             .map((a) => {
             const ext = this._getFileExt(a);
             const name = a.substring(a.lastIndexOf('/') + 1);
-            return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
+            return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" download target="_blank" rel="noopener" title="${this._escapeHtml(name)}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${this._escapeHtml(name)}</span></a>`;
         })
             .join('')}</div></div>`;
     }
@@ -1357,7 +1364,7 @@ export default class Timeline {
             : ''}
         ${adjCount > 0 && !this.inlineAdjuntos
             ? `<div class="card-adjuntos"><button class="card-actions-btn card-adjuntos-btn" title="Ver adjuntos"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Adjuntos <span class="card-actions-count">${adjCount}</span></button><div class="card-adjuntos-menu">${(card.adjuntos || [])
-                .map((a) => `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`)
+                .map((a) => `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" download target="_blank" rel="noopener">${this._escapeHtml(a.substring(a.lastIndexOf('/') + 1))}</a>`)
                 .join('')}</div></div>`
             : ''}
         ${card.link_web

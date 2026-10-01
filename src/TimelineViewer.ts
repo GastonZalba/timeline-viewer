@@ -1995,14 +1995,21 @@ export default class Timeline {
       .join('')}</div></div>`;
   }
 
-  /** Build the inline "Adjuntos" HTML block */
+  /**
+   * Build the inline "Adjuntos" HTML block.
+   *
+   * El `download` va **sin valor** a propósito (el browser deriva el nombre del último segmento de la
+   * URL, y así el atributo no suma otra interpolación al markup) y solo se respeta same-origin, así
+   * que el `target="_blank"` se queda como fallback. El nombre se escapa siempre: `adjuntos` viene del
+   * pipeline de scraping externo y va a un `title` y a texto de nodo.
+   */
   protected _buildInlineAdjuntosHtml(card: TimelineItem): string {
     if (!this.inlineAdjuntos || !card.adjuntos || !card.adjuntos.length) return '';
     return `<div class="card-inline-adjuntos"><div class="card-subtitle">Adjuntos</div><div class="card-inline-adjuntos-list">${card.adjuntos
       .map((a) => {
         const ext = this._getFileExt(a);
         const name = a.substring(a.lastIndexOf('/') + 1);
-        return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" target="_blank" rel="noopener" title="${name}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${name}</span></a>`;
+        return `<a class="card-inline-adjunto${ext === 'pdf' ? ' card-inline-adjunto-pdf' : ''}" href="${this._encodeFileName(a)}" download target="_blank" rel="noopener" title="${this._escapeHtml(name)}">${this._fileIconSvg(ext)}<span class="card-inline-adjunto-name">${this._escapeHtml(name)}</span></a>`;
       })
       .join('')}</div></div>`;
   }
@@ -2031,7 +2038,7 @@ export default class Timeline {
               )
                 .map(
                   (a) =>
-                    `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" target="_blank" rel="noopener">${a.substring(a.lastIndexOf('/') + 1)}</a>`
+                    `<a class="card-adjunto-link" href="${this._encodeFileName(a)}" download target="_blank" rel="noopener">${this._escapeHtml(a.substring(a.lastIndexOf('/') + 1))}</a>`
                 )
                 .join('')}</div></div>`
             : ''
