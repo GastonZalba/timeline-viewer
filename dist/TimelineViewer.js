@@ -147,7 +147,6 @@ export default class Timeline {
         this.filtrosInternosMenu = null;
         this.section = null;
         this.searchWrap = null;
-        this.searchToggle = null;
         this.searchInput = null;
         this.searchTerm = '';
         this._lgInstance = null;
@@ -564,9 +563,9 @@ export default class Timeline {
               <span class="expand-icon" id="expand-icon"></span>
             </button>
             <div class="search-wrap" id="search-wrap">
-              <button class="search-toggle" id="search-toggle" title="Buscar">
+              <span class="search-icon" aria-hidden="true">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              </button>
+              </span>
               <input class="search-input" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
             </div>
             ${filterMenuHtml}
@@ -617,7 +616,6 @@ export default class Timeline {
         this.filtrosInternosToggle = this.container.querySelector('#filtros-internos-toggle');
         this.filtrosInternosMenu = this.container.querySelector('#filtros-internos-menu');
         this.searchWrap = this.container.querySelector('#search-wrap');
-        this.searchToggle = this.container.querySelector('#search-toggle');
         this.searchInput = this.container.querySelector('#search-input');
         this.taxonomyRow = this.container.querySelector('#taxonomy-row');
         this.taxonomySelectWrap = this.container.querySelector('#taxonomy-select-wrap');
@@ -3445,7 +3443,7 @@ export default class Timeline {
         const internosActive = this.filters.some((f) => f.group === 'filtros_internos' && isActive(f));
         if (this.filtrosInternosToggle)
             this.filtrosInternosToggle.classList.toggle('active', internosActive);
-        this.searchToggle.classList.toggle('active', this.searchTerm.trim().length > 0);
+        this.searchWrap.classList.toggle('active', this.searchTerm.trim().length > 0);
     }
     /**
      * Apply active filters and re-render the full view (or reload from the API).
@@ -3952,6 +3950,28 @@ export default class Timeline {
                 this._applySort(this._sortField, input.value === 'asc');
         });
     }
+    /**
+     * Open the search field and put the caret in it.
+     *
+     * The field is a single element in both states —collapsed it is the magnifier circle, `open` it is
+     * the pill— so the only way in is focusing it: the mouse click and the <kbd>Tab</kbd> both land
+     * here, and there is no toggle button left to click.
+     */
+    _openSearch() {
+        this.searchWrap.classList.add('open');
+        this.searchInput.focus();
+    }
+    /**
+     * Collapse the search field, but only when it isn't filtering. A term the user wrote is a filter
+     * in use: collapsing it on the next outside click would hide the search that is narrowing the list
+     * —and hide the only place where it can be taken off—. `Escape` clears the value first, so it does
+     * close it: the caller that empties the field passes `force`.
+     */
+    _closeSearch(force = false) {
+        if (!force && this.searchInput.value.trim().length > 0)
+            return;
+        this.searchWrap.classList.remove('open');
+    }
     /** Bind the header/global event listeners shared by both local and API modes */
     _bindBaseEvents() {
         // En fullpage el botón de expandir es solo el contador: no se le bindea el colapso.
@@ -3986,15 +4006,14 @@ export default class Timeline {
                 this.filtrosInternosToggle.classList.toggle('open');
             });
         }
-        this.searchToggle.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.searchWrap.classList.toggle('open');
-            this.searchToggle.classList.toggle('open');
-            if (this.searchWrap.classList.contains('open')) {
-                this.searchInput.focus();
-            }
+        this.searchInput.addEventListener('focus', () => {
+            if (!this.searchWrap.classList.contains('open'))
+                this._openSearch();
         });
         this.searchInput.addEventListener('input', () => {
+            // Escribir tiene que abrir el campo igual: <kbd>Esc</kbd> lo colapsa sin sacarle el foco, y
+            // sin esto el término se escribiría a ciegas.
+            this.searchWrap.classList.add('open');
             this.searchTerm = this.searchInput.value;
             // Not immediate, unlike the discrete changes: every keystroke is a prefix of the term, so
             // the request has to wait for the typing to settle.
@@ -4004,8 +4023,7 @@ export default class Timeline {
             if (e.key === 'Escape') {
                 this.searchInput.value = '';
                 this.searchTerm = '';
-                this.searchWrap.classList.remove('open');
-                this.searchToggle.classList.remove('open');
+                this._closeSearch(true);
                 this._applyFilters(true);
             }
         });
@@ -4040,8 +4058,7 @@ export default class Timeline {
                 this.filtrosInternosToggle.classList.remove('open');
             }
             if (!e.target.closest('.search-wrap')) {
-                this.searchWrap.classList.remove('open');
-                this.searchToggle.classList.remove('open');
+                this._closeSearch();
             }
         });
     }

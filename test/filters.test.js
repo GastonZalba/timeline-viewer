@@ -776,7 +776,7 @@ test('la búsqueda enciende su propio botón, no los de filtros', () => {
   const panel = container.querySelector('#filter-toggle');
   tl.searchInput.value = 'decreto';
   tl.searchInput.dispatchEvent(new window.Event('input'));
-  assert.equal(container.querySelector('#search-toggle').classList.contains('active'), true);
+  assert.equal(container.querySelector('#search-wrap').classList.contains('active'), true);
   assert.equal(panel.classList.contains('active'), false, 'buscar no es filtrar');
   assert.equal(tl.searchTerm, 'decreto');
 });

@@ -534,7 +534,6 @@ export default class Timeline {
      */
     _filterExpanded: Set<string>;
     searchWrap: HTMLElement;
-    searchToggle: HTMLElement;
     searchInput: HTMLInputElement;
     searchTerm: string;
     _lgInstance: LightGallery | null;
@@ -1523,6 +1522,21 @@ export default class Timeline {
      * once and not rebuilt when the facets land.
      */
     protected _bindSortToggle(): void;
+    /**
+     * Open the search field and put the caret in it.
+     *
+     * The field is a single element in both states —collapsed it is the magnifier circle, `open` it is
+     * the pill— so the only way in is focusing it: the mouse click and the <kbd>Tab</kbd> both land
+     * here, and there is no toggle button left to click.
+     */
+    protected _openSearch(): void;
+    /**
+     * Collapse the search field, but only when it isn't filtering. A term the user wrote is a filter
+     * in use: collapsing it on the next outside click would hide the search that is narrowing the list
+     * —and hide the only place where it can be taken off—. `Escape` clears the value first, so it does
+     * close it: the caller that empties the field passes `force`.
+     */
+    protected _closeSearch(force?: boolean): void;
     /** Bind the header/global event listeners shared by both local and API modes */
     protected _bindBaseEvents(): void;
 }

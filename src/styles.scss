@@ -206,8 +206,10 @@
       display: inline-flex;
     }
 
-    .search-toggle {
-      display: inline-flex;
+    // El buscador es un elemento: el input colapsado (el círculo de la lupa) y el `display: block` de
+    // acá son los del viejo botón.
+    .search-input {
+      display: block;
     }
 
     .featured-cards {
@@ -512,30 +514,10 @@
     position: relative;
     display: flex;
     align-items: center;
-  }
 
-  .search-toggle {
-    position: relative;
-    background: none;
-    border: 1px solid var(--tv-accent);
-    color: var(--tv-text-on-primary);
-    padding: 8px;
-    border-radius: 42px;
-    height: 34px;
-    width: 34px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(59, 130, 246, 0.25);
-
-    &:hover,
-    &.open {
-      background: var(--tv-accent);
-    }
-
-    &.active::after {
+    // Puntito de "filtro en uso". Solo con el campo colapsado: desplegado, el término escrito ya
+    // lo dice, y el badge en la esquina de la píldora de 180px era ruido.
+    &.active:not(.open)::after {
       content: '';
       position: absolute;
       top: -2px;
@@ -548,25 +530,45 @@
     }
   }
 
+  // El ícono de la lupa es decorativo: absoluto, `pointer-events: none` y sin texto propio (el
+  // `aria-label` lo tiene el input). No ocupa lugar, así que el buscador entero es un solo elemento:
+  // el mismo `left` lo deja centrado en el círculo colapsado y en el borde izquierdo de la píldora
+  // abierta — lo único que se mueve es el `padding-left` del input.
+  .search-icon {
+    position: absolute;
+    left: 10px;
+    display: inline-flex;
+    align-items: center;
+    color: var(--tv-text-on-primary);
+    pointer-events: none;
+  }
+
+  // Un solo control en los dos estados: acá el círculo de la lupa (34px, sin texto —el ícono está
+  // encima y el placeholder escondido—) y `.search-wrap.open` lo estira a la píldora. El
+  // `box-sizing` va explícito porque el `padding-left` que despeja el ícono deformaría el ancho
+  // fijo en un consumidor que no tenga un reset global, y el círculo tiene que medir lo mismo que
+  // los otros botones de la barra.
   .search-input {
-    width: 0;
-    opacity: 0;
+    box-sizing: border-box;
+    width: 34px;
+    height: 34px;
     padding: 0;
     border: 1px solid var(--tv-accent);
     border-radius: 42px;
-    height: 34px;
-    background: rgba(59, 130, 246, 0.15);
+    background: rgba(59, 130, 246, 0.25);
     color: var(--tv-text-on-primary);
     font-size: 0.75rem;
     outline: none;
+    display: none;
     transition:
       width 0.3s ease,
-      opacity 0.3s ease,
       padding 0.3s ease,
-      margin 0.3s ease;
+      background 0.3s ease;
 
     &::placeholder {
       color: var(--tv-text-muted);
+      opacity: 0;
+      transition: opacity 0.3s ease;
     }
 
     &:focus {
@@ -579,11 +581,19 @@
     }
   }
 
+  // El hover del círculo solo aplica colapsado: abierto, el campo ya no es un botón.
+  .search-wrap:not(.open) .search-input:hover {
+    background: var(--tv-accent);
+  }
+
   .search-wrap.open .search-input {
     width: 180px;
-    opacity: 1;
-    padding: 0 12px;
-    margin-left: 8px;
+    padding: 0 12px 0 30px;
+    background: rgba(59, 130, 246, 0.15);
+
+    &::placeholder {
+      opacity: 1;
+    }
   }
 
   .filter-menu {

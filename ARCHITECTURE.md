@@ -85,7 +85,8 @@ new Timeline({ container, items, ... })
 | `_applySort(field, asc)` | 2616 | Fija el sorter activo (`_sortField` + `_sortAsc`) y refresca la lista: re-ordena el pool en local y re-pide la página en API |
 | `_bindSortToggle()` | 4463 | Bindea el menú de orden: el botón abre/cierra, y un `change` en sus radios llama a `_applySort()` |
 | `_applyFilters(immediate)` | 2978 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
-| `_syncFilterToggleState()` | 2961 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-toggle` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
+| `_syncFilterToggleState()` | 2961 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-wrap` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
+| `_openSearch()` / `_closeSearch(force)` | 4605 | Abre el buscador (`.open` + foco) y lo colapsa. El colapso se corta si el campo tiene texto: un término escrito es un filtro en uso, y esconderlo dejaría al filtro puesto sin forma de sacarlo. `force` lo usa <kbd>Esc</kbd>, que primero vacía el campo |
 
 ### Embeds sociales
 
@@ -127,6 +128,9 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │   ├── button.expand-toggle (#expand-toggle)
   │   │   │   ├── span.expand-text (contiene #remaining-count + #remaining-text; con taxonomías, #remaining-count se oculta al expandir)
   │   │   │   └── span.expand-icon (#expand-icon)
+  │   │   ├── .search-wrap (#search-wrap) — un solo control: colapsado es el círculo de la lupa; con `.open` (o con un término escrito, que no se colapsa) es la píldora
+  │   │   │   ├── span.search-icon (ícono decorativo, absolute + `pointer-events: none`, sin texto propio)
+  │   │   │   └── input.search-input (#search-input) — el que recibe el foco para abrirse, y el que muestra el término
   │   │   ├── .filter-wrap (solo si la opción `filters` declara grupos `'menu'`)
   │   │   │   ├── button.filter-toggle (#filter-toggle)
   │   │   │   └── div.filter-menu (#filter-menu)
