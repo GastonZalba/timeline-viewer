@@ -23,7 +23,7 @@ new Timeline({ container, items, ... })
       │        │       opción `filters`: valores         │
       │        │       derivados de los datos o facets   │
      │        │                                          │
-     │        ├── Sort data (fecha_publicacion DESC)    │
+     │        ├── _sortBy (sorter activo, DEF f.pub)     │
      │        │                                          │
      │        ├── _renderAll() ◄──────────────────────┐ │
      │        │       │                               │ │
@@ -36,12 +36,12 @@ new Timeline({ container, items, ... })
      │                │                               │ │
      │                ├── expandToggle → _toggleExpand()│
      │                ├── featuredContainer → _toggleExpand()│
-     │                ├── sortToggle → _toggleSort()  │ │
+      │                ├── sortToggle → _bindSortToggle()│ │
      │                ├── filterToggle → toggle menu  │ │
      │                └── document click → close menus│ │
      │                                                │ │
      └────────────────────────────────────────────────┘ │
-              _toggleSort() y _applyFilters() ──────────┘
+              _applySort() y _applyFilters() ────────────┘
 ```
 
 ## Clase `Timeline` — Mapa de métodos
@@ -82,7 +82,8 @@ new Timeline({ container, items, ... })
 |--------|-------|-------------|
 | `_toggleExpand(scrollTo?)` | 2107 | Alterna entre vista featured (colapsada) y timeline (expandida) |
 | `_scrollToSection()` | 2169 | Smooth scroll para hacer visible el timeline |
-| `_toggleSort()` | 2222 | Invierte orden ascendente/descendente por fecha |
+| `_applySort(field, asc)` | 2616 | Fija el sorter activo (`_sortField` + `_sortAsc`) y refresca la lista: re-ordena el pool en local y re-pide la página en API |
+| `_bindSortToggle()` | 4463 | Bindea el menú de orden: el botón abre/cierra, y un `change` en sus radios llama a `_applySort()` |
 | `_applyFilters(immediate)` | 2978 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
 | `_syncFilterToggleState()` | 2961 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-toggle` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
 
@@ -338,7 +339,7 @@ Mapa de métodos (líneas actuales):
 | `_buildFilterMore(f, overflow)` | 2477 | Agrega el `button.filter-more` al final del grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
 | `_loadPersistedFilterState()` | 2507 | Lee la key `tv-filtros-internos-filters` de `localStorage` (los valores son los `input.value`, o sea tokens) |
 | `_savePersistedFilterState()` | 2519 | Escribe el estado de los grupos con `persist: true` (solo en el gesture del usuario) |
-| `_buildQueryParams(page)` | 2605 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`) |
+| `_buildQueryParams(page)` | 2605 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`), más `page`/`pageSize`, `sort` (dirección) y `sortBy` (el sorter activo) |
 | `_syncFilterToggleState()` | 2961 | Enciende los botones por dominio (ver arriba) |
 
 Flujo:
@@ -346,7 +347,7 @@ Flujo:
 1. `_normalizeFilters()` valida la opción (y `_resolveFilterItems()` resuelve los `items`) y `_buildLayout()` + `_attachFilterOptions()` crean los slots.
 2. `_buildFilterCheckboxes()` obtiene valores y conteos por grupo, en dos ramas: un grupo **con `items`** muestra esos valores, en ese orden, y solo los cuenta (en local sobre el **scope activo**; en API sobre `GET {url}/facets`, con `(0)` para lo que el server todavía no mandó); un grupo **sin `items`** deriva los valores del dato (en local los tokens únicos del scope, en API las claves de los facets), descarta el token vacío salvo que declare `allowEmpty`, y los ordena por conteo cuando hay que truncarlo (el bucket vacío, si está, se mueve al final después de ese sort). En API los checkboxes se arman **dos veces y solo dos**: sin conteos al iniciar (para que los `checked` ya viajen en la primera request) y otra vez cuando llegan los facets — nunca en cada página, porque recrearlos borraría el estado de los grupos sin `persist`. Los grupos con `items` funcionan sin facets (con los conteos en cero); los derivados quedan ocultos hasta que llegan.
 3. Al cambiar un checkbox, `_applyFilters(true)` filtra el scope activo con **AND entre grupos, OR dentro de cada uno** (además de la búsqueda), y `_renderAll()` re-renderiza. En modo API el paso no filtra nada local: `_applyFilters()` delega en `_schedulePageReload(immediate)` y el `true` pide el borde de entrada del debounce (el `input` del buscador es el único trigger que no lo pasa, porque cada tecla es un prefijo del término).
-4. El sort se re-aplica después del filtrado (`_sortByDateDesc()` + `reverse()`), así `asc` no re-ordena de verdad: invierte la lista descendente.
+4. El sort se re-aplica después del filtrado (`_sortBy()`): ordena por el sorter activo (`_sortField` + `_sortAsc`) con una comparación natural y estable. Un valor ausente es el más chico, así que en `desc` los ítems sin valor van **últimos** y en `asc` **primeros**, y los empates conservan el orden de origen.
 
 El botón activo es **por dominio**: `_syncFilterToggleState()` enciende `#filter-toggle` solo con los grupos `group !== 'filtros_internos'` y `#filtros-internos-toggle` solo con los `'filtros_internos'`. El puntito del panel lo deciden los grupos del panel; un `validado`/`capturado`/`descartado` activo enciende únicamente el botón rojo del flyout.
 
@@ -390,7 +391,9 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `fullpage` | `boolean` | Modo fullpage (opción del constructor): fuerza `isExpanded`, bloquea el colapso, no emite el resize handle y no renderiza las featured cards |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
-| `sortAscending` | `boolean` | Dirección del sort |
+| `sorters` | `SortDef[]` | Sorters normalizados de la opción `sorters` (con `default` resuelto a boolean). Vacío = sin UI de orden |
+| `_sortField` | `string` | Campo por el que se ordena (el sorter activo, o `fecha_publicacion` sin `sorters`) |
+| `_sortAsc` | `boolean` | Dirección del orden (`false` = descendente, "más reciente primero") |
 | `filters` | `FilterDef[]` | Grupos normalizados de la opción `filters` (defaults resueltos, `items` resueltos en `declared`, columnas repartidas, slots DOM y `checkboxes`). Vacío = sin filtros |
 | `_filterExpanded` | `Set<string>` | Grupos de filtros (por `field`) con el "Ver más" abierto (sobrevive a los rebuilds de los checkboxes) |
 | `section` | `HTMLElement` | `.publicaciones-section` |
@@ -400,7 +403,8 @@ Las transiciones CSS usan `transition-delay` escalonado (`index * 0.08s`) para c
 | `expandToggle` | `HTMLElement` | `#expand-toggle` |
 | `remainingCount` | `HTMLElement` | `#remaining-count` |
 | `expandIcon` | `HTMLElement` | `#expand-icon` |
-| `sortToggle` | `HTMLElement` | `#sort-toggle` |
+| `sortToggle` | `HTMLElement \| null` | `#sort-toggle` (null cuando la opción `sorters` no declara ninguna entrada, y entonces no se renderiza) |
+| `sortMenu` | `HTMLElement \| null` | `#sort-menu` (el desplegable del orden) |
 | `filterToggle` | `HTMLElement \| null` | `#filter-toggle` (sus listeners/estilo se resguardan de `null`: sin grupos `'menu'` no se renderiza) |
 | `filterMenu` | `HTMLElement \| null` | `#filter-menu` |
 | `workNotesToggle` | `HTMLElement` | `#work-notes-toggle` (solo con `internalButtons: true`) |

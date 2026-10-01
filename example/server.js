@@ -41,7 +41,7 @@ function normalize(value) {
 const FACET_FIELDS = filters.map((f) => f.field);
 
 /** Query params that are not filters: the ones that drive the page, the search and the order. */
-const RESERVED_PARAMS = new Set(['page', 'pageSize', 'sort', 'q']);
+const RESERVED_PARAMS = new Set(['page', 'pageSize', 'sort', 'sortBy', 'q']);
 
 /**
  * Values an item carries for a field, as the tokens the client filters on: always a list of
@@ -128,18 +128,28 @@ const STATIC_FACETS = buildFacets(mockData.items);
 const STATIC_TOTAL = mockData.items.length;
 
 /**
- * Non-destructive sorted copy of the filtered items. The undated ones are part of the direction
- * and not a fixed bucket: `desc` (the default) leaves them last, `asc` brings them first. That is
- * what the client does in local mode — it reverses the descending array — so flipping only the
- * dated comparison would make the two modes disagree on where the undated land.
+ * Comparable text of an item for the requested sorter. A missing value compares as `''`, the
+ * smallest, so an item without the field lands last in `desc` and first in `asc`. This is the
+ * server counterpart of the client's `_sortValue`.
  */
-function sortItems(items, sortAsc) {
-  return [...items].sort((a, b) => {
-    if (!a.fecha_publicacion) return !b.fecha_publicacion ? 0 : sortAsc ? -1 : 1;
-    if (!b.fecha_publicacion) return sortAsc ? 1 : -1;
-    const diff = new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
-    return sortAsc ? -diff : diff;
-  });
+function sortValue(item, field) {
+  const value = item[field];
+  return value === null || value === undefined ? '' : String(value);
+}
+
+/**
+ * Non-destructive sorted copy of the filtered items, ordered by `field` + direction. The natural
+ * comparison (`Intl.Collator` with `numeric`) is the same one the client uses in local mode: ISO
+ * dates and zero-padded ids both order correctly as plain strings, and ties keep their source
+ * order because the sort is stable. The direction applies to the whole list —a missing value, the
+ * smallest, goes last in `desc` and first in `asc`—, which is what makes the two modes agree on
+ * where the items without a value land.
+ */
+function sortItems(items, field, sortAsc) {
+  const collator = new Intl.Collator(undefined, { numeric: true });
+  const cmp = (a, b) => (a === b ? 0 : a === '' ? -1 : b === '' ? 1 : collator.compare(a, b));
+  const dir = sortAsc ? 1 : -1;
+  return [...items].sort((a, b) => dir * cmp(sortValue(a, field), sortValue(b, field)));
 }
 
 /**
@@ -170,20 +180,23 @@ function toSummary(item) {
 
 /**
  * GET /api — paginated list with search, filters and sort.
- * `sort` is the only ordering param and it carries the direction only (`asc` / `desc`), never a
- * field name: the field is `fecha_publicacion`. Anything other than `asc` falls back to `desc`.
- * `total` is the count of what the current query matches (it drives the "Cargar más" button and
- * the status row). The values that don't change with the query — the collection `total` and
- * `lastUpdated` — travel with the facets instead.
+ * The order is two params: `sort` carries the direction only (`asc` / `desc`, anything else falls
+ * back to `desc`) and `sortBy` the field, defaulting to `fecha_publicacion`. The field is an open
+ * string —the server does not validate it against a list— because the fields come from the
+ * client's `sorters` option, exactly like the filter fields. `total` is the count of what the
+ * current query matches (it drives the "Cargar más" button and the status row). The values that
+ * don't change with the query — the collection `total` and `lastUpdated` — travel with the
+ * facets instead.
  */
 function handleItems(url, res) {
   const params = Object.fromEntries(url.searchParams.entries());
   const q = normalize(params.q || '');
   const filters = parseFilters(params);
   const sortAsc = params.sort === 'asc';
+  const sortBy = params.sortBy || 'fecha_publicacion';
 
   const filtered = poolItems(q, filters);
-  const sorted = sortItems(filtered, sortAsc);
+  const sorted = sortItems(filtered, sortBy, sortAsc);
 
   const page = Math.max(1, Number(params.page) || 1);
   const pageSize = Math.max(1, Number(params.pageSize) || 10);

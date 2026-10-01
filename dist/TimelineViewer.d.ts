@@ -102,6 +102,24 @@ export interface ContentGroup {
     label: string;
     items: TimelineItem[];
 }
+/**
+ * One sort option of the toolbar, as declared by the `sorters` option of the constructor.
+ * `field` is the `TimelineItem` field to order by —it orders the items in local mode and travels
+ * as the `sortBy` param in API mode, where the server owns the order—, and `label` is the text the
+ * menu shows. See [Orden configurable](#orden-configurable).
+ */
+export interface TimelineSorter {
+    /** Field of `TimelineItem` to order by (e.g. `'fecha_publicacion'`, `'id'`). */
+    field: string;
+    /** Text of the option in the menu. Escaped before being injected into the markup. */
+    label: string;
+    /**
+     * Selects this option on mount (default: false). Only one is honoured —the first marked one
+     * wins—; with none marked, the first declared entry is. The direction always starts at
+     * descending ("más reciente primero"), which the menu then lets the user flip.
+     */
+    default?: boolean;
+}
 export interface TimelineOptions {
     container: string | HTMLElement;
     /**
@@ -152,6 +170,17 @@ export interface TimelineOptions {
      * [TimelineFilter](#timelinefilter) and [Filtros configurables](#filtros-configurables).
      */
     filters?: TimelineFilter[];
+    /**
+     * Sort options of the toolbar, in display order. **Without this option the component renders no
+     * sort UI at all** —no button, no menu—: like `filters`, nothing is hardcoded. The timeline is
+     * still ordered by `fecha_publicacion` descending, which is the built-in default order.
+     *
+     * The button opens a menu with a radio per entry and a direction switch ("más reciente primero"
+     * / "más antiguo primero"). One entry can be marked with `default: true` to be the one selected
+     * on mount; without it the first declared entry is. The order is resolved locally in local mode,
+     * and travels as the `sort` + `sortBy` params in API mode.
+     */
+    sorters?: TimelineSorter[];
     lastUpdated?: string;
     /**
      * Items shown per page. `0` disables the batch pagination: every matching item is rendered
@@ -363,6 +392,12 @@ interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 
     /** The control of a `'select'` group, or `null` for a `'checkboxes'` one */
     select: FilterSelect | null;
 }
+/** A `TimelineSorter` normalized for rendering: `default` resolved to a boolean */
+interface SortDef {
+    field: string;
+    label: string;
+    default: boolean;
+}
 /**
  * One row of the list of a `'select'` group. Just the node: what the search matches against is
  * `FilterSelect.haystacks`, which covers every value and not only the rendered ones.
@@ -463,8 +498,14 @@ export default class Timeline {
     remainingCount: HTMLElement;
     expandIcon: HTMLElement;
     section: HTMLElement;
-    sortToggle: HTMLElement;
-    sortAscending: boolean;
+    /** Null when the `sorters` option declares no entry, in which case no sort button is rendered */
+    sortToggle: HTMLElement | null;
+    sortMenu: HTMLElement | null;
+    sorters: SortDef[];
+    /** Field the timeline is ordered by: the active sorter, or `fecha_publicacion` when there is none */
+    _sortField: string;
+    /** Direction of the order: `false` (default) is descending, "más reciente primero" */
+    _sortAsc: boolean;
     workNotesToggle: HTMLElement;
     /** Null when the `filters` option declares no group, in which case the panel is not rendered */
     filterToggle: HTMLElement | null;
@@ -544,6 +585,16 @@ export default class Timeline {
     protected _resolveFilterItems(field: string, items: TimelineFilterItem[]): FilterDefItem[] | null;
     /** Report a group of the `filters` option that was dropped, so a typo does not go unnoticed */
     protected _warnFilter(index: number, reason: string): void;
+    /**
+     * Normalize the `sorters` option into the options the menu renders. Like `filters`, nothing is
+     * hardcoded: an absent or invalid option simply yields no options, and then the component renders
+     * **no sort UI at all** —the timeline keeps its built-in `fecha_publicacion` descending order—.
+     *
+     * Entries without a `field` or a `label`, and two entries sharing the same `field`, are dropped
+     * with a warning instead of breaking the mount: a broken entry is a runtime typo far easier to
+     * spot in the console than as an option that silently does not appear.
+     */
+    protected _normalizeSorters(sorters: TimelineSorter[] | undefined): SortDef[];
     /** Every item of every taxonomy, used by the featured stack, the counter and single mode */
     protected _allItems(): TimelineItem[];
     /**
@@ -551,8 +602,18 @@ export default class Timeline {
      * Falls back to the legacy flat `items` list when no group is configured.
      */
     protected _scopeItems(): TimelineItem[];
-    /** Sorted copy: newest first, undated items last */
-    protected _sortByDateDesc(items: TimelineItem[]): TimelineItem[];
+    /**
+     * Order a copy of the items by the active sorter (`_sortField` + `_sortAsc`).
+     *
+     * The comparison is natural (`Intl.Collator` with `numeric`): ISO dates (`YYYY-MM-DD`) and
+     * zero-padded ids (`FUE-00001`) both sort correctly as plain strings, so no per-field logic is
+     * needed. An item that carries no value for the field is the smallest value, which puts it first
+     * in `asc` and last in `desc` —the same places the undated items took before—. The sort is
+     * stable, so ties keep their source order in **both** directions, exactly as the API server does.
+     */
+    protected _sortBy(items: TimelineItem[]): TimelineItem[];
+    /** Comparable text of an item for the active sorter; a missing value compares as `''` (smallest) */
+    protected _sortValue(item: TimelineItem): string;
     /**
      * Number of items of the active scope, shown next to the taxonomy label.
      * The selector is a scope, not a filter, so this is the raw size of the group
@@ -605,6 +666,13 @@ export default class Timeline {
      * to read as the first thing in the panel rather than as one more group among the others.
      */
     protected _buildFilterMenuHtml(): string;
+    /**
+     * Markup of the sort control, or an empty string when the `sorters` option declares no entry:
+     * without `sorters` the component has **no sort UI at all**, not a hidden one. The button opens
+     * a menu shaped like the filter panel: one radio per sorter and one radio per direction. The
+     * direction is global (not per sorter), so the two radios are a fixed pair, not a list.
+     */
+    protected _buildSortMenuHtml(): string;
     /**
      * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
      * declared for it, the `filtros_internos` flyout. Without the latter the button would open an
@@ -847,8 +915,13 @@ export default class Timeline {
      * replaced, so animating it means scrolling across cards that are already gone.
      */
     protected _scrollToTimelineTop(): void;
-    /** Toggle timeline sort order between ascending and descending */
-    protected _toggleSort(): void;
+    /**
+     * Apply the chosen sorter and direction, and refresh the list. Mirror of a filter change: in
+     * local mode the pool is re-ordered in place, and in API mode the order is resolved by the
+     * server, so it starts a page reload. The `asc` class keeps the button's icon pointing the same
+     * way the direction does.
+     */
+    protected _applySort(field: string, asc: boolean): void;
     /** Apply the persisted work-notes visibility state to the section and toggle button */
     protected _applyWorkNotesState(): void;
     /** Toggle work-notes visibility and persist the state to localStorage */
@@ -1188,7 +1261,7 @@ export default class Timeline {
      * Debounce a full page reload triggered by filter/search/sort changes.
      *
      * Two shapes, because the triggers are not alike:
-     * - `immediate` (a single discrete action: a checkbox, the sort toggle, Escape on the search
+     * - `immediate` (a single discrete action: a checkbox, a sort option, Escape on the search
      *   input) has no burst to coalesce, so waiting the whole window is pure added latency: the
      *   request goes out on the leading edge and the window only swallows what comes next.
      * - without it (typing in the search input) the classic trailing debounce applies, because a
@@ -1371,12 +1444,29 @@ export default class Timeline {
     /** Initialize the component: build layout, sort data, render, bind events */
     protected _init(): void;
     /**
+     * Close the toolbar's floating menus, leaving out the one that is about to open. Only one can be
+     * open at a time: without this the filter panel and the sort menu overlap. `except` is the menu
+     * the caller is about to toggle, so its own state is left alone —closing the others and then
+     * toggling is what gives the "switch" behaviour—. The `select` list inside the filter panel is
+     * not a menu of this group: it closes with the panel.
+     */
+    protected _closeOtherMenus(except: 'filter' | 'sort' | 'internal'): void;
+    /**
      * Bind the click of the filter toggle. Split out of `_bindBaseEvents` because in API mode the
      * button is on screen from the start but the panel has no values until the facets land: until
      * then there is nothing to open, so the click does nothing. Called from `_bindBaseEvents` in
      * local mode and from the `.then()` of `_ensureApiFacets` in API mode, which runs once.
      */
     protected _bindFilterToggle(): void;
+    /**
+     * Bind the sort control: the button opens/closes the menu, and a change in any of its radios
+     * applies the order. Without `sorters` there is no button and this is a no-op. The menu does not
+     * close on change —picking a field and then a direction is two changes—, only on the same
+     * outside click that closes the filter panel (see the `document` listener in `_bindBaseEvents`).
+     * Unlike the filter panel, the sort menu has all its options from `_buildLayout`, so it is bound
+     * once and not rebuilt when the facets land.
+     */
+    protected _bindSortToggle(): void;
     /** Bind the header/global event listeners shared by both local and API modes */
     protected _bindBaseEvents(): void;
 }

@@ -1,6 +1,7 @@
 import Timeline from '../dist/TimelineViewer.js';
 import mockData from './mock-data.js';
 import filters from './filters.js';
+import sorters from './sorters.js';
 
 // Uso: abrir index.html con ?api para probar el modo API contra el mock.
 // ?id=FUE-0001 (opcional) renderiza solo esa tarjeta, ya expandida.
@@ -89,6 +90,9 @@ const baseOptions = {
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos
   // grupos se llenan con los valores que devuelve `GET /api/facets`.
   filters,
+  // El menú de orden. Sin esta opción no hay UI de orden: la librería no trae ningún sorter
+  // hardcodeado (ver example/sorters.js). En modo API los mismos campos viajan como `sortBy`.
+  sorters,
   singleId
 };
 

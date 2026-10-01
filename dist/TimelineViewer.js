@@ -83,7 +83,6 @@ function foldForSearch(value) {
 }
 export default class Timeline {
     constructor(config) {
-        this.sortAscending = false;
         this.searchTerm = '';
         this.container =
             typeof config.container === 'string'
@@ -102,6 +101,10 @@ export default class Timeline {
         this.fullpage = config.fullpage === true;
         this.filters = this._normalizeFilters(config.filters);
         this._filterExpanded = new Set();
+        this.sorters = this._normalizeSorters(config.sorters);
+        const defaultSorter = this.sorters.find((s) => s.default) || this.sorters[0];
+        this._sortField = defaultSorter ? defaultSorter.field : 'fecha_publicacion';
+        this._sortAsc = false;
         this.relatedLabel = config.relatedLabel || null;
         this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
         this.taxonomyRow = null;
@@ -125,6 +128,7 @@ export default class Timeline {
         this.remainingCount = null;
         this.expandIcon = null;
         this.sortToggle = null;
+        this.sortMenu = null;
         this.workNotesToggle = null;
         this.filterToggle = null;
         this.filterMenu = null;
@@ -296,6 +300,43 @@ export default class Timeline {
     _warnFilter(index, reason) {
         console.warn(`TimelineViewer: filtro #${index} de la opción "filters" descartado: ${reason}.`);
     }
+    /**
+     * Normalize the `sorters` option into the options the menu renders. Like `filters`, nothing is
+     * hardcoded: an absent or invalid option simply yields no options, and then the component renders
+     * **no sort UI at all** —the timeline keeps its built-in `fecha_publicacion` descending order—.
+     *
+     * Entries without a `field` or a `label`, and two entries sharing the same `field`, are dropped
+     * with a warning instead of breaking the mount: a broken entry is a runtime typo far easier to
+     * spot in the console than as an option that silently does not appear.
+     */
+    _normalizeSorters(sorters) {
+        if (!Array.isArray(sorters) || sorters.length === 0)
+            return [];
+        const seen = new Set();
+        const defs = [];
+        sorters.forEach((s, i) => {
+            if (!s || typeof s !== 'object') {
+                console.warn(`TimelineViewer: sorter #${i} de la opción "sorters" descartado: no es un objeto.`);
+                return;
+            }
+            if (typeof s.field !== 'string' || s.field.trim() === '') {
+                console.warn(`TimelineViewer: sorter #${i} de la opción "sorters" descartado: no tiene \`field\`.`);
+                return;
+            }
+            const field = s.field.trim();
+            if (typeof s.label !== 'string' || s.label.trim() === '') {
+                console.warn(`TimelineViewer: sorter "${field}" descartado: no tiene \`label\`.`);
+                return;
+            }
+            if (seen.has(field)) {
+                console.warn(`TimelineViewer: sorter "${field}" ya está declarado en otra entrada.`);
+                return;
+            }
+            seen.add(field);
+            defs.push({ field, label: s.label.trim(), default: s.default === true });
+        });
+        return defs;
+    }
     /** Every item of every taxonomy, used by the featured stack, the counter and single mode */
     _allItems() {
         if (this.content.length === 0)
@@ -313,15 +354,25 @@ export default class Timeline {
             return this._allItems();
         return this.content[this._contentIndex]?.items || [];
     }
-    /** Sorted copy: newest first, undated items last */
-    _sortByDateDesc(items) {
-        return [...items].sort((a, b) => {
-            if (!a.fecha_publicacion)
-                return 1;
-            if (!b.fecha_publicacion)
-                return -1;
-            return new Date(b.fecha_publicacion).getTime() - new Date(a.fecha_publicacion).getTime();
-        });
+    /**
+     * Order a copy of the items by the active sorter (`_sortField` + `_sortAsc`).
+     *
+     * The comparison is natural (`Intl.Collator` with `numeric`): ISO dates (`YYYY-MM-DD`) and
+     * zero-padded ids (`FUE-00001`) both sort correctly as plain strings, so no per-field logic is
+     * needed. An item that carries no value for the field is the smallest value, which puts it first
+     * in `asc` and last in `desc` —the same places the undated items took before—. The sort is
+     * stable, so ties keep their source order in **both** directions, exactly as the API server does.
+     */
+    _sortBy(items) {
+        const collator = new Intl.Collator(undefined, { numeric: true });
+        const cmp = (a, b) => (a === b ? 0 : a === '' ? -1 : b === '' ? 1 : collator.compare(a, b));
+        const dir = this._sortAsc ? 1 : -1;
+        return [...items].sort((a, b) => dir * cmp(this._sortValue(a), this._sortValue(b)));
+    }
+    /** Comparable text of an item for the active sorter; a missing value compares as `''` (smallest) */
+    _sortValue(item) {
+        const value = item[this._sortField];
+        return value === null || value === undefined ? '' : String(value);
     }
     /**
      * Number of items of the active scope, shown next to the taxonomy label.
@@ -428,6 +479,36 @@ export default class Timeline {
             </div>`;
     }
     /**
+     * Markup of the sort control, or an empty string when the `sorters` option declares no entry:
+     * without `sorters` the component has **no sort UI at all**, not a hidden one. The button opens
+     * a menu shaped like the filter panel: one radio per sorter and one radio per direction. The
+     * direction is global (not per sorter), so the two radios are a fixed pair, not a list.
+     */
+    _buildSortMenuHtml() {
+        if (this.sorters.length === 0)
+            return '';
+        const items = this.sorters
+            .map((s) => `<label class="sort-option"><input type="radio" name="tv-sort-field" value="${this._escapeHtml(s.field)}"${s.field === this._sortField ? ' checked' : ''} /> <span class="sort-option-label">${this._escapeHtml(s.label)}</span></label>`)
+            .join('');
+        const dir = (value, label) => `<label class="sort-option"><input type="radio" name="tv-sort-dir" value="${value}"${(value === 'asc') === this._sortAsc ? ' checked' : ''} /> <span class="sort-option-label">${label}</span></label>`;
+        return `<div class="sort-wrap">
+              <button class="sort-toggle" id="sort-toggle" title="Ordenar" aria-haspopup="true" aria-expanded="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="17,9 12,4 7,9" fill="currentColor"/><polygon points="17,15 12,20 7,15" fill="none" stroke-width="1.5"/></svg>
+              </button>
+              <div class="sort-menu" id="sort-menu">
+                <div class="sort-section">
+                  <div class="sort-header">Ordenar por</div>
+                  ${items}
+                </div>
+                <div class="sort-section">
+                  <div class="sort-header">Dirección</div>
+                  ${dir('desc', 'Más reciente primero')}
+                  ${dir('asc', 'Más antiguo primero')}
+                </div>
+              </div>
+            </div>`;
+    }
+    /**
      * Markup of the internal toolbar: the work-notes toggle plus, when at least one group is
      * declared for it, the `filtros_internos` flyout. Without the latter the button would open an
      * empty menu, so both of them are conditional on the `filters` option as well.
@@ -462,6 +543,7 @@ export default class Timeline {
     _buildLayout() {
         const internalButtonsHtml = this._buildInternalButtonsHtml();
         const filterMenuHtml = this._buildFilterMenuHtml();
+        const sortMenuHtml = this._buildSortMenuHtml();
         this.container.innerHTML = `
       <section class="publicaciones-section" id="publicaciones-section">
         <div class="featured-row">
@@ -477,9 +559,7 @@ export default class Timeline {
               <input class="search-input" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
             </div>
             ${filterMenuHtml}
-            <button class="sort-toggle" id="sort-toggle" title="Invertir orden">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="17,9 12,4 7,9" fill="currentColor"/><polygon points="17,15 12,20 7,15" fill="none" stroke-width="1.5"/></svg>
-            </button>
+            ${sortMenuHtml}
             ${internalButtonsHtml}
           </div>
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
@@ -518,6 +598,7 @@ export default class Timeline {
         this.remainingCount = this.container.querySelector('#remaining-count');
         this.expandIcon = this.container.querySelector('#expand-icon');
         this.sortToggle = this.container.querySelector('#sort-toggle');
+        this.sortMenu = this.container.querySelector('#sort-menu');
         this.workNotesToggle = this.container.querySelector('#work-notes-toggle');
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
@@ -1862,10 +1943,16 @@ export default class Timeline {
             window.scrollTo(0, window.scrollY + delta);
         }
     }
-    /** Toggle timeline sort order between ascending and descending */
-    _toggleSort() {
-        this.sortAscending = !this.sortAscending;
-        this.sortToggle.classList.toggle('asc', this.sortAscending);
+    /**
+     * Apply the chosen sorter and direction, and refresh the list. Mirror of a filter change: in
+     * local mode the pool is re-ordered in place, and in API mode the order is resolved by the
+     * server, so it starts a page reload. The `asc` class keeps the button's icon pointing the same
+     * way the direction does.
+     */
+    _applySort(field, asc) {
+        this._sortField = field;
+        this._sortAsc = asc;
+        this.sortToggle?.classList.toggle('asc', asc);
         this._applyFilters(true);
     }
     /** Apply the persisted work-notes visibility state to the section and toggle button */
@@ -2841,7 +2928,8 @@ export default class Timeline {
         const params = {
             page: String(page),
             pageSize: String(this._apiPageSize()),
-            sort: this.sortAscending ? 'asc' : 'desc'
+            sort: this._sortAsc ? 'asc' : 'desc',
+            sortBy: this._sortField
         };
         if (this.searchTerm.trim())
             params.q = this.searchTerm.trim();
@@ -3033,7 +3121,7 @@ export default class Timeline {
      * Debounce a full page reload triggered by filter/search/sort changes.
      *
      * Two shapes, because the triggers are not alike:
-     * - `immediate` (a single discrete action: a checkbox, the sort toggle, Escape on the search
+     * - `immediate` (a single discrete action: a checkbox, a sort option, Escape on the search
      *   input) has no burst to coalesce, so waiting the whole window is pure added latency: the
      *   request goes out on the leading edge and the window only swallows what comes next.
      * - without it (typing in the search input) the classic trailing debounce applies, because a
@@ -3276,12 +3364,8 @@ export default class Timeline {
                     return true;
                 return this._filterValuesOf(f, c).some((x) => active.includes(x));
             });
-        this.allCards = this._sortByDateDesc(this._scopeItems().filter(matches));
-        this._featuredCards = this._sortByDateDesc(this._allItems().filter(matches));
-        if (this.sortAscending) {
-            this.allCards.reverse();
-            this._featuredCards.reverse();
-        }
+        this.allCards = this._sortBy(this._scopeItems().filter(matches));
+        this._featuredCards = this._sortBy(this._allItems().filter(matches));
         if (this.pagination) {
             // Search, filters, sort and taxonomy re-scope all narrow or reorder the pool, so the page
             // the user was on may not even exist in the new one: every one of them starts over at the
@@ -3693,6 +3777,28 @@ export default class Timeline {
         this._bindBaseEvents();
     }
     /**
+     * Close the toolbar's floating menus, leaving out the one that is about to open. Only one can be
+     * open at a time: without this the filter panel and the sort menu overlap. `except` is the menu
+     * the caller is about to toggle, so its own state is left alone —closing the others and then
+     * toggling is what gives the "switch" behaviour—. The `select` list inside the filter panel is
+     * not a menu of this group: it closes with the panel.
+     */
+    _closeOtherMenus(except) {
+        if (except !== 'filter' && this.filterMenu) {
+            this.filterMenu.classList.remove('open');
+            this.filterToggle?.classList.remove('open');
+        }
+        if (except !== 'sort' && this.sortMenu) {
+            this.sortMenu.classList.remove('open');
+            this.sortToggle?.classList.remove('open');
+            this.sortToggle?.setAttribute('aria-expanded', 'false');
+        }
+        if (except !== 'internal' && this.filtrosInternosMenu) {
+            this.filtrosInternosMenu.classList.remove('open');
+            this.filtrosInternosToggle?.classList.remove('open');
+        }
+    }
+    /**
      * Bind the click of the filter toggle. Split out of `_bindBaseEvents` because in API mode the
      * button is on screen from the start but the panel has no values until the facets land: until
      * then there is nothing to open, so the click does nothing. Called from `_bindBaseEvents` in
@@ -3703,8 +3809,38 @@ export default class Timeline {
             return;
         this.filterToggle.addEventListener('click', (e) => {
             e.stopPropagation();
+            this._closeOtherMenus('filter');
             this.filterMenu?.classList.toggle('open');
             this.filterToggle?.classList.toggle('open');
+        });
+    }
+    /**
+     * Bind the sort control: the button opens/closes the menu, and a change in any of its radios
+     * applies the order. Without `sorters` there is no button and this is a no-op. The menu does not
+     * close on change —picking a field and then a direction is two changes—, only on the same
+     * outside click that closes the filter panel (see the `document` listener in `_bindBaseEvents`).
+     * Unlike the filter panel, the sort menu has all its options from `_buildLayout`, so it is bound
+     * once and not rebuilt when the facets land.
+     */
+    _bindSortToggle() {
+        if (!this.sortToggle || !this.sortMenu)
+            return;
+        this.sortToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = !this.sortMenu?.classList.contains('open');
+            this._closeOtherMenus('sort');
+            this.sortMenu?.classList.toggle('open', open);
+            this.sortToggle?.classList.toggle('open', open);
+            this.sortToggle?.setAttribute('aria-expanded', String(open));
+        });
+        this.sortMenu.addEventListener('change', (e) => {
+            const input = e.target;
+            if (!input || input.type !== 'radio')
+                return;
+            if (input.name === 'tv-sort-field')
+                this._applySort(input.value, this._sortAsc);
+            else if (input.name === 'tv-sort-dir')
+                this._applySort(this._sortField, input.value === 'asc');
         });
     }
     /** Bind the header/global event listeners shared by both local and API modes */
@@ -3716,11 +3852,11 @@ export default class Timeline {
         this.featuredRow.addEventListener('click', (e) => {
             if (this.isExpanded)
                 return;
-            if (e.target.closest('.expand-toggle, .featured-cards, .sort-toggle, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .filtros-internos-toggle, .filtros-internos-wrap'))
+            if (e.target.closest('.expand-toggle, .featured-cards, .sort-wrap, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .filtros-internos-toggle, .filtros-internos-wrap'))
                 return;
             this._toggleExpand();
         });
-        this.sortToggle.addEventListener('click', () => this._toggleSort());
+        this._bindSortToggle();
         if (this.taxonomySelect) {
             this.taxonomySelect.addEventListener('change', () => this._onTaxonomyChange());
         }
@@ -3736,6 +3872,7 @@ export default class Timeline {
         if (this.filtrosInternosToggle) {
             this.filtrosInternosToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
+                this._closeOtherMenus('internal');
                 this.filtrosInternosMenu.classList.toggle('open');
                 this.filtrosInternosToggle.classList.toggle('open');
             });
@@ -3783,6 +3920,11 @@ export default class Timeline {
             if (this.filterMenu && !e.target.closest('.filter-wrap')) {
                 this.filterMenu.classList.remove('open');
                 this.filterToggle?.classList.remove('open');
+            }
+            if (this.sortMenu && !e.target.closest('.sort-wrap')) {
+                this.sortMenu.classList.remove('open');
+                this.sortToggle?.classList.remove('open');
+                this.sortToggle?.setAttribute('aria-expanded', 'false');
             }
             if (!e.target.closest('.filtros-internos-wrap') && this.filtrosInternosMenu) {
                 this.filtrosInternosMenu.classList.remove('open');
