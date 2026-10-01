@@ -106,15 +106,16 @@ const LG_WHEEL_ZOOM_COOLDOWN = 60;
 /** Cuántos píxeles vale una línea de `deltaY`, para `deltaMode === WheelEvent.DOM_DELTA_LINE` */
 const LG_WHEEL_ZOOM_LINE_PX = 16;
 /**
- * Zoom máximo al que llega la rueda, y a la vez el **piso** del tope.
+ * Zoom **de reserva** al que llega la rueda cuando la imagen no tiene nada más grande que su propia
+ * caja: una captura de 400x800 (los screenshots del mock) o cualquier thumbnail que la galería ya
+ * muestra 1:1, donde `getCurrentImageActualSizeScale()` da 1 y el techo real no dejaría mover nada.
+ * Para una imagen grande el tope es su tamaño real y este 4 no entra.
  *
- * El techo solo no alcanza: `getScale()` del plugin `zoom` clampa al tamaño natural de la imagen, y
- * para una imagen que la galería muestra 1:1 (que es el caso de los screenshots, y de cualquier
- * thumbnail) ese techo es 1, o sea que la rueda no podría moverla. El piso se aplica solo cuando no
- * hay nada que ampliar: para una captura chica —que es justo para lo que se abre una captura— 4x
- * pixelado se sigue leyendo, y para una imagen grande el tope sigue siendo su tamaño real.
+ * Antes este 4 era también el techo de las imágenes grandes, porque el tope se sacaba de
+ * `getScale(LG_WHEEL_ZOOM_MAX)` y ese método **clampa por su argumento**: una captura de 1265x8012 en
+ * un visor de 632 da `getScale(4) === 4` en vez de sus ~12.7x reales. De ahí el nombre.
  */
-const LG_WHEEL_ZOOM_MAX = 4;
+const LG_WHEEL_ZOOM_FALLBACK_MAX = 4;
 /**
  * Escala real mínima para que la captura se abra zoomeada. El plugin `zoom` ya no hace nada cuando la
  * imagen va 1:1 (`setActualSize` termina en `resetZoom()` y `zoomImage` sale por `scaleDiff === 0`),
@@ -140,11 +141,12 @@ const LG_ZOOM_POLL_TRIES = 20;
  * las instancias que el core construye en el constructor; el tipo del peer dep lo declara como
  * `any[]`, y acá se acota con `instanceof lgZoom`.
  *
- * El tope es el tamaño natural de la imagen (`getScale`), y si ese tamaño no es mayor que el que ya
- * se muestra —una imagen 1:1— el tope pasa a ser `LG_WHEEL_ZOOM_MAX`, para que la captura se pueda
- * ampliar. Ojo con `getScale()`: si la imagen todavía no tiene layout devuelve `Infinity` (divide
- * por `offsetWidth === 0`), de ahí el guard de `containerRect` y el chequeo de `Number.isFinite` del
- * handler.
+ * El tope es el tamaño natural de la imagen (`getCurrentImageActualSizeScale()`), y si ese tamaño no es
+ * mayor que el que ya se muestra —una imagen 1:1— el tope pasa a ser `LG_WHEEL_ZOOM_FALLBACK_MAX`,
+ * para que la captura se pueda ampliar. Ojo con `getScale()`: clampa al valor que se le pasa, así que
+ * usarlo para el tope lo convertía en el tope. Y `getCurrentImageActualSizeScale()` devuelve
+ * `Infinity` si la imagen todavía no tiene layout (divide por `offsetWidth === 0`), de ahí el guard de
+ * `containerRect` y el chequeo de `Number.isFinite` del handler.
  */
 class LgWheelZoom {
     constructor(core) {
@@ -189,10 +191,15 @@ class LgWheelZoom {
             }
             const prev = zoom.scale;
             // Techo: el tamaño real de la imagen, y el piso solo cuando no hay nada que ampliar, que es el
-            // caso de una imagen que la galería muestra 1:1 (un screenshot, un thumbnail). `getScale` ya
-            // clampea por abajo en 1, así que el `max(…, 1)` de abajo es por si `prev` viniera < 1.
-            const realMax = zoom.getScale(LG_WHEEL_ZOOM_MAX);
-            const max = realMax > 1 ? realMax : LG_WHEEL_ZOOM_MAX;
+            // caso de una imagen que la galería muestra 1:1 (un screenshot chico, un thumbnail).
+            //
+            // La escala real sale de `getCurrentImageActualSizeScale()` y NO de `getScale(...)`: ese clampa al
+            // valor que se le pasa, así que pedirle el techo a él lo convertía en el techo (una captura de
+            // 1265x8012 en un visor de 632 se quedaba en 4x de sus ~12.7). Acá el 4 es el piso, y solo entra
+            // cuando la imagen ya va 1:1. El `Number.isFinite` cubre el `Infinity` que devuelve el método si
+            // la imagen todavía no tiene layout (divide por `offsetWidth === 0`).
+            const realMax = zoom.getCurrentImageActualSizeScale();
+            const max = realMax > 1 && Number.isFinite(realMax) ? realMax : LG_WHEEL_ZOOM_FALLBACK_MAX;
             const next = Math.min(Math.max(prev * (1 - delta * LG_WHEEL_ZOOM_RATE), 1), max);
             // Ya en el tope, o `zoomImage` no-op con `scaleDiff` 0: no se toca nada.
             if (!Number.isFinite(next) || Math.abs(next - prev) < 0.001)
