@@ -226,7 +226,6 @@ export interface TimelineOptions {
      * when there is something to gain: a capture already shown at (or near) its real size — or under
      * `LG_ZOOM_ACTUAL_MIN_SCALE`, 2x — opens exactly as before.
      */
-    screenshotActualSize?: boolean;
     /**
      * Label of the expand toggle for the given count.
      * The count is the total number of publications, independent of the selected taxonomy.
@@ -487,7 +486,6 @@ export default class Timeline {
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
-    screenshotActualSize: boolean;
     fullpage: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
@@ -771,7 +769,7 @@ export default class Timeline {
     /** Build the embed markup for a parsed link */
     protected _buildEmbed(embedUrl: LinkInfo): string;
     /** Open a lightGallery modal with the provided images */
-    protected _openLightGallery(images: ImageInfo[] | null | undefined, title: string, showFileName: boolean, startIndex?: number, openAtActualSize?: boolean): void;
+    protected _openLightGallery(images: ImageInfo[] | null | undefined, title: string, showFileName: boolean, startIndex?: number): void;
     /** HTML del icono de fuente oficial (edificio) sobre el círculo de acento */
     protected _oficialIconSvg(): string;
     /** Extraer la extensión en minúsculas de una URL, o '' si no tiene */

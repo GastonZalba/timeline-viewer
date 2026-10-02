@@ -166,8 +166,8 @@
 .publicaciones-section.expanded .filter-toggle {
   display: inline-flex;
 }
-.publicaciones-section.expanded .search-input {
-  display: block;
+.publicaciones-section.expanded .search-wrap {
+  display: inline-flex;
 }
 .publicaciones-section.expanded .featured-cards {
   opacity: 0;
@@ -409,7 +409,7 @@
 }
 .publicaciones-section .search-wrap {
   position: relative;
-  display: flex;
+  display: none;
   align-items: center;
 }
 .publicaciones-section .search-wrap.active:not(.open)::after {
@@ -442,7 +442,6 @@
   color: var(--tv-text-on-primary);
   font-size: 0.75rem;
   outline: none;
-  display: none;
   transition: width 0.3s ease, padding 0.3s ease, background 0.3s ease;
 }
 .publicaciones-section .search-input::placeholder {

@@ -208,8 +208,8 @@
 
     // El buscador es un elemento: el input colapsado (el círculo de la lupa) y el `display: block` de
     // acá son los del viejo botón.
-    .search-input {
-      display: block;
+    .search-wrap {
+      display: inline-flex;
     }
 
     .featured-cards {
@@ -512,7 +512,7 @@
 
   .search-wrap {
     position: relative;
-    display: flex;
+    display: none;
     align-items: center;
 
     // Puntito de "filtro en uso". Solo con el campo colapsado: desplegado, el término escrito ya
@@ -559,7 +559,6 @@
     color: var(--tv-text-on-primary);
     font-size: 0.75rem;
     outline: none;
-    display: none;
     transition:
       width 0.3s ease,
       padding 0.3s ease,
