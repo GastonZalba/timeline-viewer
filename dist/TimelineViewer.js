@@ -147,6 +147,9 @@ const LG_ZOOM_POLL_TRIES = 20;
  * usarlo para el tope lo convertía en el tope. Y `getCurrentImageActualSizeScale()` devuelve
  * `Infinity` si la imagen todavía no tiene layout (divide por `offsetWidth === 0`), de ahí el guard de
  * `containerRect` y el chequeo de `Number.isFinite` del handler.
+ *
+ * El punto desde el que se escala lo aporta `_anchorToCursor`, porque el ancla de `zoomImage()` no es un
+ * parámetro sino estado del plugin.
  */
 class LgWheelZoom {
     constructor(core) {
@@ -204,6 +207,12 @@ class LgWheelZoom {
             // Ya en el tope, o `zoomImage` no-op con `scaleDiff` 0: no se toca nada.
             if (!Number.isFinite(next) || Math.abs(next - prev) < 0.001)
                 return;
+            // El ancla va en el cursor: `zoomImage()` no la recibe como parámetro, la lee del estado del
+            // plugin, y el peer dep la deja en el centro del modal al abrir (ver `_anchorToCursor`). Ir antes
+            // del `beginZoom` no tiene trampa: `beginZoom` solo resetea el ancla cuando `next === 1`, y ahí
+            // ya se llama a `resetZoom()`, que además pone `left`/`top` en 0, así que el transform final es
+            // `translate3d(0, 0)` igual (el `setPageCords()` de ese reset deja el ancla en el centro).
+            this._anchorToCursor(zoom, event);
             zoom.beginZoom(next);
             zoom.zoomImage(next, next - prev, true, false);
         };
@@ -221,6 +230,10 @@ class LgWheelZoom {
     destroy() {
         this._core.outer.get().removeEventListener('wheel', this._onWheel);
     }
+    /** La imagen de la slide visible: la que miden el estado de tamaño real y el ancla del cursor */
+    _currentImage() {
+        return this._core.outer.get().querySelector('.lg-current .lg-image');
+    }
     /**
      * Si el peer dep dejó la imagen en su representación de "tamaño real" (la que describe `_onWheel`).
      *
@@ -230,11 +243,48 @@ class LgWheelZoom {
      * que en ese estado es la única que vale: el elemento con su tamaño natural en layout.
      */
     _atActualSize() {
-        const image = this._core.outer.get().querySelector('.lg-current .lg-image');
+        const image = this._currentImage();
         return (this._core.outer.get().classList.contains('lg-actual-size') &&
             !!image &&
             image.naturalWidth > 0 &&
             image.offsetWidth === image.naturalWidth);
+    }
+    /**
+     * Ancla el zoom en el cursor en vez de en el centro del modal.
+     *
+     * `zoomImage()` no recibe un punto: arma el nuevo transform a partir de `pageX`/`pageY` del
+     * plugin, y el peer dep los deja en el centro del modal al abrir, así que sin esto la rueda escala
+     * siempre desde el medio. Se escriben los dos campos en vez de llamar a `setPageCords()` porque esa
+     * hace `event.pageX || event.touches[0].pageX` y un `WheelEvent` no tiene `touches`: con `pageX` en
+     * `0` reventaría. Los dos son públicos en el `.d.ts` del peer dep.
+     *
+     * El gate es el rect de la imagen y no el del `.lg-img-wrap` porque el wrap es `position: absolute`
+     * con `left/right/top/bottom: 0` y `width/height: 100%`, o sea el rect del slide entero: daría
+     * "dentro" siempre. Con el cursor fuera de la imagen (caption, barra de miniaturas) no se escribe
+     * nada y el ancla sigue siendo el centro.
+     *
+     * Un detalle que no importa: el rect sale con la transición de 0.5s del peer dep a medio camino, así
+     * que la elección cursor/centro puede quedar un frame desfasada justo en el borde de la imagen. El
+     * ancla misma sale del evento y es exacta, y las dos opciones son legales.
+     */
+    _anchorToCursor(zoom, event) {
+        const image = this._currentImage();
+        if (!image)
+            return;
+        const rect = image.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right)
+            return;
+        if (event.clientY < rect.top || event.clientY > rect.bottom)
+            return;
+        // Coordenadas de página, que es el espacio con el que trabaja la fórmula del peer dep
+        // (`containerRect` + `zoom.scrollTop`) y en el que el `dblclick` ya deja su ancla.
+        zoom.pageX = event.pageX;
+        zoom.pageY = event.pageY;
+        // El drag y el pinch dejan `positionChanged` en `true`, y `zoomImage()` lo mira antes que
+        // `pageX`/`pageY`: rehace el ancla desde `left`/`top` para no mover lo que quedó arrastrado. Por
+        // eso hay que limpiarlo, o el primer tick de la rueda tras arrastrar vuelve al centro. El
+        // `left`/`top` del drag entra igual en la fórmula, así que la posición alcanzada no se pierde.
+        zoom.positionChanged = false;
     }
 }
 export default class Timeline {

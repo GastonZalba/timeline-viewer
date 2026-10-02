@@ -590,7 +590,7 @@ To run the server without the file watchers:
 npm start
 ```
 
-The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency. The images open in a lightgallery modal where the wheel zooms in and out over the picture (up to the image's real size, or 4x when the gallery shows it 1:1, which is the case of the article screenshots): zoom is continuous, like a pinch, and the drag pans once zoomed.
+The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency. The images open in a lightgallery modal where the wheel zooms in and out over the picture (up to the image's real size, or 4x when the gallery shows it 1:1, which is the case of the article screenshots): zoom is continuous, like a pinch, it grows from the point under the cursor (over the caption or the thumbnail bar it zooms from the centre), and the drag pans once zoomed.
 
 The **screenshot** gallery has one extra step: it opens the capture at its **real size, anchored to the top** of the viewer (`screenshotActualSize`, on by default), because a long capture centred vertically lands in the middle of nothing useful. From there you read it by dragging, the wheel does nothing (it is already 1:1, i.e. pixel-perfect) and wheel down goes back to fit. The `imagenes` grid opens the way it always did.
 
