@@ -1,5 +1,5 @@
 ﻿import { test, expect } from '@playwright/test';
-import { openDemo, sel, ARTICLE_ROWS } from './helpers/demo.js';
+import { openDemo, sel, ARTICLE_ROWS, articleIds } from './helpers/demo.js';
 import mockData from '../example/mock-data.js';
 import demoFilters from '../example/filters.js';
 
@@ -187,7 +187,9 @@ test.describe('filtros configurables en el navegador', () => {
     await expect(group.locator('.filter-option:visible')).toHaveCount(4);
   });
 
-  test('modo local: el estado de los grupos con `persist` sobrevive a la recarga', async ({ page }) => {
+  test('modo local: el estado de los grupos con `persist` sobrevive a la recarga, y el resto viaja en la URL', async ({
+    page
+  }) => {
     await openDemo(page, 'flat&expanded');
 
     // Tildar `capturado` (persiste, vive en el flyout de filtros internos): se suma al estado con
@@ -199,17 +201,19 @@ test.describe('filtros configurables en el navegador', () => {
     await expect(page.locator('#filtros-internos-toggle')).toHaveClass(/active/);
     await expect(page.locator('#filter-toggle')).not.toHaveClass(/active/);
 
-    // `tipo_fuente` no persiste: tildar un valor del panel es un estado efímero.
+    // `tipo_fuente` no persiste: su estado es efímero y solo sobrevive si viaja en la URL, que es lo
+    // que hace el demo con `stateInUrl`.
     await openPanel(page);
     await page.click(optionLabel('tipo_fuente', 'Sitio web o portal'));
+    await expect(page).toHaveURL(/tv_tipo_fuente=Sitio\+web\+o\+portal/);
 
     await page.reload();
     await page.waitForSelector('.publicaciones-section .timeline-card', { state: 'attached' });
 
-    // El estado interno vuelve tildado (persistió) y el del panel con su default (sin chequear,
-    // porque `tipo_fuente` no persiste).
+    // El estado interno vuelve tildado (persistió) y el del panel vuelve tildado (viajó en la URL),
+    // por dos caminos distintos que acá se ven juntos.
     await expect(page.locator('[data-filter-field="capturado"] input[value="true"]')).toBeChecked();
-    await expect(page.locator('[data-filter-field="tipo_fuente"] input[value="Sitio web o portal"]')).not.toBeChecked();
+    await expect(page.locator('[data-filter-field="tipo_fuente"] input[value="Sitio web o portal"]')).toBeChecked();
   });
 
   test('modo API: los conteos llegan de /facets y activar un valor viaja como query param', async ({ page }) => {
@@ -274,5 +278,107 @@ test.describe('filtros configurables en el navegador', () => {
         rows.map((r) => r.querySelector('.timeline-card')?.getAttribute('data-card-id'))
       )
     ).toEqual(sitios);
+  });
+});
+
+/**
+ * `stateInUrl` in the browser, which the demo always turns on: the address bar is a link
+ * compartible de la vista.
+ *
+ * Lo que se mira acá es lo que jsdom no puede ver — que la URL del navegador cambie de verdad, que
+ * un link abra la lista correcta, y que en modo API el **primer** request salga ya filtrado (el
+ * sembrado tiene que ocurrir antes de que los valores existan, porque en API vienen de `/facets`) —
+ * y el caso de permisos que lo justifica: un link con filtros internos abierto por alguien que no
+ * los tiene declarados.
+ */
+test.describe('estado en la URL', () => {
+  /** The params the component owns in the current URL */
+  const tvParams = (page) => Object.fromEntries(new URL(page.url()).searchParams);
+
+  test('un link abre la vista que comparte, y esa vista sigue en la URL', async ({ page }) => {
+    // Los dos ítems sin `tipo_fuente` son los que no se capturaron, y son los únicos cuyo orden por
+    // `id` no coincide con el de fecha: el link los pide por id ascendente y el default (fecha
+    // descendente) los daría al revés, así que la lista en pantalla dice cuál de los dos se aplicó.
+    await openDemo(page, 'flat&expanded&tv_tipo_fuente=null&tv_sortBy=id&tv_sort=asc');
+
+    // El filtro llega tildado —aunque su fila esté detrás del "Ver más", que no se abre nunca—, y el
+    // término... acá no hay término: los dos ítems no tienen título, así que la búsqueda solo
+    // aparecería vacía o se comería la lista.
+    await expect(page.locator(optionLabel('tipo_fuente', 'null') + ' input')).toBeChecked();
+    expect(await articleIds(page)).toEqual(firstPageOf(poolPorDefecto((i) => i.tipo_fuente === null).sort()));
+
+    // Montar no reescribe el link, así que sigue siendo el mismo link.
+    expect(tvParams(page)['tv_tipo_fuente']).toBe('null');
+    expect(tvParams(page)['tv_sortBy']).toBe('id');
+
+    // Y cambiar algo lo actualiza sin dejar de ser el mismo link (replaceState, sin historial). Lo
+    // que queda acá ya es solo URL: este filtro vacía la lista (los dos ítems no traen `contenido`).
+    await openPanel(page);
+    await page.click(optionLabel('contenido', 'imagenes'));
+    await expect.poll(() => tvParams(page)['tv_contenido']).toBe('imagenes');
+    await expect(page).toHaveURL(/tv_sortBy=id/);
+  });
+
+  test('el link decide la taxonomía, y el que ya no existe abre en la primera', async ({ page }) => {
+    const segunda = mockData.content[1].label;
+    await openDemo(page, `expanded&tv_tax=${encodeURIComponent(segunda)}`);
+    await expect(page.locator('#taxonomy-select')).toHaveValue(segunda);
+    expect(await articleIds(page)).toEqual(delPool((i) => mockData.content[1].items.includes(i)));
+
+    await openDemo(page, 'expanded&tv_tax=Taxonom%C3%ADa%20que%20ya%20no%20existe');
+    await expect(page.locator('#taxonomy-select')).toHaveValue(mockData.content[0].label);
+  });
+
+  test('con `?pagination` el link abre en su página, y con "Cargar más" la página no existe', async ({ page }) => {
+    await openDemo(page, 'flat&expanded&pagination&tv_page=2');
+    await expect(page.locator(sel.paginatorText)).toHaveText('Página 2 de 2');
+
+    // Con "Cargar más" lo que hay en pantalla no es una página, así que el param se descarta: el
+    // link abre en la primera y no promete una página que no se puede pedir.
+    await openDemo(page, 'flat&expanded&tv_page=3');
+    await expect(page.locator(sel.loadMore)).toBeVisible();
+  });
+
+  test('`?sininternos`: un link con filtros internos abre igual y los limpia de la URL', async ({ page }) => {
+    const errores = [];
+    page.on('pageerror', (e) => errores.push(String(e)));
+
+    // El link lo mandó alguien que sí tiene los internos; este usuario no los declara.
+    await openDemo(page, 'flat&expanded&sininternos&tv_validado=true&tv_capturado=true&tv_contenido=imagenes');
+
+    expect(errores).toEqual([]);
+    await expect(page.locator('#filtros-internos-wrap')).toHaveCount(0);
+    // El resto del link se aplica igual: no se pierde la vista por lo que no se puede usar.
+    await expect(page.locator(optionLabel('contenido', 'imagenes') + ' input')).toBeChecked();
+    expect(await articleIds(page)).toEqual(firstPageOf(poolPorDefecto((i) => i.contenido?.includes('imagenes'))));
+
+    // Montar no reescribe el link, así que los params ajenos siguen ahí; la primera interacción es
+    // la que limpia el namespace propio. El filtro que se tilda es uno de los que sí están
+    // declarados: `tipo_fuente` tiene su cola detrás del "Ver más", así que su "Video" no es
+    // clickeable sin abrirlo, y acá lo que importa es el efecto en la URL, no el checkbox.
+    expect(tvParams(page)['tv_validado']).toBe('true');
+    await openPanel(page);
+    await page.click(optionLabel('es_oficial', 'true'));
+    await expect.poll(() => tvParams(page)['tv_es_oficial']).toBe('true');
+    expect(tvParams(page)['tv_validado']).toBeUndefined();
+    expect(tvParams(page)['tv_capturado']).toBeUndefined();
+  });
+
+  test('modo API: el primer request ya viaja con los filtros del link', async ({ page }) => {
+    const requests = [];
+    page.on('request', (req) => {
+      const url = new URL(req.url());
+      if (url.pathname === '/api') requests.push(url.searchParams);
+    });
+
+    await openDemo(page, 'api&expanded&pagination&tv_tipo_fuente=Sitio+web+o+portal&tv_page=1');
+    await expect(page.locator(ARTICLE_ROWS)).toHaveCount(
+      poolPorDefecto((i) => i.tipo_fuente === 'Sitio web o portal').length
+    );
+
+    // El primero, no el último: si el sembrado esperaba a los valores del grupo, el primer request
+    // saldría sin filtro y la lista ya estaría en pantalla cuando llegaran los facets.
+    expect(requests[0].get('tipo_fuente')).toBe('Sitio web o portal');
+    expect(requests[0].get('page')).toBe('1');
   });
 });

@@ -76,7 +76,7 @@ The `Timeline` constructor accepts a single config object:
 | `inlineImages`  | `boolean`                      | `false`    | When `true`, shows the `imagenes` thumbnails inline inside each expanded card (below the summary, before the topics) and hides the "Imágenes" action button (the inline thumbs replace it). Clicking a thumbnail opens the gallery at that image |
 | `inlineAdjuntos` | `boolean` | `false` | When `true`, shows the `adjuntos` inline inside each expanded card (below the topics) as a list of file names with a type icon (PDF vs generic, inferred from the extension), and hides the "Adjuntos" action button. Both this block and the hidden "Adjuntos" menu link each file with `download`, so same-origin attachments are saved instead of opened in a tab |
 | `internalButtons` | `boolean` | `false` | When `true`, shows the internal work controls in the timeline toolbar: the red "work notes" toggle (hide/show `notas_de_trabajo` on cards and topics) and the red "Filtros internos" flyout button. The flyout only renders when the `filters` option declares at least one group with `group: 'filtros_internos'` (validado / capturado / descartado in the demo). When `false` (default) those buttons are not rendered |
-| `screenshotActualSize` | `boolean` | `true` | When `true` (default), opening the **screenshot** gallery (`screenshot`) zooms the capture to its **real size, anchored to the top** of the viewer instead of showing it centred, so a long capture starts at its first row and reads from there by dragging. Only applies to the one-image screenshot gallery, not to the `imagenes` grid, and only when there is something to gain: a capture whose real size is under `2x` the viewer (the mock's 400x800 screenshots, any normal photo) opens exactly as before, at fit. In that state the mouse wheel does not zoom (it is already at 1:1, i.e. pixel-perfect); **wheel down returns the capture to fit** and wheel up zooms again from there |
+| `stateInUrl`    | `boolean`                      | `false`    | When `true`, the **address bar becomes a shareable link of the view**: whoever opens it sees the same search, filters, order, taxonomy and page. The state travels as query params under the `tv_` prefix (`tv_q`, `tv_<field>` with the active values as CSV, `tv_sortBy` + `tv_sort`, `tv_tax`, `tv_page`), which are the very same params API mode sends to the server. The URL is read **once**, before the first render (so a link opens on the view it shares, and the first API request already carries the filters) and written with `history.replaceState` after every change: it is a snapshot of the view, not a navigation log, so there is no back button and nothing is pushed to the history. Mounting never rewrites the URL it just read; the first interaction does, and that is also when the `tv_*` keys that are not in effect get dropped — **what the link asks for that this instance cannot do is ignored silently** (a filter the consumer did not declare, a value that no longer exists, an order or a taxonomy that is not there, a page out of range): nothing warns, nothing breaks, and a group whose values leave nothing checked simply does not filter. Params outside the `tv_` prefix are never touched, so the consumer keeps its own flags. Ignored in single mode (`singleId`). See [State in the URL](#state-in-the-url) |
 | `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given count. When unset, the default Spanish label is used with singular/plural logic. `count` is the **total number of publications, independent of the selected taxonomy** (the same number shown next to the label), which keeps the singular/plural grammatical. The returned string is injected as **HTML (not escaped)**, so it can contain markup (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`); escape any untrusted value before returning it |
 | `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode. The navigation links block under the card is not configured here: it comes from the item's own `taxonomias` field. See [Single view taxonomies](#single-view-taxonomies) |
 
@@ -560,6 +560,42 @@ The comparison is **natural** (`Intl.Collator` with `numeric`), which is why no 
 | `label` | `string` | **required** | Text of the option in the menu. Escaped before being injected. An entry with a missing `label` is dropped with a `console.warn` |
 | `default` | `boolean` | `false` | Selects this option on mount. Only one is honoured — the first marked wins — and with none marked the first declared entry is. The direction always starts descending. Two entries sharing a `field` drop the second one with a `console.warn` |
 
+### State in the URL
+
+`stateInUrl: true` turns the address bar into a shareable link of the view: the search, the filters, the order, the taxonomy and the page travel in the query string, so opening that URL anywhere shows the same list.
+
+```js
+new Timeline({
+  container: '#noticias-container',
+  content,
+  filters,
+  sorters,
+  stateInUrl: true
+});
+```
+
+Everything travels under the **`tv_` prefix**, and each key is the param API mode already sends to the server:
+
+| Param | What it is |
+| --- | --- |
+| `tv_q` | The search term |
+| `tv_<field>` | The active values of that filter group, as CSV (`tv_contenido=adjuntos,video`) — the very tokens the API receives |
+| `tv_sortBy` + `tv_sort` | The active sorter field and the direction (`asc` / `desc`) |
+| `tv_tax` | The selected taxonomy **by label** (`tv_tax=También%20en`), never by index, because the index depends on the deployment |
+| `tv_page` | The page of the numeric paginator, only with `pagination: true` |
+
+Three things worth knowing:
+
+- **It is read once, before the first render**, and written with `history.replaceState` after every change. So a link opens on the view it shares — the sorter is already selected, the taxonomy pill already says its label, the term is already written in the search box — and in API mode the **first request already carries the filters**, even for a group whose values only arrive with `/facets`. Since it is a snapshot and not a navigation log, there is no back button: nothing is pushed to the history and `popstate` is not listened to.
+- **Mounting does not rewrite the URL.** The link you opened stays exactly as it is until the user interacts; that first interaction is also when the `tv_*` keys that are not in effect are dropped.
+- **What the link asks for and this instance cannot do is ignored, silently.** A filter field the consumer did not declare, a value that no longer exists, a sorter or a taxonomy that is not offered, a page out of range: nothing is warned about, nothing breaks, and a group whose tokens leave nothing checked simply does not filter instead of matching nothing and emptying the list. That is what makes the option safe to hand to the public — the shared link of someone with internal permissions opens fine (with the rest of the filters applied) for someone who does not have them. Params **outside** the `tv_` prefix are never touched, so the consumer keeps its own flags (`?api`, `?flat`, `?id`...); a consumer that needs its own namespaced keys should stay out of the prefix.
+
+The order the URL gives precedence to the declared defaults is **URL → `localStorage` (a `persist` group) → `checked` in the declaration**, and it wins over them precisely because a shared link is a more explicit "show me this" than a value this browser happens to have stored. It also reseeds on every rebuild of the checkboxes (the API facets, a taxonomy re-scope), which is what keeps a shared filter from being wiped the way a non-persistent one is. An **empty** value (`?tv_contenido=`) counts as "this group was cleared on purpose" and is shareable as such.
+
+A declared value can be a list — `{ value: [null, false] }` is **one** checkbox — and its token is then a CSV itself, so it travels joined with the rest (`tv_descartado=true,null,false`) and comes back split. A group is matched **by tokens and not by whole strings**: that is what makes the checkbox still checked when the link is reopened, instead of the group narrowing down to a single value and filtering most of the list away.
+
+In single mode (`singleId`) the option is a no-op: there is no list to share.
+
 ## Build
 
 ```bash
@@ -592,8 +628,6 @@ npm start
 
 The demo page loads lightgallery JS and CSS from CDN via importmap. Consumers are responsible for providing lightgallery as a peer dependency. The images open in a lightgallery modal where the wheel zooms in and out over the picture (up to the image's real size, or 4x when the gallery shows it 1:1, which is the case of the article screenshots): zoom is continuous, like a pinch, it grows from the point under the cursor (over the caption or the thumbnail bar it zooms from the centre), and the drag pans once zoomed.
 
-The **screenshot** gallery has one extra step: it opens the capture at its **real size, anchored to the top** of the viewer (`screenshotActualSize`, on by default), because a long capture centred vertically lands in the middle of nothing useful. From there you read it by dragging, the wheel does nothing (it is already 1:1, i.e. pixel-perfect) and wheel down goes back to fit. The `imagenes` grid opens the way it always did.
-
 The demo declares its filters in `example/filters.js` and passes them through the `filters` option, so the toolbar you see is built from that config — tweak a group there to see the panel change without touching the library. Most groups derive their values from the data and get sorted by number of results when the "Ver más" cut has to truncate them; the ones that need fixed labels or a fixed order declare `items` instead, and several of the derived ones add `allowEmpty: true` so the articles that carry no value are offered as a last "Sin valor". A derived group can never start checked (`checked` only exists in a declared item), so those groups open with nothing applied and the user narrows from there. The mock ships the fields already classified (`tipo_fuente`, `contenido`, `anio_publicacion`), so the demo needs no `extract`: `example/server.js` tokenizes with `String()` and has no per-field logic either.
 
 Query flags of the demo page:
@@ -607,6 +641,7 @@ Query flags of the demo page:
 | `?api` | API mode against the mock server (`example/server.js`): no taxonomy selector, server-side filters |
 | `?pagination` | Numeric pagination (`pagination: true`): replaces "Cargar más" with ‹ Previous \| Page X of Y \| Next ›. Note that without `?flat` the first taxonomy has 9 items against `itemsPerPage: 10`, which is a single page, so no paginator is rendered — combine it with `?flat` or pick "Ver todo" in the selector |
 | `?many` | Adds a synthetic `topicos_demo` field with **400 values** to the items and injects a `select` filter for it (local mode only, combinable with `?flat`/`?expanded`/`?full`). It is the stress test for the lazy windowed list: shows the search box, renders 50 per window, grows by scrolling, and lets you try the keyboard navigation and the accent/case-insensitive search. Two items are left with the field in `null` (one in the first taxonomy, so it is visible without switching), so the group also declares `allowEmpty: true` and the **"Sin valor"** bucket appears last — reachable through the dropdown search or <kbd>End</kbd> |
+| `?sininternos` | Drops the `filtros_internos` groups from the declaration, as a consumer without permissions for them would. With `stateInUrl` (always on in the demo) it is the case worth trying: open a link that carries `?tv_validado=...` with it and the internal filter is ignored without a warning while the rest of the link is applied, then dropped from the URL on the first interaction |
 | `?id=FUE-00001` | Single mode: renders just that card, already expanded, with the navigation block from the item's `taxonomias` (FUE-00001 has the three groups, one of them with 7 links to exercise the "Ver más (4)" toggle; FUE-00002 exercises the incomplete-group filtering, FUE-00005 a single column, the rest have no `taxonomias` and render no block) |
 
 ## Tests

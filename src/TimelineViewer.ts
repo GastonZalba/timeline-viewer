@@ -103,6 +103,24 @@ const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
  */
 const PERSISTED_FILTER_STORAGE_KEY = 'tv-filtros-internos-filters';
 
+/**
+ * Prefix of every query param the component owns in the browser URL with `stateInUrl`. The namespace
+ * is what makes "clean the URL" safe: writing strips the `tv_*` keys it does not recognize (a filter
+ * the consumer did not declare this time —an internal one, for a user without permissions—) and
+ * leaves every other param alone, so the consumer keeps its own flags (`?api`, `?flat`, `?id`...).
+ * A consumer that wants to reserve keys of its own has to stay out of this prefix.
+ */
+const URL_STATE_PREFIX = 'tv_';
+
+/** The fixed params of the URL state, the ones that are not a filter field */
+const URL_STATE_KEYS = {
+  q: URL_STATE_PREFIX + 'q',
+  sortBy: URL_STATE_PREFIX + 'sortBy',
+  sort: URL_STATE_PREFIX + 'sort',
+  taxonomy: URL_STATE_PREFIX + 'tax',
+  page: URL_STATE_PREFIX + 'page'
+} as const;
+
 const TONE_LABEL: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
 
 /**
@@ -342,17 +360,29 @@ export interface TimelineOptions {
   inlineAdjuntos?: boolean;
   internalButtons?: boolean;
   /**
-   * Open the screenshot gallery at the image's real size, anchored to the top of the viewport
-   * (default `true`).
+   * Keep the state of the view in the browser URL (default: false), so the address bar is a
+   * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
    *
-   * lightGallery centers a portrait image vertically when it shows it at 1:1, which is the wrong
-   * place to land on a long screenshot: you open it in the middle. This zooms to the real size and
-   * moves it to the top instead.
+   * It mirrors the query params of API mode, under the `tv_` prefix to stay clear of the params of
+   * the consumer: `tv_q` for the search, `tv_<field>` per filter group with its active values as
+   * CSV (the very tokens the API receives), `tv_sortBy` + `tv_sort`, `tv_tax` (the **label** of the
+   * taxonomy, not its index, which is not stable across deploys) and `tv_page`, which only travels
+   * with `pagination: true` because with "Cargar más" the loaded prefix is not a page.
    *
-   * Only applies to the screenshot (the one-image gallery), not to the `imagenes` grid, and only
-   * when there is something to gain: a capture already shown at (or near) its real size — or under
-   * `LG_ZOOM_ACTUAL_MIN_SCALE`, 2x — opens exactly as before.
+   * The URL is read **once**, before the first render, and written with `history.replaceState` after
+   * every change: it is a snapshot of the view, not a navigation log, so there is no back button
+   * and `popstate` is not listened to.
+   *
+   * What the URL says that this instance cannot do is **ignored, silently**: a filter the consumer
+   * did not declare (the usual case: the shared link carries the internal filters of someone who has
+   * permissions and the person opening it does not), a value that no longer exists, an order or a
+   * taxonomy that is not there, a page out of range. Nothing is warned about and nothing breaks;
+   * a group whose tokens leave nothing active simply does not filter, instead of matching nothing
+   * and emptying the list.
+   *
+   * Ignored in single mode (`singleId`), which has no view to share.
    */
+  stateInUrl?: boolean;
   /**
    * Label of the expand toggle for the given count.
    * The count is the total number of publications, independent of the selected taxonomy.
@@ -649,20 +679,6 @@ const LG_WHEEL_ZOOM_LINE_PX = 16;
 const LG_WHEEL_ZOOM_FALLBACK_MAX = 4;
 
 /**
- * Escala real mínima para que la captura se abra zoomeada. El plugin `zoom` ya no hace nada cuando la
- * imagen va 1:1 (`setActualSize` termina en `resetZoom()` y `zoomImage` sale por `scaleDiff === 0`),
- * pero sí haría un zoom visible con una escala real de 1.5 (una foto de 1600x1200 en una caja de
- * 1083). Con el piso en 2x, lo único que entra por esta vía son las capturas largas.
- */
-const LG_ZOOM_ACTUAL_MIN_SCALE = 2;
-
-/** Cada cuánto se reintenta una espera por condición, en ms. */
-const LG_ZOOM_POLL_INTERVAL = 100;
-
-/** Cuántas esperas por condición se hacen antes de abandonar: `20 x 100ms` = 2s. */
-const LG_ZOOM_POLL_TRIES = 20;
-
-/**
  * Plugin de lightGallery: **zoom con la rueda** sobre la imagen abierta.
  *
  * lightGallery 2.9 no lo trae. El plugin `zoom` maneja pinch (táctil), drag para panear y los
@@ -834,6 +850,18 @@ export default class Timeline {
   inlineImages: boolean;
   inlineAdjuntos: boolean;
   internalButtons: boolean;
+  stateInUrl: boolean;
+  /**
+   * Filter state read from the URL, keyed by `field`, with the same CSV the API params use. `null`
+   * when `stateInUrl` is off. It outlives the read: `_seedFilterActive` consults it on every rebuild
+   * of the checkboxes (the API facets, a taxonomy re-scope), which is what keeps a filter shared by
+   * URL from being wiped by a rebuild the way a non-`persist` one is.
+   */
+  _urlFilters: Record<string, string[]> | null;
+  /** Page asked for by the URL, 1-based. `1` when there is none to ask for */
+  _urlPage: number;
+  /** Whether the component already mounted, which is what gates writing the URL */
+  _urlReady: boolean;
   fullpage: boolean;
   relatedLabel: ((count: number) => string) | null;
   singleId: string | null;
@@ -942,8 +970,14 @@ export default class Timeline {
     this.inlineImages = config.inlineImages || false;
     this.inlineAdjuntos = config.inlineAdjuntos || false;
     this.internalButtons = config.internalButtons || false;
-    // Default true: es lo que espera quien abre una captura larga, y el gate por escala real lo deja
-    // sin efecto cuando no hay nada que ganar (ver `LgWheelZoomTopAnchored`).
+    // The URL state is read here, before `_init()`, and not inside it: what it says has to be part of
+    // the **first** render (the markup of the toolbar, the selected sorter, the taxonomy pill) and of
+    // the first API request, or the shared link would open on the wrong view and then correct itself.
+    // It is skipped in single mode, which has no list to share.
+    this.stateInUrl = config.stateInUrl === true && !config.singleId;
+    this._urlFilters = null;
+    this._urlPage = 1;
+    this._urlReady = false;
     this.fullpage = config.fullpage === true;
     this.filters = this._normalizeFilters(config.filters);
     this._filterExpanded = new Set<string>();
@@ -1002,6 +1036,9 @@ export default class Timeline {
     this._apiError = '';
     this._apiDetails = new Map();
     this._shareTimer = 0;
+    // After every field above is in place: `_readUrlState` resolves the sort field and the taxonomy
+    // against the normalized `sorters` and `content`, so it has to come last.
+    this._readUrlState();
     this._init();
   }
 
@@ -1577,8 +1614,18 @@ export default class Timeline {
       all.textContent = `${ALL_TAXONOMIES_LABEL} (${this._allItems().length})`;
       select.appendChild(all);
     }
-    this._contentIndex = 0;
-    select.selectedIndex = 0;
+    // `_contentIndex` may have arrived from the URL (`stateInUrl`) before this ran, and it is its
+    // owner from the constructor, so here it is only trimmed against what ended up in the select: a
+    // "Ver todo" of a link to a deployment that had a single group falls back to the first one, and
+    // so does any index that no longer exists.
+    const hasAll = groups.length > 1;
+    let index = this._contentIndex;
+    if (index === ALL_TAXONOMIES_INDEX) index = hasAll ? ALL_TAXONOMIES_INDEX : 0;
+    else if (index >= groups.length) index = 0;
+    this._contentIndex = index;
+    // "Ver todo" is not a group of `content`, so in the select it is the last option, not the `-1`
+    // that `_contentIndex` uses for it.
+    select.selectedIndex = index === ALL_TAXONOMIES_INDEX ? groups.length : index;
     select.disabled = groups.length === 1;
     row.hidden = false;
     this.section.classList.add('has-taxonomy');
@@ -3151,15 +3198,39 @@ export default class Timeline {
   }
 
   /**
-   * Reseed the values a group starts with: the ones persisted by a `persist` group, and otherwise
-   * the `checked` its declared `items` bring. An empty persisted record wins over those defaults,
-   * which is what lets the user clear a group and have it stay cleared across the rebuilds.
+   * Reseed the values a group starts with: what the URL asked for, then the ones persisted by a
+   * `persist` group, and otherwise the `checked` its declared `items` bring. An empty record wins
+   * over those defaults, which is what lets the user clear a group and have it stay cleared across
+   * the rebuilds.
+   *
+   * The URL comes first because a shared link is a more explicit "what to show" than a value this
+   * browser happens to have stored, and it is the only one of the three that is not something the
+   * consumer declared. That key **existing** is the signal, not it having values: `?tv_tipo_fuente=`
+   * means "that group was cleared on purpose", which is a legitimate thing to share.
+   *
+   * This is also what keeps a shared filter from being wiped by a rebuild, since it reseeds on
+   * every one of them (the API facets, a taxonomy re-scope) the way it does for a `persist` group.
+   *
+   * A saved value is matched **by tokens and not by string**, because the two places that carry it
+   * are comma-separated (the URL param and the API one) and a declared value can be a list, whose
+   * token is itself a CSV (`[null, false]` is `'null,false'`). Reading one back splits it, so a
+   * whole-string comparison would lose it and filter the pool down to nothing.
    */
   protected _seedFilterActive(f: FilterDef, values: string[], savedState: Record<string, string[]>): void {
-    const saved = f.persist ? savedState[f.field] : undefined;
-    f.active = new Set(
-      values.filter((val) => (saved ? saved.includes(val) : f.declared?.find((d) => d.token === val)?.checked === true))
-    );
+    const urlValues = this._urlFilters?.[f.field];
+    const saved = urlValues ?? (f.persist ? savedState[f.field] : undefined);
+    if (!saved) {
+      f.active = new Set(values.filter((val) => f.declared?.find((d) => d.token === val)?.checked === true));
+      return;
+    }
+    // Matched **by tokens, not by string**: a declared value can be a list, and the demo's
+    // "Sin descartar" (`[null, false]`) is one single value whose token is `'null,false'` — the same
+    // CSV the API param and the URL carry. Both of those are comma-separated, so reading one back
+    // splits it into `'null'` and `'false'`, and a comparison of whole strings would leave that value
+    // unchecked and filter the pool down to nothing. A value is active when **all** of its tokens came
+    // in, which also gives the empty record its meaning: `?tv_campo=` asks for a cleared group.
+    const flat = new Set(saved.flatMap((entry) => entry.split(',')));
+    f.active = new Set(values.filter((val) => val.split(',').every((t) => flat.has(t))));
   }
 
   /**
@@ -3913,6 +3984,162 @@ export default class Timeline {
   }
 
   /**
+   * Read the state of the view the browser URL carries, once, from the constructor.
+   *
+   * It runs **before** `_init()` on purpose: what the URL says has to be part of the first render
+   * (the markup of the toolbar, the sorter selected, the taxonomy pill, the text in the search box)
+   * and of the **first** API request. A shared link has to open on the view it shares, not render
+   * the default one and correct itself a frame later.
+   *
+   * Everything it cannot resolve is dropped in silence, which is the rule that makes the option safe
+   * to hand to the public: a filter the consumer did not declare this time (the internal filters of
+   * a link shared by someone who does have permissions), an order that is not offered anymore, a
+   * taxonomy that was renamed, a page that no longer exists. None of it warns, none of it breaks,
+   * and none of it filters: an unknown `tv_*` key survives in the URL untouched until the first
+   * interaction, when `_syncUrlState()` strips it.
+   */
+  protected _readUrlState(): void {
+    if (!this.stateInUrl) return;
+    let params: URLSearchParams;
+    try {
+      params = new URLSearchParams(window.location.search);
+    } catch {
+      return;
+    }
+
+    const q = params.get(URL_STATE_KEYS.q);
+    if (q) this.searchTerm = q;
+
+    // Only a sorter the consumer declared (or the built-in default) is taken: an unknown field would
+    // order the list by something that is not on offer, and there is no UI to show that in.
+    const sortBy = params.get(URL_STATE_KEYS.sortBy);
+    if (sortBy && (sortBy === this._sortField || this.sorters.some((s) => s.field === sortBy))) {
+      this._sortField = sortBy;
+    }
+    const sort = params.get(URL_STATE_KEYS.sort);
+    if (sort) this._sortAsc = sort.toLowerCase() === 'asc';
+
+    // The taxonomy travels by **label** and not by index: the index depends on the order and the
+    // amount of groups of that deployment, so a link would point somewhere else on the next deploy.
+    const tax = params.get(URL_STATE_KEYS.taxonomy);
+    if (tax !== null && this.content.length > 1) {
+      if (tax === ALL_TAXONOMIES_LABEL) {
+        this._contentIndex = ALL_TAXONOMIES_INDEX;
+      } else {
+        const idx = this.content.findIndex((g) => g.label === tax);
+        if (idx >= 0) this._contentIndex = idx;
+      }
+    }
+
+    // Only the paginator has a page to share: with "Cargar más" what is on screen is a prefix that
+    // grows, which is not a page of the result set.
+    if (this.pagination) {
+      const page = Number(params.get(URL_STATE_KEYS.page));
+      if (Number.isInteger(page) && page >= 1) this._urlPage = page;
+    }
+
+    // Filter groups, keyed by the field the consumer declared. Undeclared fields are dropped right
+    // here and never reach a filter, which is why no `console.warn` shows up: a shared link carries
+    // the internal filters of whoever sent it, and whoever opens it may not be allowed to see them.
+    const urlFilters: Record<string, string[]> = {};
+    this.filters.forEach((f) => {
+      const raw = params.get(URL_STATE_PREFIX + f.field);
+      if (raw === null) return;
+      // The CSV is the same one the API params use, token by token.
+      urlFilters[f.field] = raw === '' ? [] : raw.split(',');
+    });
+    this._urlFilters = urlFilters;
+  }
+
+  /**
+   * Seed the active values of every group from the URL, **without** crossing them against the
+   * values the group resolves.
+   *
+   * It runs before `_buildFilterCheckboxes()` and that is the whole point: in API mode a derived
+   * group gets its values out of `/facets`, which has not arrived yet, so seeding at that point
+   * would leave the group empty and the **first** request would go out unfiltered — and the rebuild
+   * that lands with the facets would find the list already on screen and never fix it. Assigning the
+   * raw tokens here gets them into `_buildQueryParams()` from the very first page; the intersection
+   * happens later, on that rebuild, when the values are known.
+   */
+  protected _applyUrlFilterState(): void {
+    if (!this._urlFilters) return;
+    this.filters.forEach((f) => {
+      const tokens = this._urlFilters![f.field];
+      if (tokens) f.active = new Set(tokens);
+    });
+  }
+
+  /**
+   * Land on the page the URL asked for, in local mode. It runs **after** `_applyFilters()` because
+   * that is what resets the cursor (`_page = 1`): the search, the filters, the order and the taxonomy
+   * all narrow or reorder the pool, so the page of the link may not even exist in the new one.
+   *
+   * Out of range is clamped, exactly like `_goToPage()` does: a link whose result set is now shorter
+   * lands on the last page instead of an empty one.
+   */
+  protected _restoreUrlPage(): void {
+    if (this._urlPage <= 1) return;
+    const target = Math.min(this._urlPage, this._pageCount());
+    if (target === this._page) return;
+    this._page = target;
+    this._renderAll();
+    this._syncUrlState();
+  }
+
+  /**
+   * Write the state of the view into the URL with `history.replaceState`.
+   *
+   * `replaceState` and not `pushState`: this is a snapshot of what is on screen, not a navigation
+   * log, so there is nothing to go back to — and `pushState` would add an entry per keystroke in the
+   * search box. For the same reason there is no `popstate` listener.
+   *
+   * The params of the consumer are left alone; only the `tv_` namespace belongs to the component, and
+   * inside it the keys that are not in effect are dropped. That is what makes a link shared by
+   * someone with internal filters come back clean for someone who does not have them: the declared
+   * groups survive, the undeclared ones are gone, and no warning was ever printed.
+   *
+   * Called from the three places that change the view — `_applyFilters()`, `_goToPage()` and
+   * `_fetchPage()` — and gated by `_urlReady`, so mounting never rewrites the URL it just read.
+   */
+  protected _syncUrlState(): void {
+    if (!this.stateInUrl || !this._urlReady) return;
+    try {
+      const url = new URL(window.location.href);
+      const params = url.searchParams;
+      // Read **before** touching the params: `url.search` serializes them live, so comparing it
+      // after the writes below would always find them equal and nothing would ever be replaced.
+      const before = url.search;
+      // Ours to clean first: every `tv_*` key, so what is not in effect below does not linger.
+      Array.from(params.keys())
+        .filter((key) => key.startsWith(URL_STATE_PREFIX))
+        .forEach((key) => params.delete(key));
+
+      const term = this.searchTerm.trim();
+      if (term) params.set(URL_STATE_KEYS.q, term);
+      params.set(URL_STATE_KEYS.sortBy, this._sortField);
+      params.set(URL_STATE_KEYS.sort, this._sortAsc ? 'asc' : 'desc');
+      // The taxonomy only exists with a selector on screen, which API mode never has (its groups
+      // come from the server, so the list is not re-scoped here).
+      if (this.taxonomySelect && this.content.length > 1) {
+        params.set(URL_STATE_KEYS.taxonomy, this._currentLabel());
+      }
+      if (this.pagination) params.set(URL_STATE_KEYS.page, String(this._currentPage()));
+      this.filters.forEach((f) => {
+        const active = this._filterActiveValues(f);
+        if (active.length === 0) return;
+        params.set(URL_STATE_PREFIX + f.field, active.join(','));
+      });
+
+      if ('?' + params.toString() === before) return;
+      window.history.replaceState(window.history.state, '', url.toString());
+    } catch {
+      // `replaceState` can be unavailable (sandboxed document, `file://`, a consumer that stubs the
+      // history): the view works either way, it just is not shareable.
+    }
+  }
+
+  /**
    * Build the query string params for the list endpoint from the current UI state.
    * Each group sends the tokens of its checked checkboxes joined by commas, which is exactly the
    * `value` of those checkboxes: a declared `[false, null]` travels as `validado=false,null`.
@@ -4000,6 +4227,10 @@ export default class Timeline {
     // show the placeholders earlier and get a no-op here, and synchronous, so the DOM is already
     // swapped by the time the caller yields.
     this._renderApiLoading();
+    // The page the cursor is on is already decided, so the URL can follow it now: the page the link
+    // asked for has to travel in the address bar even while the request is still in flight, and a
+    // page change is not a history entry (`replaceState`), it is the same link, seen further down.
+    this._syncUrlState();
     try {
       const data = await this._apiFetch<TimelineApiPageResponse>('', this._buildQueryParams(page));
       if (seq !== this._apiSeq) return;
@@ -4024,6 +4255,9 @@ export default class Timeline {
       // goes back to the one that was there. Without this the paginator would count from a page
       // that never rendered and every retry would skip one.
       this._apiPage = prevPage;
+      // The cursor is back where it was, so the URL goes with it: a link that says page 3 would
+      // otherwise keep promising the page that just failed.
+      this._syncUrlState();
       // No `_renderAll` here: the skeletons are what is on screen, and whatever is in memory is
       // either what the panel no longer matches (search/filter/sort) or the page the user just left,
       // so neither is rendered and the list is left empty with the error row.
@@ -4360,6 +4594,11 @@ export default class Timeline {
       this._displayedCount = this.itemsPerPage;
     }
     this._renderAll();
+    // The URL follows the view, and here it is already back on page 1: narrowing the pool starts
+    // over, so the page of the previous link has to leave the address bar with it. The API branch
+    // does not write here because its page cursor belongs to the request that is about to go out,
+    // and that is `_fetchPage` who writes it when it lands.
+    this._syncUrlState();
   }
 
   /** Label of the expand toggle; uses the custom function when provided, otherwise the Spanish singular/plural default */
@@ -4578,6 +4817,7 @@ export default class Timeline {
     }
     this._page = target;
     this._renderAll();
+    this._syncUrlState();
     this._scrollToTimelineTop();
   }
 
@@ -4724,6 +4964,13 @@ export default class Timeline {
     // En fullpage la lista no tiene scroll propio, así que no hay nada que ajustar: tampoco se
     // lee el alto persistido, que escribiría un `max-height` inline sobre el `none` del SCSS.
     if (!this.fullpage) this._initResizeHandle();
+    // A shared link opens with the term already written in the box: `_buildLayout` emits it empty,
+    // and a search applied with an input that says nothing reads as a filter nobody can undo. The
+    // wrap opens too, or the term would be typed (and hidden) behind the collapsed circle.
+    if (this.searchTerm) {
+      this.searchInput.value = this.searchTerm;
+      this.searchWrap.classList.add('open');
+    }
     if (this.api) {
       this._bindBaseEvents();
       this._renderApiLoading();
@@ -4732,6 +4979,9 @@ export default class Timeline {
       // derived groups have nothing to show, so nothing can be checked before they arrive: the
       // panel is rebuilt with the counts by `_ensureApiFacets()`. A group that declares `items`
       // shows them right away (with the counts in zero) and the rebuild only fills the counts.
+      // Same thing for a URL: its tokens are assigned before this, because the values they have to
+      // be crossed with may only arrive with the facets, and by then the first page is already out.
+      this._applyUrlFilterState();
       this._buildFilterCheckboxes();
       this._syncFilterToggleState();
       // The facets travel the static values of the collection (counts, total, lastUpdated) and
@@ -4741,16 +4991,33 @@ export default class Timeline {
       // feed the expand counter and the footer. Waiting would gain nothing: the defaults of the
       // checkboxes above do not depend on the facets.
       void this._ensureApiFacets();
-      // The embed preload reads the rendered cards, so it waits for the first page.
-      void this._fetchPage(1).then(() => {
+      // The URL is writable from here on. It was not before, so mounting leaves the query it just
+      // read alone; the request below can now write the page it lands on (or the one it clamps to).
+      this._urlReady = true;
+      // The embed preload reads the rendered cards, so it waits for the first page. With
+      // `stateInUrl` the first page is the one the link asked for.
+      void this._fetchPage(this._urlPage).then(() => {
+        // The link may ask for a page that does not exist anymore (a filter left fewer results than
+        // that, the link is older than the filter): instead of opening on an empty list it falls
+        // back to the first, like the clamp of `_goToPage()` does, and the `_syncUrlState()` of that
+        // refetch leaves the URL corrected.
+        if (this._urlPage > 1 && this.allCards.length === 0 && !this._apiError) {
+          void this._fetchPage(1);
+        }
         if (this.isExpanded) this._preloadEmbedLibraries();
       });
       return;
     }
+    this._applyUrlFilterState();
     this._buildFilterCheckboxes();
     // The pagination cursor is reset by `_applyFilters` below, which is the only place that
-    // decides it, so it does not have to be seeded here.
+    // decides it, so it does not have to be seeded here: `_restoreUrlPage`, right after, is what
+    // puts back the page the URL asked for.
     this._applyFilters();
+    // Writable from here on: `_restoreUrlPage` below is the first thing that can write the URL, and
+    // it does it when it had to clamp the page of the link.
+    this._urlReady = true;
+    this._restoreUrlPage();
     if (this.isExpanded) this._preloadEmbedLibraries();
 
     requestAnimationFrame(() => {

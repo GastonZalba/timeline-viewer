@@ -50,8 +50,8 @@ new Timeline({ container, items, ... })
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `constructor(config)` | 101 | Recibe `TimelineOptions`, inicializa propiedades, llama `_init()` |
-| `_init()` | 3353 | Orquesta todo: layout → filtros → sort → render → eventos |
+| `constructor(config)` | 101 | Recibe `TimelineOptions`, inicializa propiedades, lee el estado de la URL (`_readUrlState()`) y llama `_init()` |
+| `_init()` | 3353 | Orquesta todo: layout → búsqueda → filtros → sort → render → eventos. Con `stateInUrl` siembra los filtros del link antes de los checkboxes y deja la URL escribible antes de restaurar la página |
 
 ### Rendering
 
@@ -87,6 +87,10 @@ new Timeline({ container, items, ... })
 | `_applyFilters(immediate)` | 2978 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
 | `_syncFilterToggleState()` | 2961 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-wrap` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
 | `_openSearch()` / `_closeSearch(force)` | 4605 | Abre el buscador (`.open` + foco) y lo colapsa. El colapso se corta si el campo tiene texto: un término escrito es un filtro en uso, y esconderlo dejaría al filtro puesto sin forma de sacarlo. `force` lo usa <kbd>Esc</kbd>, que primero vacía el campo |
+| `_readUrlState()` | ver [Estado en la URL](#estado-en-la-url) | Con `stateInUrl`: lee el link **una vez**, desde el constructor, y deja el término, el orden, la taxonomía y la página ya puestos antes del primer render |
+| `_applyUrlFilterState()` | ídem | Siembra los tokens del link en `f.active` **antes** de `_buildFilterCheckboxes()`, sin cruzarlos contra los valores del grupo (que en API todavía no existen) |
+| `_restoreUrlPage()` | ídem | Modo local: deja la página del link en pantalla, recortada a la última |
+| `_syncUrlState()` | ídem | Escribe el estado de la vista con `history.replaceState`, borrando primero los `tv_*` que no están en efecto. Lo llaman `_applyFilters`, `_goToPage` y `_fetchPage` |
 
 ### Embeds sociales
 
@@ -298,6 +302,29 @@ Detalles del append:
 - Las tarjetas nuevas se pasan solas a `_setupTimelineObserver(added)`, que acepta un scope opcional: las viejas ya están `visible` y las observable su propio observer, así que no hay que re-observarlas.
 - El stack de featured **no** se re-renderiza: solo se ve con el timeline colapsado, y el botón "Cargar más" vive adentro del timeline (`max-height: 0` + `overflow: hidden` cuando está colapsado), así que es inalcanzable en ese estado. Además el stack debería reflejar la página 1, no la última.
 
+## Estado en la URL (`stateInUrl`)
+
+Con la opción activa la barra de direcciones es un link compartible de la vista. El estado viaja con el **mismo vocabulario que `_buildQueryParams()`** (la request de API), pero bajo el prefijo `tv_` para no pisar los params del consumidor:
+
+| Param | Origen en el componente |
+|-------|-------------------------|
+| `tv_q` | `searchTerm` |
+| `tv_<field>` | `_filterActiveValues(f)`, CSV de los tokens |
+| `tv_sortBy` + `tv_sort` | `_sortField` + `_sortAsc` |
+| `tv_tax` | `_currentLabel()` (el **label**, no el índice) |
+| `tv_page` | `_currentPage()`, solo con `pagination: true` |
+
+Cuatro métodos, y el orden entre ellos es lo que sostiene el resto:
+
+1. `_readUrlState()`, desde el **constructor** y antes de `_init()`: deja `searchTerm`, `_sortField`/`_sortAsc`, `_contentIndex` y `_urlPage` ya puestos, para que el primer render y el primer request de API salgan con lo que el link pide. Lo que no puede resolver lo tira en silencio (un campo no declarado, un valor que ya no existe, un sorter o una taxonomía que no están, una página inválida) — sin `console.warn`, porque el caso real es el link de alguien con permisos que abre alguien que no los tiene.
+2. `_applyUrlFilterState()`, en `_init()` y **antes** de `_buildFilterCheckboxes()`: pone los tokens crudos en `f.active`, sin cruzarlos contra los valores del grupo, que en API todavía no existen (vienen con `/facets`). Si el cruce se hiciera recién en `_buildFilterCheckboxes()`, la primera request saldría sin filtro y el rebuild de los facets ya no la corregiría.
+3. `_restoreUrlPage()`, al final de `_init()` y solo en local: `_applyFilters()` resetea el cursor a la página 1, así que el link se aplica sobre el pool ya filtrado, y se recorta con el mismo clamp de `_goToPage()` (en API, en cambio, es `_fetchPage(this._urlPage)` en el arranque, con un refetch a la 1 si la página del link vuelve vacía).
+4. `_syncUrlState()`, desde `_applyFilters()`, `_goToPage()` y `_fetchPage()`: borra **todas** las keys `tv_*` y reescribe las que están en efecto con `history.replaceState` (no `pushState`, y sin `popstate`: es una foto de la vista, no un historial). Los params del consumidor no se tocan. El `_urlReady` lo gatea para que **montar no reescriba el link que acaba de leer**.
+
+La precedencia de los filtros queda en un solo lugar, `_seedFilterActive()`: **URL → `localStorage` (`persist`) → `checked` declarado**. La URL gana porque es lo más explícito y porque es la única que sobrevive a los rebuilds de los checkboxes; un CSV vacío (`tv_x=`) cuenta como "limpiado a propósito", y por eso importa que lo que decida sea si la **key existe**, no si trae valores.
+
+El cruce contra los valores reales del grupo es **por tokens, no por cadenas enteras**, y es lo que hace que el viaje de ida y vuelta del que habla el punto 2 no pierda nada: un `value` declarado puede ser una lista (`[null, false]` es **un** valor cuyo token es `'null,false'`), y como el param de API y el `tv_*` viajan ese token como CSV, releerlo lo devuelve partido. Un valor queda activo cuando **todos** sus tokens llegaron, de modo que el CSV vacío deja el grupo vacío sin ser un caso especial.
+
 ## Estados de carga (modo API)
 
 Solo existe en modo API, y se apoya en que una respuesta de lista **sustituye** lo que hay en pantalla:
@@ -346,7 +373,8 @@ Mapa de métodos (líneas actuales):
 | `_buildFilterMore(f, overflow)` | 2477 | Agrega el `button.filter-more` al final del grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
 | `_loadPersistedFilterState()` | 2507 | Lee la key `tv-filtros-internos-filters` de `localStorage` (los valores son los `input.value`, o sea tokens) |
 | `_savePersistedFilterState()` | 2519 | Escribe el estado de los grupos con `persist: true` (solo en el gesture del usuario) |
-| `_buildQueryParams(page)` | 2605 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`), más `page`/`pageSize`, `sort` (dirección) y `sortBy` (el sorter activo) |
+| `_seedFilterActive(f, values, savedState)` | 3195 | Con qué valores arranca un grupo en cada rebuild: **URL → `localStorage` (`persist`) → `checked` declarado**, en ese orden, y el cruce es **por tokens** (un valor declarado con lista es un solo token que es un CSV). Que la URL gane es lo que hace que un filtro compartido sobreviva a los rebuilds (los facets de API, un cambio de taxonomía) |
+| `_buildQueryParams(page)` | 2605 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`), más `page`/`pageSize`, `sort` (dirección) y `sortBy` (el sorter activo). Es el mismo vocabulario que usa la URL del navegador (ver [Estado en la URL](#estado-en-la-url)) |
 | `_syncFilterToggleState()` | 2961 | Enciende los botones por dominio (ver arriba) |
 
 Flujo:
@@ -409,6 +437,10 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 | `_sortAsc` | `boolean` | Dirección del orden (`false` = descendente, "más reciente primero") |
 | `filters` | `FilterDef[]` | Grupos normalizados de la opción `filters` (defaults resueltos, `items` resueltos en `declared`, columnas repartidas, slots DOM y `checkboxes`). Vacío = sin filtros |
 | `_filterExpanded` | `Set<string>` | Grupos de filtros (por `field`) con el "Ver más" abierto (sobrevive a los rebuilds de los checkboxes) |
+| `stateInUrl` | `boolean` | Con la opción activa, la URL del navegador es un link compartible de la vista (ver [Estado en la URL](#estado-en-la-url)). No-op en modo single |
+| `_urlFilters` | `Record<string, string[]> \| null` | Tokens del link por `field`, leídos una vez; `null` con la opción apagada. Vive fuera de los `FilterDef` a propósito: es lo que sobrevive a los rebuilds de los checkboxes |
+| `_urlPage` | `number` | Página que pidió el link (1 si no pidió ninguna) |
+| `_urlReady` | `boolean` | Si el componente ya montó. Lo gatea para que el arranque no reescriba la URL que acaba de leer |
 | `section` | `HTMLElement` | `.publicaciones-section` |
 | `featuredContainer` | `HTMLElement` | `#featured-cards` |
 | `timelineContainer` | `HTMLElement` | `#timeline-container` |

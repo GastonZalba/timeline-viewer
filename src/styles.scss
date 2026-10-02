@@ -206,8 +206,8 @@
       display: inline-flex;
     }
 
-    // El buscador es un elemento: el input colapsado (el círculo de la lupa) y el `display: block` de
-    // acá son los del viejo botón.
+    // El buscador es un elemento: se muestra entero recién acá, porque el input que hace de círculo
+    // de la lupa no tiene nada que abrir con el timeline colapsado (el resto de la barra tampoco).
     .search-wrap {
       display: inline-flex;
     }

@@ -215,17 +215,29 @@ export interface TimelineOptions {
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
     /**
-     * Open the screenshot gallery at the image's real size, anchored to the top of the viewport
-     * (default `true`).
+     * Keep the state of the view in the browser URL (default: false), so the address bar is a
+     * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
      *
-     * lightGallery centers a portrait image vertically when it shows it at 1:1, which is the wrong
-     * place to land on a long screenshot: you open it in the middle. This zooms to the real size and
-     * moves it to the top instead.
+     * It mirrors the query params of API mode, under the `tv_` prefix to stay clear of the params of
+     * the consumer: `tv_q` for the search, `tv_<field>` per filter group with its active values as
+     * CSV (the very tokens the API receives), `tv_sortBy` + `tv_sort`, `tv_tax` (the **label** of the
+     * taxonomy, not its index, which is not stable across deploys) and `tv_page`, which only travels
+     * with `pagination: true` because with "Cargar más" the loaded prefix is not a page.
      *
-     * Only applies to the screenshot (the one-image gallery), not to the `imagenes` grid, and only
-     * when there is something to gain: a capture already shown at (or near) its real size — or under
-     * `LG_ZOOM_ACTUAL_MIN_SCALE`, 2x — opens exactly as before.
+     * The URL is read **once**, before the first render, and written with `history.replaceState` after
+     * every change: it is a snapshot of the view, not a navigation log, so there is no back button
+     * and `popstate` is not listened to.
+     *
+     * What the URL says that this instance cannot do is **ignored, silently**: a filter the consumer
+     * did not declare (the usual case: the shared link carries the internal filters of someone who has
+     * permissions and the person opening it does not), a value that no longer exists, an order or a
+     * taxonomy that is not there, a page out of range. Nothing is warned about and nothing breaks;
+     * a group whose tokens leave nothing active simply does not filter, instead of matching nothing
+     * and emptying the list.
+     *
+     * Ignored in single mode (`singleId`), which has no view to share.
      */
+    stateInUrl?: boolean;
     /**
      * Label of the expand toggle for the given count.
      * The count is the total number of publications, independent of the selected taxonomy.
@@ -486,6 +498,18 @@ export default class Timeline {
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
+    stateInUrl: boolean;
+    /**
+     * Filter state read from the URL, keyed by `field`, with the same CSV the API params use. `null`
+     * when `stateInUrl` is off. It outlives the read: `_seedFilterActive` consults it on every rebuild
+     * of the checkboxes (the API facets, a taxonomy re-scope), which is what keeps a filter shared by
+     * URL from being wiped by a rebuild the way a non-`persist` one is.
+     */
+    _urlFilters: Record<string, string[]> | null;
+    /** Page asked for by the URL, 1-based. `1` when there is none to ask for */
+    _urlPage: number;
+    /** Whether the component already mounted, which is what gates writing the URL */
+    _urlReady: boolean;
     fullpage: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
@@ -1061,9 +1085,23 @@ export default class Timeline {
         overflow: number;
     } | null;
     /**
-     * Reseed the values a group starts with: the ones persisted by a `persist` group, and otherwise
-     * the `checked` its declared `items` bring. An empty persisted record wins over those defaults,
-     * which is what lets the user clear a group and have it stay cleared across the rebuilds.
+     * Reseed the values a group starts with: what the URL asked for, then the ones persisted by a
+     * `persist` group, and otherwise the `checked` its declared `items` bring. An empty record wins
+     * over those defaults, which is what lets the user clear a group and have it stay cleared across
+     * the rebuilds.
+     *
+     * The URL comes first because a shared link is a more explicit "what to show" than a value this
+     * browser happens to have stored, and it is the only one of the three that is not something the
+     * consumer declared. That key **existing** is the signal, not it having values: `?tv_tipo_fuente=`
+     * means "that group was cleared on purpose", which is a legitimate thing to share.
+     *
+     * This is also what keeps a shared filter from being wiped by a rebuild, since it reseeds on
+     * every one of them (the API facets, a taxonomy re-scope) the way it does for a `persist` group.
+     *
+     * A saved value is matched **by tokens and not by string**, because the two places that carry it
+     * are comma-separated (the URL param and the API one) and a declared value can be a list, whose
+     * token is itself a CSV (`[null, false]` is `'null,false'`). Reading one back splits it, so a
+     * whole-string comparison would lose it and filter the pool down to nothing.
      */
     protected _seedFilterActive(f: FilterDef, values: string[], savedState: Record<string, string[]>): void;
     /**
@@ -1287,6 +1325,59 @@ export default class Timeline {
     protected _hasMorePages(): boolean;
     /** Fetch a JSON resource from the API with the configured fetch implementation */
     protected _apiFetch<T>(path: string, params: Record<string, string>): Promise<T>;
+    /**
+     * Read the state of the view the browser URL carries, once, from the constructor.
+     *
+     * It runs **before** `_init()` on purpose: what the URL says has to be part of the first render
+     * (the markup of the toolbar, the sorter selected, the taxonomy pill, the text in the search box)
+     * and of the **first** API request. A shared link has to open on the view it shares, not render
+     * the default one and correct itself a frame later.
+     *
+     * Everything it cannot resolve is dropped in silence, which is the rule that makes the option safe
+     * to hand to the public: a filter the consumer did not declare this time (the internal filters of
+     * a link shared by someone who does have permissions), an order that is not offered anymore, a
+     * taxonomy that was renamed, a page that no longer exists. None of it warns, none of it breaks,
+     * and none of it filters: an unknown `tv_*` key survives in the URL untouched until the first
+     * interaction, when `_syncUrlState()` strips it.
+     */
+    protected _readUrlState(): void;
+    /**
+     * Seed the active values of every group from the URL, **without** crossing them against the
+     * values the group resolves.
+     *
+     * It runs before `_buildFilterCheckboxes()` and that is the whole point: in API mode a derived
+     * group gets its values out of `/facets`, which has not arrived yet, so seeding at that point
+     * would leave the group empty and the **first** request would go out unfiltered — and the rebuild
+     * that lands with the facets would find the list already on screen and never fix it. Assigning the
+     * raw tokens here gets them into `_buildQueryParams()` from the very first page; the intersection
+     * happens later, on that rebuild, when the values are known.
+     */
+    protected _applyUrlFilterState(): void;
+    /**
+     * Land on the page the URL asked for, in local mode. It runs **after** `_applyFilters()` because
+     * that is what resets the cursor (`_page = 1`): the search, the filters, the order and the taxonomy
+     * all narrow or reorder the pool, so the page of the link may not even exist in the new one.
+     *
+     * Out of range is clamped, exactly like `_goToPage()` does: a link whose result set is now shorter
+     * lands on the last page instead of an empty one.
+     */
+    protected _restoreUrlPage(): void;
+    /**
+     * Write the state of the view into the URL with `history.replaceState`.
+     *
+     * `replaceState` and not `pushState`: this is a snapshot of what is on screen, not a navigation
+     * log, so there is nothing to go back to — and `pushState` would add an entry per keystroke in the
+     * search box. For the same reason there is no `popstate` listener.
+     *
+     * The params of the consumer are left alone; only the `tv_` namespace belongs to the component, and
+     * inside it the keys that are not in effect are dropped. That is what makes a link shared by
+     * someone with internal filters come back clean for someone who does not have them: the declared
+     * groups survive, the undeclared ones are gone, and no warning was ever printed.
+     *
+     * Called from the three places that change the view — `_applyFilters()`, `_goToPage()` and
+     * `_fetchPage()` — and gated by `_urlReady`, so mounting never rewrites the URL it just read.
+     */
+    protected _syncUrlState(): void;
     /**
      * Build the query string params for the list endpoint from the current UI state.
      * Each group sends the tokens of its checked checkboxes joined by commas, which is exactly the

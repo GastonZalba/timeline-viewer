@@ -20,6 +20,10 @@ import sorters from './sorters.js';
 // Además le deja el campo a dos ítems como `null`, para que el "Sin valor" de `allowEmpty` tenga
 // algo que representar: el bucket vacío solo existe si de verdad hay ítems sin valor.
 // No aplica en modo API (los ítems los manda el servidor, no este archivo).
+// ?sininternos saca los grupos de `filtros_internos` de la declaración, como si este usuario no
+// tuviera permisos para ellos. Con `stateInUrl` (siempre activo en el demo) es el caso para el que
+// existe el "fallar en silencio": un link que traiga `?tv_<campo interno>=...` se abre filtrado por
+// todo lo demás, sin error y sin dejar el filtro colgado en la URL.
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
 // el botón de compartir con esa misma URL.
@@ -33,6 +37,8 @@ const useFull = new URLSearchParams(window.location.search).has('full');
 const usePagination = new URLSearchParams(window.location.search).has('pagination');
 // ?many: el caso de uso del filtro `select`. Solo tiene efecto en modo local (ver la nota de arriba).
 const useMany = new URLSearchParams(window.location.search).has('many');
+// ?sininternos: este usuario no tiene los filtros internos, así que no se declaran (ver la nota).
+const useSinInternos = new URLSearchParams(window.location.search).has('sininternos');
 const singleId = new URLSearchParams(window.location.search).get('id');
 
 /**
@@ -102,6 +108,21 @@ function withManyFilter(groups) {
   ];
 }
 
+/**
+ * Los filtros del demo sin los grupos de `filtros_internos`, que es lo que declara un consumidor
+ * cuando este usuario no tiene permisos para ellos. El panel y el flyout quedan con el resto, así
+ * que la única diferencia visible es que los grupos ausentes ni aparecen ni filtran.
+ */
+function withoutInternalFilters(groups) {
+  return groups.filter((f) => f.group !== 'filtros_internos');
+}
+
+/** Los filtros del demo, ya sea completos (`?many` adelante) o sin los internos (`?sininternos`) */
+function demoFilters() {
+  const base = useMany ? withManyFilter(filters) : filters;
+  return useSinInternos ? withoutInternalFilters(base) : base;
+}
+
 const baseOptions = {
   container: '#noticias-container',
   featuredCount: 10,
@@ -110,6 +131,9 @@ const baseOptions = {
   inlineImages: true,
   inlineAdjuntos: true,
   internalButtons: true,
+  // La barra de direcciones es un link compartible de la vista: búsqueda, filtros, orden,
+  // taxonomía y página viajan en la URL con prefijo `tv_`. Siempre activo en el demo.
+  stateInUrl: true,
   // Con ?expanded el timeline arranca abierto en vez de colapsado sobre las featured.
   startExpanded: useExpanded,
   // Con ?full la página entera scrollea y la barra de filtros queda siempre visible.
@@ -118,7 +142,7 @@ const baseOptions = {
   // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos
   // grupos se llenan con los valores que devuelve `GET /api/facets`.
-  filters,
+  filters: demoFilters(),
   // El menú de orden. Sin esta opción no hay UI de orden: la librería no trae ningún sorter
   // hardcodeado (ver example/sorters.js). En modo API los mismos campos viajan como `sortBy`.
   sorters,
@@ -143,7 +167,6 @@ if (useApi) {
   new Timeline({
     ...baseOptions,
     ...data,
-    filters: useMany ? withManyFilter(filters) : filters,
     lastUpdated: mockData.lastUpdated
   });
 }

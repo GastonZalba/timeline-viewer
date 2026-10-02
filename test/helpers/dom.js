@@ -92,3 +92,27 @@ export function resetDom() {
 export function flushFrames() {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+/**
+ * Leave the page at a query string, as a shared link would, and return its params.
+ *
+ * It goes through the History API on purpose: that is the only thing that moves jsdom's location
+ * between two tests without reloading the document, and it is the very same API the component uses
+ * to write (`history.replaceState`), so the tests exercise the real round trip.
+ */
+export function setSearch(query = '') {
+  window.history.replaceState(null, '', '/' + (query ? '?' + query : ''));
+  return new URLSearchParams(window.location.search);
+}
+
+/** Params of the URL as it is right now, i.e. what the component last wrote. */
+export function currentParams() {
+  return new URLSearchParams(window.location.search);
+}
+
+/** Names of the `tv_*` params of the current URL, sorted, for order-independent assertions */
+export function tvParams() {
+  return Array.from(currentParams().keys())
+    .filter((key) => key.startsWith('tv_'))
+    .sort();
+}
