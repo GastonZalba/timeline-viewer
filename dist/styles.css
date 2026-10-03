@@ -1787,6 +1787,7 @@
 .publicaciones-section .timeline-card .card-temas-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
 }
@@ -1798,11 +1799,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
+  padding: 0 10px;
+  border-radius: 15px;
+  display: flex;
+  gap: 5px;
+  height: 25px;
   border: 1px solid var(--tv-accent);
-  border-radius: 50%;
   background: transparent;
   color: var(--tv-accent);
   cursor: pointer;
@@ -1810,8 +1812,14 @@
 }
 .publicaciones-section .timeline-card .card-temas-map-toggle svg {
   display: block;
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle .card-temas-map-chevron {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  transition: transform 0.2s ease;
 }
 .publicaciones-section .timeline-card .card-temas-map-toggle:hover {
   background: var(--tv-bg-hover);
@@ -1822,6 +1830,9 @@
   background: var(--tv-bg-hover);
   border: 1px solid var(--tv-accent-light);
   color: var(--tv-accent-light);
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle[aria-expanded=true] .card-temas-map-chevron {
+  transform: rotate(180deg);
 }
 .publicaciones-section .timeline-card .card-temas-map-toggle:focus-visible {
   outline: 2px solid var(--tv-accent);
@@ -1881,7 +1892,7 @@
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.4);
   color: rgba(255, 255, 255, 0.85);
-  font-family: inherit;
+  font-family: sans-serif;
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;

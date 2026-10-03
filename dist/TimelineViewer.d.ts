@@ -3,8 +3,6 @@ import type OlMap from 'ol/Map.js';
 import type OlView from 'ol/View.js';
 import type OlFeature from 'ol/Feature.js';
 import type OlPoint from 'ol/geom/Point.js';
-import type OlLineString from 'ol/geom/LineString.js';
-import type OlPolygon from 'ol/geom/Polygon.js';
 import type VectorLayer from 'ol/layer/Vector.js';
 import type VectorSource from 'ol/source/Vector.js';
 import type TileLayer from 'ol/layer/Tile.js';
@@ -43,8 +41,6 @@ interface TemasMapModules {
         geometry?: OlPoint;
     }) => OlFeature;
     OlPoint: typeof OlPoint;
-    LineString: typeof OlLineString;
-    Polygon: typeof OlPolygon;
     OlOverlay: typeof OlOverlay;
     VectorLayer: typeof VectorLayer;
     VectorSource: typeof VectorSource;
@@ -1023,6 +1019,12 @@ export default class Timeline {
      * cannot see the glyph swap. They carry the action and no count: the number of topics is already
      * on the subtitle next to it, and on the badge each located topic gets.
      *
+     * The chevron after the icon is the same arrow as the "Cargar más" button, and it is the only
+     * thing on the face of the button that *does* change between states: the component CSS rotates it
+     * 180° off the same `aria-expanded` that tints the icon, so the handler has nothing extra to
+     * write and nothing to keep in sync. It carries no `aria-label` of its own (`aria-hidden`), since
+     * the two text attributes of the button already say what the control does.
+     *
      * Pure: it builds markup and binds nothing. The map itself is created on the first open
      * (`_bindTemasMapToggle`), which is what keeps OpenLayers out of the path of a page where nobody
      * ever opened a map.
@@ -1067,8 +1069,8 @@ export default class Timeline {
     protected _loadOpenLayers(): Promise<TemasMapModules>;
     /**
      * Create the map of one card inside `canvas` — a circle per located topic, numbered like the badge
-     * it has in the list and colored like its tone, spread apart with a connector when they overlap —
-     * with the view fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
+     * it has in the list and colored like its tone, pushed apart when they overlap — with the view
+     * fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
      * goes away, and bind the hover that names a topic.
      *
      * A card that already has a map is left alone: the toggle can be closed and reopened as many

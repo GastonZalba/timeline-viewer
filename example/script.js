@@ -149,7 +149,8 @@ const baseOptions = {
   singleId,
   // El mapa de "Temas destacados" usa la capa estándar de OpenStreetMap por defecto; para verlo sin
   // fondo alcanza con `temasMapTiles: ''`.
-  temasMapTiles: 'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/argenmap_oscuro@EPSG%3A3857@png/{z}/{x}/{-y}.png'
+  temasMapTiles:
+    'https://wms.ign.gob.ar/geoserver/gwc/service/tms/1.0.0/argenmap_oscuro@EPSG%3A3857@png/{z}/{x}/{-y}.png'
 };
 
 if (useApi) {

@@ -286,7 +286,7 @@ Each card's "Temas destacados" header carries an icon-only **map toggle** ("Ver 
 - **Base layer.** The default is OpenStreetMap (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`). The `temasMapTiles` option overrides the template with any `{z}/{x}/{y}` XYZ provider; passing `''` opts out and leaves the map with only the article's own points.
 - **Badges.** While the map is open, every topic in the list gets a reference badge: the ones on the map carry the number of their circle, the ones without `geom` carry a crossed-out pin. The badge `title` keeps the tone label, which is hidden from the chip while the map is open.
 - **Hover.** The circle under the pointer grows and a tooltip shows the topic title; the canvas switches to a pointer cursor. A topic without `geom` is still listed — it just stays off the map.
-- **Spiderfy.** Topics whose circles would overlap at the current zoom are pushed apart along a circle around their centroid. Each displaced circle keeps its real position marked with a small dot, joined to the circle by a connector line with an arrowhead. The layout is recomputed on every `moveend`, so zooming in gradually returns the circles to their true coordinates.
+- **Spiderfy.** Topics whose circles would overlap at the current zoom are pushed apart along a circle around their centroid. The displaced circle keeps its tone color and its number, and is drawn without anything marking its real position. The layout is recomputed on every `moveend`, so zooming in gradually returns the circles to their true coordinates.
 - **Teardown.** The maps are disposed (`dispose()` + overlay removal) whenever the list is rebuilt or replaced by the loading placeholders, so a re-render never leaks an OpenLayers instance.
 
 ### Content taxonomies

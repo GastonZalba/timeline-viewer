@@ -109,11 +109,11 @@ new Timeline({ container, items, ... })
 | `_buildTemasHtml(card, located)` | 2445 | Markup del bloque "Temas destacados": header con el subtítulo y el toggle, el body del mapa y la lista. Cada tema lleva un badge `.tema-map-ref` (número si está ubicado, ícono de pin tachado si no) |
 | `_temaGeomOf(tema)` | 2496 | Valida el `geom` de un tema: devuelve `{ lat, lon }` o `null` si falta, no es objeto o está fuera de rango (`lat` ∉ [-90, 90], `lon` ∉ [-180, 180], `NaN`/`Infinity`). Un punto inválido se trata igual que ausente: el tema se lista y solo se saltea su marcador |
 | `_temasLocated(temas)` | 2513 | Única pasada que filtra los temas con `geom` usable y les asigna `index` (1-based, el del mapa) + `temaIndex` (posición original en la lista) + `color` por tono. De acá salen tanto los badges como los círculos |
-| `_buildTemasMapToggleHtml(located)` | 2547 | Botón (solo ícono, sin texto) que abre el mapa. `''` sin temas ubicados. Acción en `aria-label` + `title` ("Ver mapa"/"Ocultar mapa"); puro |
+| `_buildTemasMapToggleHtml(located)` | 2547 | Botón (ícono del mapa + flechita, sin texto) que abre el mapa. `''` sin temas ubicados. Acción en `aria-label` + `title` ("Ver mapa"/"Ocultar mapa"); la flechita gira 180° por CSS desde el mismo `aria-expanded`; puro |
 | `_buildTemasMapBodyHtml(located)` | 2564 | Body del mapa (`.card-temas-map-body` + `.card-temas-map-canvas`), oculto hasta el primer open. `''` sin temas ubicados |
 | `_bindTemasMapToggle(slot, located)` | 2588 | Bindea el toggle (alterna `expanded`/`hidden`/`aria-expanded`/labels, con `stopPropagation`) y, en el primer open, monta el mapa en un `requestAnimationFrame` |
 | `_loadOpenLayers()` | 2621 | `import()` dinámico de los módulos de `ol` (Map, View, geometrías, capas, fuentes, estilos, overlay, controles, proj) y del plugin de zoom. Cachea la promesa |
-| `_mountTemasMap(canvas, located)` | 2700 | Crea el mapa, el overlay de tooltip y los features (círculos + texto), corre `declutter()` (spiderfy) en cada `moveend` y bindea el hit test de hover |
+| `_mountTemasMap(canvas, located)` | 2700 | Crea el mapa, el overlay de tooltip y los features (círculos + texto, estilo fijo), corre `declutter()` (spiderfy: desplaza la geometría de los markers que se solapan, sin líneas ni flechas) en cada `moveend` y bindea el hit test de hover |
 | `_destroyTemasMaps()` | 3000 | Suelta cada mapa guardado en `_temasMaps` (`overlay.setMap(null)` + `map.setTarget(undefined)` + `dispose()`). Se llama antes de vaciar la lista (`_renderTimeline`, `_renderApiLoading`) |
 
 ### Utilidades
@@ -201,7 +201,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 │   │           ├── .card-temas (solo si `temas` no está vacío)
 │   │           │   ├── .card-temas-head
 │   │           │   │   ├── .card-subtitle ("Temas destacados (N)")
-│   │           │   │   └── button.card-temas-map-toggle (solo si algún tema tiene `geom`; ícono, acción en aria-label/title)
+│   │           │   │   └── button.card-temas-map-toggle (solo si algún tema tiene `geom`; ícono del mapa + flechita que gira 180° con `aria-expanded='true'`, acción en aria-label/title)
 │   │           │   ├── .card-temas-map-body[hidden] (solo con `geom`; `.expanded` lo muestra)
 │   │           │   │   └── .card-temas-map-canvas (OpenLayers se monta acá en el primer open)
 │   │           │   └── .card-temas-list

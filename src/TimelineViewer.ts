@@ -14,8 +14,6 @@ import type OlMap from 'ol/Map.js';
 import type OlView from 'ol/View.js';
 import type OlFeature from 'ol/Feature.js';
 import type OlPoint from 'ol/geom/Point.js';
-import type OlLineString from 'ol/geom/LineString.js';
-import type OlPolygon from 'ol/geom/Polygon.js';
 import type VectorLayer from 'ol/layer/Vector.js';
 import type VectorSource from 'ol/source/Vector.js';
 import type TileLayer from 'ol/layer/Tile.js';
@@ -116,11 +114,30 @@ const TEMAS_MAP_TILES_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
  */
 const TEMAS_MAP_MARKER_RADIUS = 9;
 
-/** Width of the white ring around a marker, in screen pixels */
-const TEMAS_MAP_MARKER_STROKE = 2;
+/**
+ * Width of the white ring around a marker, in screen pixels. It is what separates a mid-tone marker
+ * from whatever the raster map has under it, so it stays at 1px: thicker, it eats the tone color of
+ * the 18px circle and starts to collide with the number painted in the middle.
+ */
+const TEMAS_MAP_MARKER_STROKE = 1;
 
-/** Font size, in px, of the number painted in the center of a marker */
+/**
+ * Font size, in px, of the number painted in the center of a marker
+ */
 const TEMAS_MAP_MARKER_FONT = 10;
+
+/**
+ * Nudge that puts the number optically in the center of its marker, in screen pixels.
+ *
+ * `textBaseline: 'middle'` is not the middle of the ink: canvas aligns it to the middle of the font's
+ * **em box**, which sits above the visual center of a digit, because digits live in the cap height
+ * and leave the descender half empty. At a 10px font that lands every number half a pixel above the
+ * circle's center —measured in a browser, not estimated: all three markers of a four-topic card came
+ * out at `dy = -0.5` against the true center. Half a pixel is invisible on its own, but it is the
+ * difference between "centered" and "not quite" on an 18px circle, so it is corrected here rather
+ * than left to every marker.
+ */
+const TEMAS_MAP_MARKER_TEXT_OFFSET_Y = 0.5;
 
 /**
  * Extra pixels added to `TEMAS_MAP_MARKER_RADIUS` for the hover hit test, so an 18px circle is not a
@@ -170,21 +187,6 @@ const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
  */
 const TEMAS_MAP_SPIDER_GAP = 6;
 
-/** Largo de la cabeza de la flecha del conector, en píxeles de pantalla */
-const TEMAS_MAP_SPIDER_ARROW_LEN = 7;
-
-/** Medio ancho de la base de la flecha, en píxeles de pantalla */
-const TEMAS_MAP_SPIDER_ARROW_HALF = 4.5;
-
-/** Separación, en píxeles, entre el borde del marcador y la punta de la flecha */
-const TEMAS_MAP_SPIDER_HEAD_GAP = 2;
-
-/** Grosor del conector y de la flecha, en píxeles de pantalla */
-const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
-
-/** Radio del punto que ancla el conector en la ubicación original del tema, en píxeles */
-const TEMAS_MAP_SPIDER_DOT_RADIUS = 2.5;
-
 /**
  * Attribution of the base layer. The tile template is opaque to the component (the consumer
  * hands it over ready to use, key included), so the provider cannot be derived from it and the
@@ -222,6 +224,26 @@ const TEMAS_MAP_TOGGLE_SVG =
  */
 const TEMAS_MAP_NO_GEOM_SVG =
   '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768" width="12" height="12" fill="currentColor" aria-hidden="true" focusable="false"><path d="M375 367.5q163.5 162 265.5 264l-40.5 40.5-108-106.5q-24 36-51 70.5t-42 51l-15 16.5q-9-10.5-24-27.75t-54-69-68.25-100.5-53.25-110.25-24-108q0-16.5 6-49.5l-102-102 40.5-40.5 267 267zM384 208.5q-34.5 0-58.5 27l-103.5-102q27-28.5 75-48.75t87-20.25q93 0 158.25 65.25t65.25 158.25q0 72-54 175.5l-115.5-117q25.5-22.5 25.5-58.5 0-33-23.25-56.25t-56.25-23.25z"></path></svg>';
+
+/**
+ * Chevron of the topics map toggle, pointing down while the map is closed: the same glyph and the same
+ * stroke as the "Cargar más" arrow, so the two read as the same control.
+ *
+ * It is a constant (and not markup inline in `_buildTemasMapToggleHtml`) only because the two
+ * attributes `width`/`height` and the class are load-bearing:
+ *
+ * - The class is what the component CSS targets, both to keep this arrow at 12px — the rule that sizes
+ *   the map icon is a bare `svg` selector and would otherwise stretch this one to the icon's size —
+ *   and to rotate it 180° when the button is open. It hangs off `aria-expanded`, so the state lives
+ *   in the attribute the handler already writes for the icon tint and the labels.
+ * - `fill="none"` + `stroke="currentColor"`: it is a stroked chevron, not a filled one, and letting
+ *   the stroke inherit is what makes it follow the button's color across its three states (base,
+ *   hover, open).
+ * - `aria-hidden` for the same reason as the icon above: the action is in the `aria-label`/`title` of
+ *   the button, so announcing the arrow would say the same thing twice.
+ */
+const TEMAS_MAP_TOGGLE_CHEVRON_SVG =
+  '<svg class="card-temas-map-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6,9 12,15 18,9"/></svg>';
 
 /**
  * Values shown per filter group before the "Ver más (N)" toggle appears, when the `maxVisible`
@@ -337,8 +359,6 @@ interface TemasMapModules {
   // mistake into a `tsc` error instead of a silent one.
   OlFeature: new (options?: { geometry?: OlPoint }) => OlFeature;
   OlPoint: typeof OlPoint;
-  LineString: typeof OlLineString;
-  Polygon: typeof OlPolygon;
   OlOverlay: typeof OlOverlay;
   VectorLayer: typeof VectorLayer;
   VectorSource: typeof VectorSource;
@@ -371,22 +391,6 @@ interface TemasMapPoint {
   lon: number;
   titulo: string;
   color: string;
-}
-
-/**
- * Displacement of one marker that had to be pulled away from its own coordinate because it
- * overlapped another marker at the current zoom. The geometries are built in map coordinates on
- * `moveend`, so the feature's style function only has to hand them to the styles.
- */
-interface TemasMapSpider {
-  /** Triangle that points at the displaced marker */
-  arrow: OlPolygon;
-  /** Line from the topic's own coordinate to the head of the arrow */
-  line: OlLineString;
-  /** Displaced marker */
-  marker: OlPoint;
-  /** Topic's own coordinate, where the connector is anchored with a small dot */
-  origin: OlPoint;
 }
 
 /**
@@ -2540,13 +2544,19 @@ export default class Timeline {
    * cannot see the glyph swap. They carry the action and no count: the number of topics is already
    * on the subtitle next to it, and on the badge each located topic gets.
    *
+   * The chevron after the icon is the same arrow as the "Cargar más" button, and it is the only
+   * thing on the face of the button that *does* change between states: the component CSS rotates it
+   * 180° off the same `aria-expanded` that tints the icon, so the handler has nothing extra to
+   * write and nothing to keep in sync. It carries no `aria-label` of its own (`aria-hidden`), since
+   * the two text attributes of the button already say what the control does.
+   *
    * Pure: it builds markup and binds nothing. The map itself is created on the first open
    * (`_bindTemasMapToggle`), which is what keeps OpenLayers out of the path of a page where nobody
    * ever opened a map.
    */
   protected _buildTemasMapToggleHtml(located: TemasMapPoint[]): string {
     if (!located.length) return '';
-    return `<button type="button" class="card-temas-map-toggle" aria-expanded="false" aria-label="Ver mapa" title="Ver mapa">${TEMAS_MAP_TOGGLE_SVG}</button>`;
+    return `<button type="button" class="card-temas-map-toggle" aria-expanded="false" aria-label="Ver mapa" title="Ver mapa">${TEMAS_MAP_TOGGLE_SVG}${TEMAS_MAP_TOGGLE_CHEVRON_SVG}</button>`;
   }
 
   /**
@@ -2598,8 +2608,9 @@ export default class Timeline {
       body.hidden = expanded;
       body.classList.toggle('expanded', !expanded);
       toggle.setAttribute('aria-expanded', String(!expanded));
-      // The face of the button is the `<svg>`, so the state goes in the two text attributes and
-      // **never** in `textContent`: writing it would wipe the icon out of the button.
+      // The face of the button is made of `<svg>`s (the map icon and the chevron), so the state goes in
+      // the two text attributes and **never** in `textContent`: writing it would wipe both out of the
+      // button. The chevron needs nothing here: its rotation is CSS, off this same `aria-expanded`.
       const nextLabel = expanded ? openLabel : 'Ocultar mapa';
       toggle.setAttribute('aria-label', nextLabel);
       toggle.setAttribute('title', nextLabel);
@@ -2625,8 +2636,6 @@ export default class Timeline {
         import('ol/View.js'),
         import('ol/Feature.js'),
         import('ol/geom/Point.js'),
-        import('ol/geom/LineString.js'),
-        import('ol/geom/Polygon.js'),
         import('ol/Overlay.js'),
         import('ol/layer/Vector.js'),
         import('ol/source/Vector.js'),
@@ -2646,8 +2655,6 @@ export default class Timeline {
           view,
           feature,
           point,
-          lineString,
-          polygon,
           overlay,
           vLayer,
           vSource,
@@ -2666,8 +2673,6 @@ export default class Timeline {
           OlView: view.default,
           OlFeature: feature.default,
           OlPoint: point.default,
-          LineString: lineString.default,
-          Polygon: polygon.default,
           OlOverlay: overlay.default,
           VectorLayer: vLayer.default,
           VectorSource: vSource.default,
@@ -2689,8 +2694,8 @@ export default class Timeline {
 
   /**
    * Create the map of one card inside `canvas` — a circle per located topic, numbered like the badge
-   * it has in the list and colored like its tone, spread apart with a connector when they overlap —
-   * with the view fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
+   * it has in the list and colored like its tone, pushed apart when they overlap — with the view
+   * fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
    * goes away, and bind the hover that names a topic.
    *
    * A card that already has a map is left alone: the toggle can be closed and reopened as many
@@ -2726,28 +2731,14 @@ export default class Timeline {
       return circle;
     };
 
-    // The dot that anchors a connector on the own coordinate of a displaced marker, one per tone for
-    // the same reason the markers are cached.
-    const dots = new Map<string, CircleStyle>();
-    const dotOf = (color: string): CircleStyle => {
-      let dot = dots.get(color);
-      if (!dot) {
-        dot = new ol.Circle({
-          radius: TEMAS_MAP_SPIDER_DOT_RADIUS,
-          fill: new ol.Fill({ color }),
-          stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: 1 })
-        });
-        dots.set(color, dot);
-      }
-      return dot;
-    };
-
     const markerText = (p: TemasMapPoint) =>
       new ol.Text({
         text: String(p.index + 1),
         font: `700 ${TEMAS_MAP_MARKER_FONT}px system-ui, sans-serif`,
         textAlign: 'center',
         textBaseline: 'middle',
+        // The nudge that makes `textBaseline: 'middle'` actually centered; see the constant.
+        offsetY: TEMAS_MAP_MARKER_TEXT_OFFSET_Y,
         fill: new ol.Fill({ color: TEMAS_MAP_MARKER_TEXT_COLOR })
       });
 
@@ -2756,30 +2747,17 @@ export default class Timeline {
         geometry: new ol.OlPoint(ol.fromLonLat([p.lon, p.lat]))
       });
       // The plain marker: the circle centered on the feature's own coordinate —so the number is too,
-      // no `offset`, unlike the pin's head which sat well above the point it marked— and no connector.
-      const image = circleOf(p.color);
-      const label = markerText(p);
-      const base = new ol.Style({ image, text: label });
-      const connector = new ol.Stroke({ color: p.color, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
-      const arrow = new ol.Fill({ color: p.color });
+      // no `offset`, unlike the pin's head which sat well above the point it marked.
+      //
       // `style` is **not** a `Feature` constructor option: passed in the options object it lands as
       // an attribute property and `getStyle()` stays null, so the renderer falls back to the default
       // style — the cyan `#3399CC` circle. `setStyle()` is the only way to give a feature its style.
       //
-      // The style is a function and not a fixed style because a marker that overlaps another one is
-      // displaced by `declutter` on every `moveend`: the function reads that displacement from the
-      // feature and, when there is one, paints the connector, its arrow, the anchor dot and the
-      // marker at the displaced point instead of at the topic's own coordinate.
-      feature.setStyle((f) => {
-        const spider = f.get('spider') as TemasMapSpider | undefined;
-        if (!spider) return base;
-        return [
-          new ol.Style({ geometry: spider.line, stroke: connector }),
-          new ol.Style({ geometry: spider.arrow, fill: arrow }),
-          new ol.Style({ geometry: spider.origin, image: dotOf(p.color) }),
-          new ol.Style({ geometry: spider.marker, image, text: label })
-        ];
-      });
+      // It is a fixed style and not a function because the only thing `declutter` does now is move
+      // the marker: it does it by replacing the feature's own geometry, so the style paints at
+      // whatever coordinate the feature holds and there is no displaced-painting branch to keep in
+      // sync. Markers that overlap are simply drawn elsewhere.
+      feature.setStyle(new ol.Style({ image: circleOf(p.color), text: markerText(p) }));
       return feature;
     };
 
@@ -2856,12 +2834,20 @@ export default class Timeline {
     // what the user sees, not at the coordinate the topic would have without the displacement.
     const markerScreens: number[][] = located.map(() => [0, 0]);
     const markerCoords: number[][] = located.map((p) => ol.fromLonLat([p.lon, p.lat]));
+    // Own coordinate of each topic, as a geometry ready to be put back on its feature. `declutter`
+    // restores every marker to this one before grouping, so the geometry is only ever replaced, never
+    // accumulated: the marker of a topic that no longer overlaps comes back to its real place.
+    const ownPoints: OlPoint[] = located.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
 
     /**
      * Spread the markers that overlap at the current zoom. Every marker starts at its own
      * coordinate; the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another are grouped
-     * and re-laid out on a circle around the group's centroid, each with a connector that anchors a
-     * dot on its real location and an arrow that points at its displaced number.
+     * and re-laid out on a circle around the group's centroid.
+     *
+     * The displacement **is** the whole treatment: the feature's own geometry is replaced, so the
+     * circle and its number simply get painted somewhere else. Nothing is drawn back to the real
+     * coordinate — no anchor dot, no connector, no arrowhead — which is why the style is a fixed one
+     * and why the map needs nothing but `Point` to spread the markers.
      *
      * Runs on every `moveend` —and once right after the fit— because what overlaps changes with the
      * zoom: a far view clusters markers that a near view separates back into place.
@@ -2871,15 +2857,15 @@ export default class Timeline {
       const screens = located.map((p) => map.getPixelFromCoordinate(ol.fromLonLat([p.lon, p.lat])));
       const used = new Array<boolean>(n).fill(false);
 
-      // Back to the own coordinate first: whatever was spiderfied before this zoom may not overlap
-      // anymore, and the style function leaves the connector behind until the property is cleared.
+      // Back to the own coordinate first: whatever was displaced before this zoom may not overlap
+      // anymore, and a feature keeps the geometry it was last given.
       clearHover();
       for (let i = 0; i < n; i++) {
         const screen = screens[i];
         if (!screen) continue;
         markerScreens[i] = screen;
-        markerCoords[i] = ol.fromLonLat([located[i].lon, located[i].lat]);
-        features[i].set('spider', undefined);
+        markerCoords[i] = ownPoints[i].getCoordinates();
+        features[i].setGeometry(ownPoints[i]);
       }
 
       for (let i = 0; i < n; i++) {
@@ -2902,7 +2888,7 @@ export default class Timeline {
             }
           }
         }
-        // A lone marker is painted on its own coordinate and has nothing to connect.
+        // A lone marker is painted on its own coordinate and is left alone.
         if (group.length < 2) continue;
 
         let cx = 0;
@@ -2920,36 +2906,10 @@ export default class Timeline {
         group.forEach((k, position) => {
           const angle = -Math.PI / 2 + (2 * Math.PI * position) / group.length;
           const displaced: number[] = [cx + Math.cos(angle) * spread, cy + Math.sin(angle) * spread];
-          const from = screens[k]!;
-          // Unit vector from the marker's own position to its displaced position. Connector and
-          // arrow are built along it, so each one points at its own number.
-          let ux = displaced[0] - from[0];
-          let uy = displaced[1] - from[1];
-          const length = Math.hypot(ux, uy) || 1;
-          ux /= length;
-          uy /= length;
-          const head = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_HEAD_GAP;
-          const tip: number[] = [displaced[0] - ux * head, displaced[1] - uy * head];
-          const base: number[] = [tip[0] - ux * TEMAS_MAP_SPIDER_ARROW_LEN, tip[1] - uy * TEMAS_MAP_SPIDER_ARROW_LEN];
-          const half: number[] = [-uy * TEMAS_MAP_SPIDER_ARROW_HALF, ux * TEMAS_MAP_SPIDER_ARROW_HALF];
-          const origin = ol.fromLonLat([located[k].lon, located[k].lat]);
-          const marker = map.getCoordinateFromPixel(displaced);
-          const tipCoord = map.getCoordinateFromPixel(tip);
-          features[k].set('spider', {
-            origin: new ol.OlPoint(origin),
-            line: new ol.LineString([origin, tipCoord]),
-            arrow: new ol.Polygon([
-              [
-                tipCoord,
-                map.getCoordinateFromPixel([base[0] + half[0], base[1] + half[1]]),
-                map.getCoordinateFromPixel([base[0] - half[0], base[1] - half[1]]),
-                tipCoord
-              ]
-            ]),
-            marker: new ol.OlPoint(marker)
-          } as TemasMapSpider);
+          const coord = map.getCoordinateFromPixel(displaced);
+          features[k].setGeometry(new ol.OlPoint(coord));
           markerScreens[k] = displaced;
-          markerCoords[k] = marker;
+          markerCoords[k] = coord;
         });
       }
     };
