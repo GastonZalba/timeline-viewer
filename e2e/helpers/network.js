@@ -25,6 +25,12 @@ const LIGHTGALLERY = new Map([
   ['/css/lightgallery-bundle.min.css', path.join('css', 'lightgallery-bundle.min.css')]
 ]);
 
+/** A 1x1 fully transparent PNG, decoded to bytes once and reused for every tile request. */
+const TILE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64'
+);
+
 /** Attach the offline network to a page. Call before `page.goto`. */
 export async function useOfflineNetwork(page) {
   await page.route('**/*', async (route) => {
@@ -41,6 +47,15 @@ export async function useOfflineNetwork(page) {
       const body = fs.readFileSync(path.join(lightgallery, file));
       const contentType = file.endsWith('.css') ? 'text/css' : 'text/javascript';
       return route.fulfill({ status: 200, contentType, body });
+    }
+
+    // The raster tiles of the themes map (OpenStreetMap by default). OpenLayers is already served
+    // from node_modules by the `/vendor/ol/` route of the example server, so the only thing left
+    // external is the tile provider. A 1x1 transparent PNG is enough: what the tests check is that
+    // the layer is wired and the view is fitted to the features, not what the tiles look like, and
+    // a stub keeps the suite hermetic instead of letting it reach a real tile server.
+    if (url.includes('tile.openstreetmap.org')) {
+      return route.fulfill({ status: 200, contentType: 'image/png', body: TILE_PNG });
     }
 
     // Anything else external (article images, social SDKs) is irrelevant to these tests.

@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="base.css" />
     <link rel="stylesheet" href="../dist/styles.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/css/lightgallery-bundle.min.css" />
+    <!--
+      OpenLayers stylesheet. The component can't inject it (it never adds side effects on import
+      and doesn't own the document), so the consumer links it — same as the map library itself.
+    -->
+    <link rel="stylesheet" href="/vendor/ol/ol.css" />
   </head>
   <body>
     <div id="noticias-container"></div>
@@ -16,7 +21,35 @@
         "imports": {
           "lightgallery": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/lightgallery.es5.js",
           "lightgallery/plugins/thumbnail": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/thumbnail/lg-thumbnail.es5.js",
-          "lightgallery/plugins/zoom": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/zoom/lg-zoom.es5.js"
+          "lightgallery/plugins/zoom": "https://cdn.jsdelivr.net/npm/lightgallery@2.9.0/plugins/zoom/lg-zoom.es5.js",
+
+          "ol/": "/vendor/ol/",
+          "ol/Map.js": "/vendor/ol/Map.js",
+          "ol/View.js": "/vendor/ol/View.js",
+          "ol/Feature.js": "/vendor/ol/Feature.js",
+          "ol/geom/Point.js": "/vendor/ol/geom/Point.js",
+          "ol/geom/LineString.js": "/vendor/ol/geom/LineString.js",
+          "ol/geom/Polygon.js": "/vendor/ol/geom/Polygon.js",
+          "ol/Overlay.js": "/vendor/ol/Overlay.js",
+          "ol/layer/Vector.js": "/vendor/ol/layer/Vector.js",
+          "ol/source/Vector.js": "/vendor/ol/source/Vector.js",
+          "ol/layer/Tile.js": "/vendor/ol/layer/Tile.js",
+          "ol/source/XYZ.js": "/vendor/ol/source/XYZ.js",
+          "ol/style/Style.js": "/vendor/ol/style/Style.js",
+          "ol/style/Circle.js": "/vendor/ol/style/Circle.js",
+          "ol/style/Fill.js": "/vendor/ol/style/Fill.js",
+          "ol/style/Stroke.js": "/vendor/ol/style/Stroke.js",
+          "ol/style/Text.js": "/vendor/ol/style/Text.js",
+          "ol/control/Zoom.js": "/vendor/ol/control/Zoom.js",
+          "ol/control/Attribution.js": "/vendor/ol/control/Attribution.js",
+          "ol/proj.js": "/vendor/ol/proj.js",
+
+          "rbush": "/vendor/rbush/index.js",
+          "quickselect": "/vendor/quickselect/index.js",
+          "pbf": "/vendor/pbf/index.js",
+          "earcut": "/vendor/earcut/src/earcut.js",
+          "geotiff": "/vendor/geotiff/dist-browser/geotiff.js",
+          "zarrita": "/vendor/zarrita/dist/src/index.js"
         }
       }
     </script>

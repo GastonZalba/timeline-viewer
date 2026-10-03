@@ -117,7 +117,7 @@
     margin-left: 6px;
     width: 22px;
     height: 22px;
-    background: var(--tv-accent);
+    background: var(--tv-accent-dark);
     border-radius: 50%;
   }
 
@@ -574,9 +574,18 @@
       border-color: var(--tv-accent-light);
     }
 
+    // La cruz nativa de `type="search"` viene como glifo oscuro sobre el campo, así que se invierte
+    // entero y se baja la opacidad para que sea legible sin competir con el término escrito (mismo
+    // criterio que el resto de los íconos claros de la barra). El hover la sube a opaco.
     &::-webkit-search-cancel-button {
-      filter: #{'invert(0.6)'};
+      filter: #{'invert(1)'};
+      opacity: 0.75;
       cursor: pointer;
+      transition: opacity 0.2s ease;
+
+      &:hover {
+        opacity: 1;
+      }
     }
   }
 
@@ -2122,6 +2131,184 @@
       display: flex;
     }
 
+    // Cabecera del bloque de temas: el subtítulo y, a su lado, el botón que abre el mapa. El
+    // subtítulo lleva su propio `margin-bottom`, así que la fila no lo repite: sin mapa, la fila es
+    // solo el subtítulo y se ve exactamente como antes.
+    .card-temas-head {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+
+      .card-subtitle {
+        margin-bottom: 0;
+      }
+    }
+
+    // Botón del mapa: solo el ícono, chico y de bajo contraste, para que no compita con el subtítulo
+    // que tiene al lado. El estado abierto/cerrado se lee del `aria-expanded` que escribe el handler
+    // (no hay texto que cambiar), así que el `[aria-expanded='true']` es también lo que tiñe el
+    // ícono cuando el mapa está desplegado.
+    .card-temas-map-toggle {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid var(--tv-accent);
+      border-radius: 50%;
+      background: transparent;
+      color: var(--tv-accent);
+      cursor: pointer;
+      transition:
+        background 0.2s,
+        border-color 0.2s,
+        color 0.2s;
+
+      svg {
+        display: block;
+        width: 15px;
+        height: 15px;
+      }
+
+      &:hover {
+        background: var(--tv-bg-hover);
+        border: 1px solid var(--tv-accent);
+        color: var(--tv-accent);
+      }
+
+      &[aria-expanded='true'] {
+        background: var(--tv-bg-hover);
+        border: 1px solid var(--tv-accent-light);
+        color: var(--tv-accent-light);
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--tv-accent);
+        outline-offset: 2px;
+      }
+    }
+
+    // El cuerpo se oculta con el atributo `hidden` que escribe el handler, y esa regla necesita
+    // su propio `display: none`: la `[hidden]` de la UA cede ante cualquier `display` de autor
+    // (mismo motivo que `.taxonomy-row[hidden]` y `.card-taxonomy-extra` más abajo). El atributo
+    // se mantiene igualado porque sin CSS el mapa queda oculto de todas formas.
+    .card-temas-map-body[hidden] {
+      display: none;
+    }
+
+    // El `margin-bottom` es el que separa el mapa de la lista de temas: sin él, el mapa abierto
+    // queda pegado al primer tema y se lee como parte de su bloque.
+    .card-temas-map-body.expanded {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 2px;
+      margin-bottom: 12px;
+    }
+
+    // Alto fijo a propósito: OpenLayers mide su target al crearse y necesita una caja con
+    // resolución. Un alto derivado del contenido no le sirve.
+    .card-temas-map-canvas {
+      height: 260px;
+      overflow: hidden;
+      border: 1px solid var(--tv-border-card);
+      border-radius: 6px;
+      background: var(--tv-bg-secondary);
+    }
+
+    .card-temas-map-error {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 0 16px;
+      font-size: 0.72rem;
+      color: var(--tv-text-muted);
+      text-align: center;
+    }
+
+    // El puntero sobre un marcador avisa que ahí hay algo que hover. El estado lo pone el TS, que es
+    // el único que sabe en píxeles de mapa dónde cayó cada marcador (ver el hit test de
+    // `_mountTemasMap`).
+    .card-temas-map-canvas.is-hover-marker {
+      cursor: pointer;
+    }
+
+    // Controles de OpenLayers (zoom). `ol.css` los dibuja como botones cuadrados sobre un contenedor
+    // blanquecino; acá se los viste como los botones redondos del componente (`.card-info-btn`):
+    // círculo de 24px, fondo negro translúcido y un hover apenas más opaco. Los selectores van
+    // scopeados bajo el canvas —y no como un `.ol-control` pelado— por dos motivos: no tocan los
+    // controles de un mapa ajeno, y le ganan en especificidad a `ol.css`, que el demo carga
+    // **después** de este stylesheet.
+    .card-temas-map-canvas .ol-control {
+      padding: 0;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .card-temas-map-canvas .ol-zoom {
+      left: auto;
+      right: 0.5em;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .card-temas-map-canvas .ol-zoom button {
+      // `ol.css` da `display: block`, `height/width: 1.375em`, `line-height: .4em` y un cuadrado de
+      // 2px de radio: hay que pisar todo eso. El `display: flex` es el que centra el glifo `+`/`–`,
+      // que con el `line-height` de `ol.css` caía cerca del borde de arriba. Los colores salen de
+      // `.card-info-btn` (negro translúcido, hover un poco más opaco), no del acento.
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 24px;
+      height: 24px;
+      margin: 0;
+      padding: 0;
+      border: none;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.4);
+      color: rgba(255, 255, 255, 0.85);
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.2s ease;
+
+      &:hover {
+        background: rgba(0, 0, 0, 0.6);
+      }
+    }
+
+    // Globo del hover sobre un marcador. Vive dentro del contenedor de overlays de OpenLayers, así que
+    // va sin `position` propio: el `bottom-center` del `Overlay` es el que lo ancla a la coordenada.
+    .card-temas-map-tooltip {
+      max-width: 220px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgb(14 17 22 / 92%);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 0.68rem;
+      line-height: 1.3;
+      white-space: normal;
+      pointer-events: none;
+    }
+
+    @media (max-width: 600px) {
+      // Las declaraciones van directo en el `@media` y no anidadas adentro de `.card-temas-map-canvas`,
+      // por el mismo motivo que el `@media` de `.filter-menu`: anidadas compilarían a un
+      // descendiente de dos clases que ningún nodo puede ser, y el bloque entero no aplicaría.
+      .card-temas-map-canvas {
+        height: 200px;
+      }
+    }
+
     .card-taxonomies {
       display: none;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2606,7 +2793,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--tv-accent);
+    background: var(--tv-accent-dark);
     color: var(--tv-text-on-primary);
   }
 
@@ -2738,6 +2925,40 @@
     padding-left: 10px;
     border-left: 1px solid #243d64;
 
+    // Referencia del tema en el mapa: el badge que reemplaza a la leyenda que había debajo del mapa.
+    // Lo lleva **cada** tema mientras el mapa está abierto, así la lista queda alineada: los que
+    // tienen `geom` muestran el número de su marcador, y los que no muestran el ícono de ubicación
+    // tachada (`.tema-map-ref-none`) en vez de un número o un hueco. Se ve **solo con el mapa abierto**
+    // (ver la regla de `.card-temas-map-body.expanded` más abajo), así que sin el mapa la lista queda
+    // como estaba. El color del número sale de `--tema-tone-color`, que cada `.tone-tema-*` define abajo.
+    .tema-map-ref {
+      flex: 0 0 auto;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--tema-tone-color, var(--tv-accent));
+      color: var(--tv-text-dark);
+      font-size: 0.62rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    // El tema sin `geom`: mismo círculo y mismo color de tono que el número, pero con el pin tachado
+    // en vez de un número, para que se lea "este no está en el mapa" y no como un dato que falta.
+    .tema-map-ref-none {
+      background: var(--tema-tone-color, var(--tv-accent));
+      color: var(--tv-text-dark);
+
+      svg {
+        display: block;
+        width: 12px;
+        height: 12px;
+      }
+    }
+
     .tema-content {
       display: flex;
       flex-direction: column;
@@ -2797,7 +3018,45 @@
     }
   }
 
+  // Con el mapa abierto la lista de temas pasa a ser su índice: se van el resumen y la fecha
+  // narrativa de cada tema y aparece el número que lo ubica en el mapa. El combinador `~` es lo que
+  // lo ata al estado del mapa sin una clase extra que el handler tenga que sincronizar: el cuerpo
+  // (`.card-temas-map-body`) es hermano anterior de la lista, y la clase `expanded` es la que ya
+  // escribe `_bindTemasMapToggle`.
+  .card-temas-map-body.expanded ~ .card-temas-list {
+    // Con el mapa abierto la lista se lee como un índice compacto del mapa, no como la lista de
+    // temas completa: se aprieta el gap de 22px a 8px y se va el borde de cada ítem.
+    gap: 8px;
+
+    .tema-map-ref {
+      display: inline-flex;
+    }
+
+    .tema-item {
+      border-left: 0;
+      padding-left: 0;
+    }
+
+    .tema-desc,
+    .tema-fecha {
+      display: none;
+    }
+
+    // El chip de tono se oculta con el mapa abierto: su valor viaja en el `title` del badge
+    // (`.tema-map-ref`), así que no se pierde y deja de competir con el mapa.
+    .tema-tone {
+      display: none;
+    }
+
+    // Sin el tono ni la descripción/fecha, la fila es de una sola línea: el margen inferior del
+    // título ya no separa nada y solo agrandaría el alto del ítem.
+    .tema-title {
+      margin-bottom: 0;
+    }
+  }
+
   .tone-tema-positivo {
+    --tema-tone-color: var(--tv-tone-positive);
     border-color: var(--tv-tone-positive);
     .tema-tone {
       color: var(--tv-tone-positive);
@@ -2806,6 +3065,7 @@
   }
 
   .tone-tema-negativo {
+    --tema-tone-color: var(--tv-tone-negative);
     border-color: var(--tv-tone-negative);
     .tema-tone {
       color: var(--tv-tone-negative);
@@ -2814,6 +3074,7 @@
   }
 
   .tone-tema-neutro {
+    --tema-tone-color: var(--tv-tone-neutral);
     border-color: var(--tv-tone-neutral);
     .tema-tone {
       color: var(--tv-tone-neutral);

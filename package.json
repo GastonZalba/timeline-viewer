@@ -32,13 +32,15 @@
   "author": "Gastón Zalba",
   "license": "MIT",
   "peerDependencies": {
-    "lightgallery": "^2.9.0"
+    "lightgallery": "^2.9.0",
+    "ol": "^10.10.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "concurrently": "^9.2.3",
     "jsdom": "^22.1.0",
     "nodemon": "^3.1.14",
+    "ol": "^10.10.0",
     "prettier": "^3.9.6",
     "sass": "~1.99.0",
     "typescript": "^6.0.3"

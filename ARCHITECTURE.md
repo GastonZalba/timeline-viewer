@@ -102,6 +102,20 @@ new Timeline({ container, items, ... })
 | `_processCardEmbeds(cardEl)` | 2192 | Procesa los embeds de la tarjeta al expandir. Para `video` no hay SDK: solo copia el `aspectRatio` real desde `videoWidth`/`videoHeight` en `loadedmetadata` |
 | `_preloadEmbedLibraries()` | 2484 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook**. `video` y `youtube` no cargan nada |
 
+### Mapa de temas (OpenLayers)
+
+| Método | Línea | Descripción |
+|--------|-------|-------------|
+| `_buildTemasHtml(card, located)` | 2445 | Markup del bloque "Temas destacados": header con el subtítulo y el toggle, el body del mapa y la lista. Cada tema lleva un badge `.tema-map-ref` (número si está ubicado, ícono de pin tachado si no) |
+| `_temaGeomOf(tema)` | 2496 | Valida el `geom` de un tema: devuelve `{ lat, lon }` o `null` si falta, no es objeto o está fuera de rango (`lat` ∉ [-90, 90], `lon` ∉ [-180, 180], `NaN`/`Infinity`). Un punto inválido se trata igual que ausente: el tema se lista y solo se saltea su marcador |
+| `_temasLocated(temas)` | 2513 | Única pasada que filtra los temas con `geom` usable y les asigna `index` (1-based, el del mapa) + `temaIndex` (posición original en la lista) + `color` por tono. De acá salen tanto los badges como los círculos |
+| `_buildTemasMapToggleHtml(located)` | 2547 | Botón (solo ícono, sin texto) que abre el mapa. `''` sin temas ubicados. Acción en `aria-label` + `title` ("Ver mapa"/"Ocultar mapa"); puro |
+| `_buildTemasMapBodyHtml(located)` | 2564 | Body del mapa (`.card-temas-map-body` + `.card-temas-map-canvas`), oculto hasta el primer open. `''` sin temas ubicados |
+| `_bindTemasMapToggle(slot, located)` | 2588 | Bindea el toggle (alterna `expanded`/`hidden`/`aria-expanded`/labels, con `stopPropagation`) y, en el primer open, monta el mapa en un `requestAnimationFrame` |
+| `_loadOpenLayers()` | 2621 | `import()` dinámico de los módulos de `ol` (Map, View, geometrías, capas, fuentes, estilos, overlay, controles, proj) y del plugin de zoom. Cachea la promesa |
+| `_mountTemasMap(canvas, located)` | 2700 | Crea el mapa, el overlay de tooltip y los features (círculos + texto), corre `declutter()` (spiderfy) en cada `moveend` y bindea el hit test de hover |
+| `_destroyTemasMaps()` | 3000 | Suelta cada mapa guardado en `_temasMaps` (`overlay.setMap(null)` + `map.setTarget(undefined)` + `dispose()`). Se llama antes de vaciar la lista (`_renderTimeline`, `_renderApiLoading`) |
+
 ### Utilidades
 
 | Método | Línea | Descripción |
@@ -184,7 +198,16 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 │   │       └── .card-body
 │   │           ├── .card-desc (resumen_ia)
 │   │           ├── .card-tone
-│   │           ├── .card-temas > .tema-item × N
+│   │           ├── .card-temas (solo si `temas` no está vacío)
+│   │           │   ├── .card-temas-head
+│   │           │   │   ├── .card-subtitle ("Temas destacados (N)")
+│   │           │   │   └── button.card-temas-map-toggle (solo si algún tema tiene `geom`; ícono, acción en aria-label/title)
+│   │           │   ├── .card-temas-map-body[hidden] (solo con `geom`; `.expanded` lo muestra)
+│   │           │   │   └── .card-temas-map-canvas (OpenLayers se monta acá en el primer open)
+│   │           │   └── .card-temas-list
+│   │           │       └── .tema-item × N
+│   │           │           ├── span.tema-map-ref (número, o `.tema-map-ref-none` con el pin tachado; visible solo con el mapa abierto)
+│   │           │           └── .tema-content > .tema-title / .tema-desc / .tema-notas-trabajo
 │   │           ├── .card-hint
 │   │           ├── button.card-collapse
               │   │           ├── button.card-info-btn
@@ -430,6 +453,8 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 | `inlineAdjuntos` | `boolean` | Muestra `adjuntos` inline en la tarjeta expandida (nombre + icono por tipo) (opción del constructor) |
 | `singleId` | `string \| null` | Cuando está seteado, renderiza una única tarjeta ya expandida (modo single) |
 | `fullpage` | `boolean` | Modo fullpage (opción del constructor): fuerza `isExpanded`, bloquea el colapso, no emite el resize handle y no renderiza las featured cards |
+| `temasMapTiles` | `string` | Plantilla `{z}/{x}/{y}` de la capa base del mapa de temas (default OpenStreetMap). `''` la apaga y deja solo los puntos |
+| `_temasMaps` | `Map<HTMLElement, TemasMapHandle>` | Mapas OpenLayers vivos por canvas, para poder destruirlos cuando la lista se rearma |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |
 | `sorters` | `SortDef[]` | Sorters normalizados de la opción `sorters` (con `default` resuelto a boolean). Vacío = sin UI de orden |

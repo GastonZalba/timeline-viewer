@@ -8,6 +8,8 @@ Interactive timeline component that displays news articles as an overlapping car
 npm install https://github.com/GastonZalba/timeline-viewer
 ```
 
+The component is vanilla DOM and ships as a single ES module + CSS with no bundler. It has two **peer dependencies** the consumer must provide: `lightgallery` (`^2.9.0`, for the image galleries) and `ol` (`^10.10.0`, for the [topics map](#topics-map)). Both are loaded lazily, when the feature that needs them is first used.
+
 ## Usage
 
 ```js
@@ -79,6 +81,7 @@ The `Timeline` constructor accepts a single config object:
 | `stateInUrl`    | `boolean`                      | `false`    | When `true`, the **address bar becomes a shareable link of the view**: whoever opens it sees the same search, filters, order, taxonomy and page. The state travels as query params under the `tv_` prefix (`tv_q`, `tv_<field>` with the active values as CSV, `tv_sortBy` + `tv_sort`, `tv_tax`, `tv_page`), which are the very same params API mode sends to the server. The URL is read **once**, before the first render (so a link opens on the view it shares, and the first API request already carries the filters) and written with `history.replaceState` after every change: it is a snapshot of the view, not a navigation log, so there is no back button and nothing is pushed to the history. Mounting never rewrites the URL it just read; the first interaction does, and that is also when the `tv_*` keys that are not in effect get dropped — **what the link asks for that this instance cannot do is ignored silently** (a filter the consumer did not declare, a value that no longer exists, an order or a taxonomy that is not there, a page out of range): nothing warns, nothing breaks, and a group whose values leave nothing checked simply does not filter. Params outside the `tv_` prefix are never touched, so the consumer keeps its own flags. Ignored in single mode (`singleId`). See [State in the URL](#state-in-the-url) |
 | `relatedLabel`   | `(count: number) => string`    | —          | Optional. Function that returns the expand button label ("publicaciones relacionadas") for the given count. When unset, the default Spanish label is used with singular/plural logic. `count` is the **total number of publications, independent of the selected taxonomy** (the same number shown next to the label), which keeps the singular/plural grammatical. The returned string is injected as **HTML (not escaped)**, so it can contain markup (e.g. `'artículos relacionados sobre <b>Plan Integral</b>'`); escape any untrusted value before returning it |
 | `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode. The navigation links block under the card is not configured here: it comes from the item's own `taxonomias` field. See [Single view taxonomies](#single-view-taxonomies) |
+| `temasMapTiles`  | `string`                       | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Optional. Tile template for the [topics map](#topics-map) (any `{z}/{x}/{y}` XYZ provider). Passing `''` explicitly opts out of the base layer, leaving the map with only the article's own points |
 
 ### Item fields
 
@@ -111,7 +114,7 @@ Each object in `content[].items` (or in the legacy `items`) supports these field
 | `notas_de_trabajo`     | `string` / `null`           | Optional. Working notes displayed as a red badge above the summary in both collapsed and expanded card states |
 | `link_edit_entry`     | `string` (URL) / `null`     | Optional. URL to an edit form. When present, a red "Editar" button is shown next to the "Visitar" button in the card actions |
 | `link_view_entry`     | `string` (URL)               | Optional. URL of the item's own **individual view** (the one `singleId` renders). Two things are built from it: the "Información" menu shows the `ID` value as a link with the external-link icon (opened in a new tab, `target="_blank"`), and a floating share button appears below the card's info button. Relative URLs are resolved against the current page (e.g. `'?id=FUE-00001'` or `'/articulos/FUE-00001'`). When the field is absent, the `ID` is plain text and no share button is rendered. The share button uses the [Web Share API](https://developer.mozilla.org/docs/Web/API/Navigator/share) (`{ title, url }`) when available — mobile and Safari; where it is not available (e.g. desktop Chrome) it copies the absolute URL to the clipboard, the icon turns into a checkmark and a small "Copiado al portapapeles!" toast appears under the card buttons for 1.5s |
-| `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa?, notas_de_trabajo? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null`. `notas_de_trabajo` is an optional working note displayed as a red badge below the theme description |
+| `temas`                | `{ titulo, resumen, tono_social, fecha_narrativa?, notas_de_trabajo?, geom? }[]` | Topics / themes within the article. `fecha_narrativa` is an optional `string` (`YYYY-MM-DD`) or `null`. `notas_de_trabajo` is an optional working note displayed as a red badge below the theme description. `geom` is an optional `{ lat: number, lon: number }` that places the topic on the [topics map](#topics-map); missing or out-of-range coordinates simply leave the topic off the map while keeping it in the list |
 | `taxonomias`           | `{ label: string, items: { content: string, link: string }[] }[]` | Optional. Groups of navigation links rendered as a block **under the card in single mode** (`singleId`), each group in its own column. See [Single view taxonomies](#single-view-taxonomies) |
 
 > **Importante:** `example/mock-data.js` es la fuente de verdad para probar el componente. Cualquier campo que se agregue, renombre o elimine en el mock **debe** actualizarse en el mismo cambio en la interfaz `TimelineItem` (`src/TimelineViewer.ts`), en la declaración de tipos generada (`dist/TimelineViewer.d.ts` vía `npm run build`) y en esta tabla de campos. Los valores de `tipo_fuente` y los `tonos_sociales` se documentan según los que existen en el mock.
@@ -273,6 +276,18 @@ Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of 
 Direct video files need no SDK: a `<video>` plays them natively. The network request is deferred by `loading="lazy"` — the player lives inside a collapsed (`display: none`) card, so it does not intersect and the browser does not fetch a byte until the card is opened; on expand it requests only metadata (`preload="metadata"`), never the file itself, and the wrapper takes the video's real aspect ratio from that metadata. `.m3u8` (HLS) is **not** treated as a video, because it needs a streaming library the module does not ship.
 
 Profile pages, channels, playlists and other non-content URLs are ignored.
+
+### Topics map
+
+Each card's "Temas destacados" header carries an icon-only **map toggle** ("Ver mapa" / "Ocultar mapa", carried in `aria-label` + `title`) when at least one topic declares a usable `geom`. Opening it drops a small [OpenLayers](https://openlayers.org/) map between the header and the topic list, with one numbered circle per located topic, colored by its `tono_social`, and the view fitted to those points.
+
+- **Lazy.** OpenLayers is imported with a dynamic `import()` the first time a map is opened, so a page where nobody opens one never loads it. The component never injects `ol.css` as a side effect: the consumer provides the stylesheet (the demo loads it from its own `/vendor/ol/ol.css`).
+- **OpenLayers is a peer dependency**, alongside lightgallery: the consumer resolves `ol` in its bundle or through an import map, exactly like the demo's.
+- **Base layer.** The default is OpenStreetMap (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`). The `temasMapTiles` option overrides the template with any `{z}/{x}/{y}` XYZ provider; passing `''` opts out and leaves the map with only the article's own points.
+- **Badges.** While the map is open, every topic in the list gets a reference badge: the ones on the map carry the number of their circle, the ones without `geom` carry a crossed-out pin. The badge `title` keeps the tone label, which is hidden from the chip while the map is open.
+- **Hover.** The circle under the pointer grows and a tooltip shows the topic title; the canvas switches to a pointer cursor. A topic without `geom` is still listed — it just stays off the map.
+- **Spiderfy.** Topics whose circles would overlap at the current zoom are pushed apart along a circle around their centroid. Each displaced circle keeps its real position marked with a small dot, joined to the circle by a connector line with an arrowhead. The layout is recomputed on every `moveend`, so zooming in gradually returns the circles to their true coordinates.
+- **Teardown.** The maps are disposed (`dispose()` + overlay removal) whenever the list is rebuilt or replaced by the loading placeholders, so a re-render never leaks an OpenLayers instance.
 
 ### Content taxonomies
 
@@ -659,7 +674,7 @@ There are two suites, split by what each can actually verify:
 
 The configurable-filters feature has a dedicated pair of suites: `test/filters.test.js` for the jsdom-side logic (panel markup, derivation of values, persistence, active buttons) and `e2e/filters.spec.js` for what needs a real browser (a click actually reordering the list, the "Ver más" toggle, and the filter travelling as a query param in API mode).
 
-The browser tests are hermetic: `e2e/helpers/network.js` intercepts the demo's jsDelivr import map and serves lightgallery from the local `node_modules`, and aborts every other external request, so the suite runs without internet. Chromium is downloaded once with:
+The browser tests are hermetic: `e2e/helpers/network.js` intercepts the demo's jsDelivr import map and serves both lightgallery and `ol` from the local `node_modules`, stubs the OpenStreetMap tiles of the topics map with a 1x1 PNG, and aborts every other external request, so the suite runs without internet. Chromium is downloaded once with:
 
 ```bash
 npx playwright install chromium

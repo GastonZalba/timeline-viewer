@@ -1,11 +1,106 @@
 import type { LightGallery } from 'lightgallery/lightgallery';
+import type OlMap from 'ol/Map.js';
+import type OlView from 'ol/View.js';
+import type OlFeature from 'ol/Feature.js';
+import type OlPoint from 'ol/geom/Point.js';
+import type OlLineString from 'ol/geom/LineString.js';
+import type OlPolygon from 'ol/geom/Polygon.js';
+import type VectorLayer from 'ol/layer/Vector.js';
+import type VectorSource from 'ol/source/Vector.js';
+import type TileLayer from 'ol/layer/Tile.js';
+import type XYZ from 'ol/source/XYZ.js';
+import type OlStyle from 'ol/style/Style.js';
+import type CircleStyle from 'ol/style/Circle.js';
+import type OlFill from 'ol/style/Fill.js';
+import type OlStroke from 'ol/style/Stroke.js';
+import type TextStyle from 'ol/style/Text.js';
+import type ZoomControl from 'ol/control/Zoom.js';
+import type AttributionControl from 'ol/control/Attribution.js';
+import type OlOverlay from 'ol/Overlay.js';
+import type { fromLonLat as FromLonLat } from 'ol/proj.js';
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
+/**
+ * Punto geográfico de un tema, en **EPSG:4326** (WGS84): latitud y longitud en
+ * grados decimales, con la convención del campo (`lat` es latitud, `lon` es longitud).
+ *
+ * Es un objeto con campos nombrados y no una tupla `[lat, lon]` a propósito: los
+ * números son negativos o de tres dígitos casi siempre, así que una tupla sería
+ * indistinguible de un vistazo y es la fuente clásica de tener la ciudad al revés.
+ * Para lo mismo el orden NO es el de GeoJSON (`[lon, lat]`).
+ */
+export interface TemaGeom {
+    lat: number;
+    lon: number;
+}
+/**
+ * The constructors and the one function the topics map needs, unpacked from the lazily
+ * imported OpenLayers modules (see `_loadOpenLayers`).
+ */
+interface TemasMapModules {
+    OlMap: typeof OlMap;
+    OlView: typeof OlView;
+    OlFeature: new (options?: {
+        geometry?: OlPoint;
+    }) => OlFeature;
+    OlPoint: typeof OlPoint;
+    LineString: typeof OlLineString;
+    Polygon: typeof OlPolygon;
+    OlOverlay: typeof OlOverlay;
+    VectorLayer: typeof VectorLayer;
+    VectorSource: typeof VectorSource;
+    TileLayer: typeof TileLayer;
+    XYZ: typeof XYZ;
+    Style: typeof OlStyle;
+    Circle: typeof CircleStyle;
+    Fill: typeof OlFill;
+    Stroke: typeof OlStroke;
+    Text: typeof TextStyle;
+    Zoom: typeof ZoomControl;
+    Attribution: typeof AttributionControl;
+    fromLonLat: typeof FromLonLat;
+}
+/**
+ * A topic's point, resolved once and shared by the map and by the reference badge the topic gets in
+ * the list above it.
+ */
+interface TemasMapPoint {
+    /** 0-based position in the located list, which is what the marker is numbered with */
+    index: number;
+    /**
+     * Position of the topic in `card.temas`. **Not** the same as `index`: the list can carry topics
+     * without a `geom`, and those are listed but never located, so the two lists drift apart. The
+     * reference badge in the list is placed by this one, the marker number by `index`.
+     */
+    temaIndex: number;
+    lat: number;
+    lon: number;
+    titulo: string;
+    color: string;
+}
+/**
+ * One live map plus the overlay that was bound to it. Both have to be let go of when the card goes
+ * away: the map because it keeps its canvas, listeners and tile source alive, and the overlay because
+ * `Map.dispose()` does not take the overlays that were added to it with it.
+ */
+interface TemasMapHandle {
+    map: OlMap;
+    overlay: OlOverlay;
+}
 export interface ItemTema {
     titulo: string;
     resumen: string;
     tono_social: TonoSocial;
     fecha_narrativa?: string | null;
     notas_de_trabajo?: string | null;
+    /**
+     * Dónde ocurre el tema. Opcional: un tema sin `geom` se lista igual pero no aporta
+     * un punto al mapa, y la sección del mapa solo se renderiza si **algún** tema lo trae.
+     *
+     * Un punto se valida al renderizar (`_temaGeomOf`): fuera de rango o no finito se
+     * descarta como si no viniera, porque el dato viene de un pipeline de scraping y
+     * un `lat: 999` poisons el `View.fit()` de todos los puntos de la tarjeta.
+     */
+    geom?: TemaGeom | null;
 }
 export interface TimelineItem {
     id: number | string;
@@ -214,6 +309,27 @@ export interface TimelineOptions {
     inlineImages?: boolean;
     inlineAdjuntos?: boolean;
     internalButtons?: boolean;
+    /**
+     * Base raster del mapa de los temas, como plantilla de tiles XYZ con `{z}` / `{x}` / `{y}`.
+     *
+     * **Sin esta opción el mapa usa la capa estándar pública de OpenStreetMap.** Es lo que hace que
+     * un mapa se vea como un mapa y no como un canvas vacío; el punto cae sobre el mismo fondo que
+     * usa el resto del componente, que es indistinguible de un mapa roto. Para dejarlo sin base,
+     * pasá `''` explícito.
+     *
+     * Ojo con los placeholders: `ol/uri.js` sustituye **solo** `{z}`, `{x}`, `{y}` y `{-y}`. El `{r}`
+     * de retina que usan Leaflet y la documentación de Stadia no está, y queda literal en la URL — el
+     * mapa pide `/5{r}.png` y cada tile da 404.
+     *
+     * La capa estándar es para tráfico bajo, que es lo que pide su política de uso. Un consumidor con
+     * volumen real tiene que apuntar esto a su propio servidor de tiles —y es también lo que no puede
+     * decidir el componente, que no pide ni pide saber una API key.
+     *
+     * Ej.: `'https://tiles.miservidor.com/tiles/{z}/{x}/{y}.png'`.
+     *
+     * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar.
+     */
+    temasMapTiles?: string;
     /**
      * Keep the state of the view in the browser URL (default: false), so the address bar is a
      * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
@@ -498,6 +614,28 @@ export default class Timeline {
     inlineImages: boolean;
     inlineAdjuntos: boolean;
     internalButtons: boolean;
+    /**
+     * Template of the raster base layer of the topics map, `''` meaning no base at all. Defaults to
+     * the public OpenStreetMap standard layer; read from the options, while the map itself is built
+     * lazily, the first time someone opens one.
+     */
+    temasMapTiles: string;
+    /**
+     * OpenLayers modules, loaded once the first time a topics map is opened. `null` until then:
+     * **never imported eagerly**, so a page without topics that carry a `geom` does not resolve
+     * the peer dependency at all — same reason the social embed SDKs are loaded on demand
+     * (`_preloadEmbedLibraries`). The promise is cached even when it rejects, so a consumer
+     * without `ol` installed does not retry the failed import on every click.
+     */
+    _olModules: Promise<TemasMapModules> | null;
+    /**
+     * Live topics maps, keyed by the container they render into. Needed because the cards are wiped on
+     * every re-render (a search, a filter, a sort, a page change) and dropping the DOM node does
+     * **not** dispose the map: it keeps its canvas, its listeners and its tile source alive.
+     * `_destroyTemasMaps` is called from the two places that empty `#timeline-cards` for exactly that
+     * reason. The handle carries the hover overlay too, which `Map.dispose()` does not take with it.
+     */
+    _temasMaps: Map<HTMLElement, TemasMapHandle>;
     stateInUrl: boolean;
     /**
      * Filter state read from the URL, keyed by `field`, with the same CSV the API params use. `null`
@@ -845,8 +983,109 @@ export default class Timeline {
     protected _buildProtagonistaHtml(card: TimelineItem): string;
     /** Build the "Fuente" HTML block */
     protected _buildFuenteHtml(card: TimelineItem): string;
-    /** Build the "Temas destacados" HTML block */
-    protected _buildTemasHtml(card: TimelineItem): string;
+    /**
+     * Build the "Temas destacados" HTML block.
+     *
+     * The map toggle rides on the block's own header row, next to the subtitle, and the map itself
+     * opens **between the header and the topics** — not after the list. Reading the block is
+     * "here is where these topics are, and here they are on a map", so the two sit together at the
+     * top; a map below a list of ten paragraphs is a scroll away from the title that opened it.
+     */
+    protected _buildTemasHtml(card: TimelineItem, located: TemasMapPoint[]): string;
+    /**
+     * A topic's point, or `null` when it does not carry one **or carries a bad one**.
+     *
+     * The validation is not paranoia about types but about the extent: every point of the card
+     * goes into a single `View.fit`, so one `lat: 999` or one `NaN` coming out of the scraping
+     * pipeline would drag every other point out of view, not just fail to add one. Out of range
+     * is treated exactly like missing, so the topic is still listed above and only skips its marker.
+     */
+    protected _temaGeomOf(tema: ItemTema | undefined): TemaGeom | null;
+    /**
+     * The topics of a card that carry a usable point, **in the order they are listed**, each with
+     * the number it gets on the map (1-based) and the color of its tone.
+     *
+     * It is the single pass both the markup and the map are built from, which is what keeps the
+     * number on a marker and the number in the legend meaning the same thing: they are indexes
+     * into this one list.
+     */
+    protected _temasLocated(temas: ItemTema[]): TemasMapPoint[];
+    /**
+     * The button that opens the topics map, for the "Temas destacados" header row.
+     *
+     * Returns `''` when **no topic carries a usable `geom`**, so an article with nothing to place
+     * leaves no dangling control on its header — the same reason the whole block returns `''` without
+     * topics.
+     *
+     * The face of the button is the map icon and nothing else, so the action lives in `aria-label` +
+     * `title`. That is not only for screen readers: with an icon-only button there is no visible text
+     * left to change between the two states, so the two attributes are the whole state for anyone who
+     * cannot see the glyph swap. They carry the action and no count: the number of topics is already
+     * on the subtitle next to it, and on the badge each located topic gets.
+     *
+     * Pure: it builds markup and binds nothing. The map itself is created on the first open
+     * (`_bindTemasMapToggle`), which is what keeps OpenLayers out of the path of a page where nobody
+     * ever opened a map.
+     */
+    protected _buildTemasMapToggleHtml(located: TemasMapPoint[]): string;
+    /**
+     * The body of the topics map: a small map with one numbered circle per located topic. Sits between the header
+     * row and the topic list, hidden until the toggle opens it.
+     *
+     * There is no legend: the numbered reference of each topic is a badge on the topic itself, in the
+     * list right below (`_buildTemasHtml`). A legend repeated the list one scroll away from it and
+     * left the topic without its number where a reader looks for it.
+     *
+     * Returns `''` with no located topic, for the same reason as the toggle: the two are the same
+     * "is there a map to show" decision, and emitting one without the other would leave a body that
+     * nothing opens.
+     */
+    protected _buildTemasMapBodyHtml(located: TemasMapPoint[]): string;
+    /**
+     * Bind the header of a topics map section so it shows and hides its body.
+     *
+     * Same shape as `_bindTaxonomyToggles`: `aria-expanded` is the source of truth for the state,
+     * the `expanded` class on the body is what the component CSS keys on (the UA `[hidden]` rule
+     * loses to any author `display`, which is why the SCSS needs its own override), and the `hidden`
+     * attribute is kept in sync anyway for the case where the stylesheet is not loaded.
+     *
+     * Two things differ from the taxonomy toggles, both forced by where this row lives:
+     *
+     * - It calls `stopPropagation()`. It sits inside `.card-body`, so the click would otherwise
+     *   reach the card-wide expand listener and re-expand a card the user had just collapsed. The
+     *   taxonomy toggle does not need it only because its block is rendered *inside* an already
+     *   expanded card.
+     * - The body is not in the markup beyond its empty shell. The first open builds the map, which
+     *   is also the first time OpenLayers is imported at all.
+     */
+    protected _bindTemasMapToggle(slot: HTMLElement, located: TemasMapPoint[]): void;
+    /**
+     * Import OpenLayers, once. The promise is cached **even when it rejects**, like
+     * `_ensureApiFacets`: a consumer without `ol` installed should not pay a failed import on every
+     * click of a toggle, and the failure is reported in the map's own place instead.
+     */
+    protected _loadOpenLayers(): Promise<TemasMapModules>;
+    /**
+     * Create the map of one card inside `canvas` — a circle per located topic, numbered like the badge
+     * it has in the list and colored like its tone, spread apart with a connector when they overlap —
+     * with the view fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
+     * goes away, and bind the hover that names a topic.
+     *
+     * A card that already has a map is left alone: the toggle can be closed and reopened as many
+     * times as wanted without rebuilding it, which would redownload the tiles and throw away
+     * whatever pan or zoom the user had done.
+     */
+    protected _mountTemasMap(canvas: HTMLElement, located: TemasMapPoint[]): Promise<void>;
+    /**
+     * Dispose every live topics map. Called from the two places that empty `#timeline-cards`,
+     * because dropping a card's DOM node does not dispose its map: OpenLayers keeps the canvas, the
+     * listeners and the tile source alive, so without this every search, filter, sort or page change
+     * would leak one map per card that had opened its topics map.
+     *
+     * The overlay is let go of explicitly: it is added to the map, not owned by it, and `Map.dispose()`
+     * does not take the overlays with it.
+     */
+    protected _destroyTemasMaps(): void;
     /** Build the "Videos vinculados" HTML block */
     protected _buildVideosHtml(card: TimelineItem): string;
     /** Build the inline "Imágenes" HTML block */
@@ -1241,7 +1480,7 @@ export default class Timeline {
      * footer are markup from `_buildLayout` that is never replaced, so binding them on the first build
      * is enough and the rebuilds of the values do not stack listeners.
      *
-     * Keyboard: the trigger opens with `Enter` / `Space` / `↓`, the list walks with the arrows and
+     * Keyboard: the trigger opens with `Enter` / `Space` / `?`, the list walks with the arrows and
      * toggles with `Enter`, and `Escape` closes the list without closing the whole panel (which is
      * what it would do otherwise, since the key bubbles to the same handler that closes the menu).
      */
@@ -1259,7 +1498,7 @@ export default class Timeline {
     protected _moveSelectCursor(f: FilterDef, step: number): void;
     /**
      * Put the cursor on the first or the last matching value (<kbd>Home</kbd> / <kbd>End</kbd>).
-     * Without these, a group with hundreds of values is only reachable with hundreds of <kbd>↓</kbd>:
+     * Without these, a group with hundreds of values is only reachable with hundreds of <kbd>?</kbd>:
      * the same dead-end the window avoids for the mouse, and this is the listbox behavior people
      * expect from the keys.
      */

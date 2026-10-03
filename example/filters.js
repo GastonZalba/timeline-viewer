@@ -52,6 +52,11 @@
  *   muestra los primeros declarados; uno derivado se ordena por **mayor conteo** antes de truncar
  *   (si no, el corte escondería los valores que más filtran), salvo que declare `sortValues`, cuyo
  *   orden es intencional y solo se trunca. **No aplica a un `select`**: su lista scrollea y busca.
+ * - `sortValues` es un comparador `(a, b) => number` sobre los **tokens**, y fija el orden de los
+ *   valores del grupo. El único grupo del demo que lo declara es `anio_publicacion`, para que la
+ *   lista de años empiece por el más nuevo en vez de seguir el orden del pool. Solo tiene efecto en
+ *   grupos **sin `items`** (los declarados ya vienen en orden), y desactiva el orden por conteo,
+ *   porque un orden deliberado es justo lo contrario de "primero los que más filtran".
  * - `group: 'filtros_internos'` manda el grupo al flyout rojo de "Filtros internos" (necesita
  *   `internalButtons: true`) en vez de a una columna del panel.
  *
@@ -85,11 +90,26 @@ const filters = [
   {
     // Año ya reducido en el dato (`anio_publicacion`), así que tampoco necesita `extract`. Los tres
     // años que trae el mock más el bucket vacío son 4 valores: no hay corte (el default es 5), así
-    // que tampoco hay orden por conteo y se muestran en el orden en que aparecen en el pool. Si
-    // alguna vez se quiere "más nuevo primero" con independencia del dato, es un `sortValues`.
+    // que sin `sortValues` se mostrarían en el orden en que aparecen en el pool, que no dice nada
+    // (venían `2026, 2024, 2025`). El `sortValues` pone el año más nuevo primero, y como el orden
+    // es intencional el grupo ya no se reordena por conteo (acá no hay corte, pero en un pool más
+    // grande sí).
+    //
+    // El bucket vacío se manda al final en dos lugares, y a propósito: el comparador no tiene que
+    // saber que el token `'null'` no es un año, y la librería lo mueve igual después de cualquier
+    // sort (`_resolveFilterValues()`), así que el resultado no depende de cuál de los dos haga el
+    // trabajo. Su label es el fijo "Sin valor" de `allowEmpty`, no uno propio del demo.
     field: 'anio_publicacion',
     label: 'Año publicación',
-    allowEmpty: true
+    allowEmpty: true,
+    sortValues: (a, b) => {
+      const x = Number.parseInt(a, 10);
+      const y = Number.parseInt(b, 10);
+      const noX = Number.isNaN(x);
+      const noY = Number.isNaN(y);
+      if (noX || noY) return noX === noY ? 0 : noX ? 1 : -1;
+      return y - x;
+    }
   },
   {
     // El único grupo del demo que declara `items`: el pipeline manda `contenido` ya clasificado y

@@ -24,6 +24,47 @@ const MIME_TYPES = {
   '.ttf': 'font/ttf'
 };
 
+/**
+ * OpenLayers is served from `node_modules` under `/vendor/<pkg>/`, so the demo's importmap can point
+ * at real files instead of a CDN. Two reasons it gets its own route instead of relying on the
+ * generic static fallback at the bottom: the files live in `node_modules`, which is two levels up
+ * from here, and the importmap needs a flat `/vendor/<pkg>/<module>.js` prefix that mirrors the
+ * package's own internal specifiers (`ol/Map.js` imports `./layer/Vector.js`, so the URLs have to
+ * keep the same shape as the package for those relative imports to resolve).
+ *
+ * It is not just `ol`: the OpenLayers sources import their own dependencies as **bare specifiers**
+ * (`import rbush from 'rbush'`, same for `pbf`, `geotiff`, `zarrita` and `earcut`), which a browser
+ * cannot resolve on its own — it fails the whole module graph with "Failed to resolve module
+ * specifier". Those packages are published as bare specifiers themselves, so each one needs its own
+ * `/vendor/<pkg>/` entry in the importmap, and its own browser/ESM build here.
+ */
+const VENDOR_ROOT = path.join(__dirname, '..', 'node_modules');
+
+/**
+ * `/vendor/<pkg>/<rest>` -> the file to serve. `entries` is the list of packages the demo's
+ * importmap points into; anything else gets a 404 instead of being looked up, so this route can't
+ * be turned into a way to read arbitrary files out of `node_modules`.
+ *
+ * The browser build of each dependency is picked explicitly, because the `main` of most of them is
+ * CommonJS and a browser can't evaluate it: `ol` needs the ESM sources (there is no bundle to
+ * serve, and its internal relative imports only work when the URL shape mirrors the package), while
+ * the dependencies ship real ESM builds.
+ */
+const VENDOR_PACKAGES = {
+  ol: { root: 'ol', entry: null },
+  // `index.js`, not the `browser` field (`rbush.min.js`): that one is a UMD bundle, so a browser
+  // loading it as an ES module gets no `default` export and `ol/render/canvas/RBush.js` fails with
+  // "does not provide an export named 'default'". The ESM entry pulls in `quickselect`, which is
+  // why that one is declared below too.
+  rbush: { root: 'rbush', entry: 'index.js' },
+  pbf: { root: 'pbf', entry: 'index.js' },
+  earcut: { root: 'earcut', entry: 'src/earcut.js' },
+  geotiff: { root: 'geotiff', entry: 'dist-browser/geotiff.js' },
+  zarrita: { root: 'zarrita', entry: 'dist/src/index.js' },
+  // Not a dependency of `ol`: `rbush/index.js` imports it bare.
+  quickselect: { root: 'quickselect', entry: 'index.js' }
+};
+
 /** Normalize a string for accent- and case-insensitive matching (mirrors the client) */
 function normalize(value) {
   return (value || '')
@@ -289,6 +330,49 @@ const server = http.createServer((req, res) => {
     if (req.method === 'GET' && detailMatch) return handleItem(decodeURIComponent(detailMatch[1]), res);
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
+  // Packages from node_modules (`ol` and its own dependencies). Three guards, in this order: the
+  // package has to be declared, the resolved path has to stay inside that package's root (`path.join`
+  // collapses `..`, so `/vendor/ol/../../../etc/passwd` would escape otherwise — checking the prefix
+  // after resolution, not the raw pathname, is what makes the guard work), and then it's a plain
+  // read with the same error handling as the static route below.
+  const vendorMatch = pathname.match(/^\/vendor\/([^/]+)\/(.+)$/);
+  if (vendorMatch) {
+    const pkg = VENDOR_PACKAGES[decodeURIComponent(vendorMatch[1])];
+    if (!pkg) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not found');
+      return;
+    }
+
+    const root = path.join(VENDOR_ROOT, pkg.root);
+    const rel = decodeURIComponent(vendorMatch[2]);
+    // `entry` is the file the importmap points at; it is what gets served when the request asks for
+    // the package root itself.
+    const filePath = rel === '' && pkg.entry ? path.join(root, pkg.entry) : path.join(root, rel);
+    const inside = filePath === root || filePath.startsWith(root + path.sep);
+
+    if (!inside) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('Forbidden');
+      return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+    fs.readFile(filePath, (err, content) => {
+      if (err) {
+        const code = err.code === 'ENOENT' ? 404 : 500;
+        res.writeHead(code, { 'Content-Type': 'text/plain' });
+        res.end(code === 404 ? 'Not found' : 'Server error');
+      } else {
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content);
+      }
+    });
     return;
   }
 

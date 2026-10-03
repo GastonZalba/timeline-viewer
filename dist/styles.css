@@ -94,7 +94,7 @@
   margin-left: 6px;
   width: 22px;
   height: 22px;
-  background: var(--tv-accent);
+  background: var(--tv-accent-dark);
   border-radius: 50%;
 }
 .publicaciones-section .card-oficial {
@@ -453,8 +453,13 @@
   border-color: var(--tv-accent-light);
 }
 .publicaciones-section .search-input::-webkit-search-cancel-button {
-  filter: invert(0.6);
+  filter: invert(1);
+  opacity: 0.75;
   cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+.publicaciones-section .search-input::-webkit-search-cancel-button:hover {
+  opacity: 1;
 }
 .publicaciones-section .search-wrap:not(.open) .search-input:hover {
   background: var(--tv-accent);
@@ -1779,6 +1784,130 @@
 .publicaciones-section .timeline-card.expanded .card-temas {
   display: flex;
 }
+.publicaciones-section .timeline-card .card-temas-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.publicaciones-section .timeline-card .card-temas-head .card-subtitle {
+  margin-bottom: 0;
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--tv-accent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--tv-accent);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle:hover {
+  background: var(--tv-bg-hover);
+  border: 1px solid var(--tv-accent);
+  color: var(--tv-accent);
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle[aria-expanded=true] {
+  background: var(--tv-bg-hover);
+  border: 1px solid var(--tv-accent-light);
+  color: var(--tv-accent-light);
+}
+.publicaciones-section .timeline-card .card-temas-map-toggle:focus-visible {
+  outline: 2px solid var(--tv-accent);
+  outline-offset: 2px;
+}
+.publicaciones-section .timeline-card .card-temas-map-body[hidden] {
+  display: none;
+}
+.publicaciones-section .timeline-card .card-temas-map-body.expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 2px;
+  margin-bottom: 12px;
+}
+.publicaciones-section .timeline-card .card-temas-map-canvas {
+  height: 260px;
+  overflow: hidden;
+  border: 1px solid var(--tv-border-card);
+  border-radius: 6px;
+  background: var(--tv-bg-secondary);
+}
+.publicaciones-section .timeline-card .card-temas-map-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 16px;
+  font-size: 0.72rem;
+  color: var(--tv-text-muted);
+  text-align: center;
+}
+.publicaciones-section .timeline-card .card-temas-map-canvas.is-hover-marker {
+  cursor: pointer;
+}
+.publicaciones-section .timeline-card .card-temas-map-canvas .ol-control {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.publicaciones-section .timeline-card .card-temas-map-canvas .ol-zoom {
+  left: auto;
+  right: 0.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.publicaciones-section .timeline-card .card-temas-map-canvas .ol-zoom button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.publicaciones-section .timeline-card .card-temas-map-canvas .ol-zoom button:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+.publicaciones-section .timeline-card .card-temas-map-tooltip {
+  max-width: 220px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(14, 17, 22, 0.92);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  white-space: normal;
+  pointer-events: none;
+}
+@media (max-width: 600px) {
+  .publicaciones-section .timeline-card .card-temas-map-canvas {
+    height: 200px;
+  }
+}
 .publicaciones-section .timeline-card .card-taxonomies {
   display: none;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -2187,7 +2316,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--tv-accent);
+  background: var(--tv-accent-dark);
   color: var(--tv-text-on-primary);
 }
 .publicaciones-section .timeline-card.expanded .card-img-oficial {
@@ -2295,6 +2424,29 @@
   padding-left: 10px;
   border-left: 1px solid #243d64;
 }
+.publicaciones-section .tema-item .tema-map-ref {
+  flex: 0 0 auto;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--tema-tone-color, var(--tv-accent));
+  color: var(--tv-text-dark);
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.publicaciones-section .tema-item .tema-map-ref-none {
+  background: var(--tema-tone-color, var(--tv-accent));
+  color: var(--tv-text-dark);
+}
+.publicaciones-section .tema-item .tema-map-ref-none svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
 .publicaciones-section .tema-item .tema-content {
   display: flex;
   flex-direction: column;
@@ -2347,7 +2499,28 @@
   text-overflow: ellipsis;
   word-break: break-word;
 }
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list {
+  gap: 8px;
+}
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list .tema-map-ref {
+  display: inline-flex;
+}
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list .tema-item {
+  border-left: 0;
+  padding-left: 0;
+}
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list .tema-desc,
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list .tema-fecha {
+  display: none;
+}
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list .tema-tone {
+  display: none;
+}
+.publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list .tema-title {
+  margin-bottom: 0;
+}
 .publicaciones-section .tone-tema-positivo {
+  --tema-tone-color: var(--tv-tone-positive);
   border-color: var(--tv-tone-positive);
 }
 .publicaciones-section .tone-tema-positivo .tema-tone {
@@ -2355,6 +2528,7 @@
   background: rgba(34, 197, 94, 0.1);
 }
 .publicaciones-section .tone-tema-negativo {
+  --tema-tone-color: var(--tv-tone-negative);
   border-color: var(--tv-tone-negative);
 }
 .publicaciones-section .tone-tema-negativo .tema-tone {
@@ -2362,6 +2536,7 @@
   background: rgba(239, 68, 68, 0.1);
 }
 .publicaciones-section .tone-tema-neutro {
+  --tema-tone-color: var(--tv-tone-neutral);
   border-color: var(--tv-tone-neutral);
 }
 .publicaciones-section .tone-tema-neutro .tema-tone {

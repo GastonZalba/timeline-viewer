@@ -34,6 +34,129 @@ const API_UNBOUNDED_PAGE_SIZE = 1000000;
 /** Links shown per taxonomy group before the "Ver más" toggle appears (single mode) */
 const TAXONOMY_VISIBLE_LINKS = 3;
 /**
+ * Padding, in px, that `View.fit` leaves between the outermost points and the edge of the map
+ * container. Without it the markers sit flush against the border and the outermost ones are
+ * visually clipped by the `overflow: hidden` of the canvas.
+ */
+const TEMAS_MAP_FIT_PADDING = 28;
+/**
+ * Ceiling for the fit of the topics map. It only matters for the degenerate extents —a single
+ * point, two identical points, or a column of points with no width— where the extent has no
+ * size to divide by and `fit` would zoom in until it hits its own limit. 16 is a street-level
+ * zoom, which is what "these topics happen in one place" should look like.
+ */
+const TEMAS_MAP_FIT_MAX_ZOOM = 16;
+/**
+ * Raster base of the topics map when the consumer does not pass one: the public OpenStreetMap
+ * standard layer, whose XYZ template only needs `{z}/{x}/{y}` —the four placeholders `ol/uri.js`
+ * actually substitutes are `{z}`, `{x}`, `{y}` and `{-y}`, so anything else (the `{r}` that Leaflet
+ * uses for retina) ends up literal in the URL and 404s on every tile.
+ *
+ * Passing `temasMapTiles: ''` explicitly opts out and leaves the map with only its own points. It
+ * used to be the default, and the base layer opt-in; the map was a blank canvas without it, which
+ * read as broken rather than as minimal.
+ *
+ * The public layer is fine for low traffic, which is what its use policy asks for. A consumer with
+ * real volume should point this at their own tile server instead —which is also why the component
+ * cannot be the one that decides.
+ */
+const TEMAS_MAP_TILES_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+/**
+ * Radius of a topic's marker, in screen pixels. The markers are circles and not pins: the tone color
+ * and the number are all the marker has to say, and the circle matches the reference badge of the
+ * list above the map (`.tema-map-ref`, 18px across) instead of implying, as a pin's tip does, a
+ * precise point the pipeline does not have.
+ */
+const TEMAS_MAP_MARKER_RADIUS = 9;
+/** Width of the white ring around a marker, in screen pixels */
+const TEMAS_MAP_MARKER_STROKE = 2;
+/** Font size, in px, of the number painted in the center of a marker */
+const TEMAS_MAP_MARKER_FONT = 10;
+/**
+ * Extra pixels added to `TEMAS_MAP_MARKER_RADIUS` for the hover hit test, so an 18px circle is not a
+ * pixel-perfect target. It only widens the pointer target: the marker itself keeps its radius.
+ */
+const TEMAS_MAP_MARKER_HIT_PADDING = 3;
+/**
+ * Marker color per social tone, matching the `--tv-tone-*` of the topic list. They are hardcoded
+ * hexes and not the CSS variables because OpenLayers paints into a canvas, where a CSS variable does
+ * not reach: the only thing that could keep them in sync is reading them back with
+ * `getComputedStyle`, which would tie the marker color to a layout pass.
+ */
+const TEMAS_MAP_TONE_COLOR = {
+    Positivo: '#22c55e',
+    Negativo: '#ef4444',
+    Neutro: '#94a3b8'
+};
+const TEMAS_MAP_TONE_FALLBACK = '#3792c4';
+/**
+ * Color of the number painted in a marker. Hardcoded for the same reason the tones are —it is painted
+ * into a canvas— and dark on every tone, so the number stays legible.
+ */
+const TEMAS_MAP_MARKER_TEXT_COLOR = '#0e1116';
+/**
+ * White ring around a marker. Hardcoded for the same reason as the tones, and white on purpose: the
+ * markers sit on top of a raster map instead of the dark card, and the ring is what separates a
+ * mid-tone marker from whatever the tiles happen to have under it.
+ */
+const TEMAS_MAP_MARKER_RING_COLOR = '#ffffff';
+/**
+ * Screen distance, in pixels, below which two markers are considered overlapped and get spread
+ * apart. It is the marker diameter —18px, so the two numbers already touch at this distance— plus a
+ * few px of slack, because a ringer separation of one or two px still reads as a single blob while
+ * the map keeps zooming out.
+ */
+const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
+/**
+ * Extra gap, in pixels, left between the rings of two neighboring markers when they are spread on a
+ * circle. The distance between consecutive markers stays fixed at
+ * `2 * (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP)` whatever their count: the radius of the
+ * circle grows with the count, which is what keeps the numbers legible when many points overlap.
+ */
+const TEMAS_MAP_SPIDER_GAP = 6;
+/** Largo de la cabeza de la flecha del conector, en píxeles de pantalla */
+const TEMAS_MAP_SPIDER_ARROW_LEN = 7;
+/** Medio ancho de la base de la flecha, en píxeles de pantalla */
+const TEMAS_MAP_SPIDER_ARROW_HALF = 4.5;
+/** Separación, en píxeles, entre el borde del marcador y la punta de la flecha */
+const TEMAS_MAP_SPIDER_HEAD_GAP = 2;
+/** Grosor del conector y de la flecha, en píxeles de pantalla */
+const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
+/** Radio del punto que ancla el conector en la ubicación original del tema, en píxeles */
+const TEMAS_MAP_SPIDER_DOT_RADIUS = 2.5;
+/**
+ * Attribution of the base layer. The tile template is opaque to the component (the consumer
+ * hands it over ready to use, key included), so the provider cannot be derived from it and the
+ * attribution of the data most such tiles carry —OpenStreetMap— is the one declared here.
+ * A consumer on another provider has to adjust it, which the README points out.
+ */
+const TEMAS_MAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+/**
+ * Icon of the button that opens the topics map: a folded map, three panels. It is inlined instead of
+ * coming from an icon font or an external sprite because the component ships no assets and no extra
+ * request for a glyph nobody would notice is missing.
+ *
+ * Two details are load-bearing and not style preferences:
+ *
+ * - `fill="currentColor"` on the root. Without it the paths take the SVG default, which is black — a
+ *   black glyph on the dark card, invisible. Letting it inherit is what lets the button rest on
+ *   `--tv-text-muted` and light up on `--tv-accent` with no change here.
+ * - The `width`/`height` attributes are the *rendering* size and the `viewBox` the coordinate space.
+ *   The component CSS overrides the two attributes, so those values are only the fallback for a
+ *   consumer that loads the markup without the stylesheet; the `viewBox` is what keeps the glyph
+ *   proportional at 28px.
+ */
+const TEMAS_MAP_TOGGLE_SVG = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 448" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false"><path d="M128 0c4.25 0 8 3.75 8 8v368c0 3-1.75 5.75-4.25 7l-120 64c-1.25 0.75-2.5 1-3.75 1-4.25 0-8-3.75-8-8v-368c0-3 1.75-5.75 4.25-7l120-64c1.25-0.75 2.5-1 3.75-1zM440 0c4.25 0 8 3.75 8 8v368c0 3-1.75 5.75-4.25 7l-120 64c-1.25 0.75-2.5 1-3.75 1-4.25 0-8-3.75-8-8v-368c0-3 1.75-5.75 4.25-7l120-64c1.25-0.75 2.5-1 3.75-1zM160 0c1.25 0 2.5 0.25 3.5 0.75l128 64c2.75 1.5 4.5 4.25 4.5 7.25v368c0 4.25-3.75 8-8 8-1.25 0-2.5-0.25-3.5-0.75l-128-64c-2.75-1.5-4.5-4.25-4.5-7.25v-368c0-4.25 3.75-8 8-8z"></path></svg>';
+/**
+ * Icon of a topic that has no usable point, shown in the list in place of the number while the map
+ * is open: a crossed-out location pin, the same glyph the map would use to say "no location".
+ *
+ * `fill="currentColor"` for the same reason as the toggle's icon; here what it inherits is the muted
+ * color of `.tema-map-ref-none`, which is what tells it apart from the colored number of a located
+ * topic. The `viewBox` is the original 768×768 the glyph was drawn in, so the path data is untouched.
+ */
+const TEMAS_MAP_NO_GEOM_SVG = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 768 768" width="12" height="12" fill="currentColor" aria-hidden="true" focusable="false"><path d="M375 367.5q163.5 162 265.5 264l-40.5 40.5-108-106.5q-24 36-51 70.5t-42 51l-15 16.5q-9-10.5-24-27.75t-54-69-68.25-100.5-53.25-110.25-24-108q0-16.5 6-49.5l-102-102 40.5-40.5 267 267zM384 208.5q-34.5 0-58.5 27l-103.5-102q27-28.5 75-48.75t87-20.25q93 0 158.25 65.25t65.25 158.25q0 72-54 175.5l-115.5-117q25.5-22.5 25.5-58.5 0-33-23.25-56.25t-56.25-23.25z"></path></svg>';
+/**
  * Values shown per filter group before the "Ver más (N)" toggle appears, when the `maxVisible`
  * of the group itself does not say otherwise. Below 2 the group is never collapsed.
  */
@@ -136,7 +259,7 @@ const LG_WHEEL_ZOOM_FALLBACK_MAX = 4;
  * Plugin de lightGallery: **zoom con la rueda** sobre la imagen abierta.
  *
  * lightGallery 2.9 no lo trae. El plugin `zoom` maneja pinch (táctil), drag para panear y los
- * íconos +/−, pero no escucha `wheel`; y el `settings.mousewheel` del core, que sí escucha, es de
+ * iconos +/−, pero no escucha `wheel`; y el `settings.mousewheel` del core, que sí escucha, es de
  * navegación entre slides con un throttle de 1s, no de zoom (por eso queda en `false`).
  *
  * En vez de reimplementar el transform, el handler llama la API pública del plugin `zoom`
@@ -309,6 +432,11 @@ export default class Timeline {
         this.inlineImages = config.inlineImages || false;
         this.inlineAdjuntos = config.inlineAdjuntos || false;
         this.internalButtons = config.internalButtons || false;
+        // `=== undefined` and not `||`: an explicit `''` is how a consumer turns the base off, and `||`
+        // would swallow it and put the default tiles back on.
+        this.temasMapTiles = config.temasMapTiles === undefined ? TEMAS_MAP_TILES_DEFAULT : config.temasMapTiles;
+        this._olModules = null;
+        this._temasMaps = new Map();
         // The URL state is read here, before `_init()`, and not inside it: what it says has to be part of
         // the **first** render (the markup of the toolbar, the selected sorter, the taxonomy pill) and of
         // the first API request, or the shared link would open on the wrong view and then correct itself.
@@ -1099,7 +1227,8 @@ export default class Timeline {
                     : ''
             })),
             plugins: [lgZoom, lgThumbnail, LgWheelZoom],
-            showZoomInOutIcons: true
+            showZoomInOutIcons: true,
+            actualSize: false
         });
         this._lgContainer.addEventListener('lgAfterClose', () => {
             if (this._lgInstance) {
@@ -1418,25 +1547,543 @@ export default class Timeline {
     _buildFuenteHtml(card) {
         return `<div class="card-fuente"><span class="fuente-label">Fuente:</span> ${card.fuente_institucional ?? '-'}${card.es_oficial ? `<span class="card-oficial-wrap" title="Es fuente oficial">${this._oficialIconSvg()}</span>` : ''}</div>`;
     }
-    /** Build the "Temas destacados" HTML block */
-    _buildTemasHtml(card) {
+    /**
+     * Build the "Temas destacados" HTML block.
+     *
+     * The map toggle rides on the block's own header row, next to the subtitle, and the map itself
+     * opens **between the header and the topics** — not after the list. Reading the block is
+     * "here is where these topics are, and here they are on a map", so the two sit together at the
+     * top; a map below a list of ten paragraphs is a scroll away from the title that opened it.
+     */
+    _buildTemasHtml(card, located) {
         if (!card.temas || !card.temas.length)
             return '';
+        const toggleHtml = this._buildTemasMapToggleHtml(located);
+        const bodyHtml = this._buildTemasMapBodyHtml(located);
+        // The point of a topic, by the position it has in `card.temas`. It is what puts the reference
+        // badge on the right list item: the located list skips the topics without a `geom`, so position
+        // in one list is not position in the other (see `TemasMapPoint.temaIndex`).
+        const byTema = new Map(located.map((p) => [p.temaIndex, p]));
         return `<div class="card-temas">
-        <div class="card-subtitle">Temas destacados (${card.temas.length})</div>
+        <div class="card-temas-head">
+          <div class="card-subtitle">Temas destacados (${card.temas.length})</div>
+          ${toggleHtml}
+        </div>
+        ${bodyHtml}
         <div class="card-temas-list">
         ${card.temas
-            .map((t) => `
+            .map((t, i) => {
+            const point = byTema.get(i);
+            // Every topic gets a badge while the map is open, so the list stays aligned: the ones with
+            // a `geom` carry the number of their circle, the ones without carry the crossed-out pin icon
+            // instead of a number or a hole. The badge is hidden by CSS until the map is expanded (see
+            // `.card-temas-map-body.expanded ~ .card-temas-list`), so without the map the list looks
+            // exactly as it did before. With the map open the tone chip is hidden, so the tone label
+            // moves into the badge `title`: the value stays reachable without it competing with the map.
+            const toneLabel = TONE_LABEL[t.tono_social];
+            const ref = point
+                ? `<span class="tema-map-ref" title="${toneLabel} · Punto ${point.index + 1} en el mapa">${point.index + 1}</span>`
+                : `<span class="tema-map-ref tema-map-ref-none" title="${toneLabel} · Sin ubicación en el mapa">${TEMAS_MAP_NO_GEOM_SVG}</span>`;
+            return `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
+            ${ref}
             <div class="tema-content">
               <span class="tema-title"><span class="tema-tone">${TONE_LABEL[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-desc">${t.resumen}</span>
               ${t.notas_de_trabajo ? `<div class="tema-notas-trabajo">${t.notas_de_trabajo}</div>` : ''}
             </div>
-          </div>`)
+          </div>`;
+        })
             .join('')}
         </div>
         </div>`;
+    }
+    /**
+     * A topic's point, or `null` when it does not carry one **or carries a bad one**.
+     *
+     * The validation is not paranoia about types but about the extent: every point of the card
+     * goes into a single `View.fit`, so one `lat: 999` or one `NaN` coming out of the scraping
+     * pipeline would drag every other point out of view, not just fail to add one. Out of range
+     * is treated exactly like missing, so the topic is still listed above and only skips its marker.
+     */
+    _temaGeomOf(tema) {
+        const geom = tema?.geom;
+        if (!geom || typeof geom !== 'object')
+            return null;
+        const { lat, lon } = geom;
+        if (!Number.isFinite(lat) || !Number.isFinite(lon))
+            return null;
+        if (lat < -90 || lat > 90 || lon < -180 || lon > 180)
+            return null;
+        return { lat, lon };
+    }
+    /**
+     * The topics of a card that carry a usable point, **in the order they are listed**, each with
+     * the number it gets on the map (1-based) and the color of its tone.
+     *
+     * It is the single pass both the markup and the map are built from, which is what keeps the
+     * number on a marker and the number in the legend meaning the same thing: they are indexes
+     * into this one list.
+     */
+    _temasLocated(temas) {
+        const out = [];
+        temas.forEach((tema, temaIndex) => {
+            const geom = this._temaGeomOf(tema);
+            if (!geom)
+                return;
+            out.push({
+                index: out.length,
+                temaIndex,
+                lat: geom.lat,
+                lon: geom.lon,
+                titulo: tema.titulo,
+                color: TEMAS_MAP_TONE_COLOR[tema.tono_social] || TEMAS_MAP_TONE_FALLBACK
+            });
+        });
+        return out;
+    }
+    /**
+     * The button that opens the topics map, for the "Temas destacados" header row.
+     *
+     * Returns `''` when **no topic carries a usable `geom`**, so an article with nothing to place
+     * leaves no dangling control on its header — the same reason the whole block returns `''` without
+     * topics.
+     *
+     * The face of the button is the map icon and nothing else, so the action lives in `aria-label` +
+     * `title`. That is not only for screen readers: with an icon-only button there is no visible text
+     * left to change between the two states, so the two attributes are the whole state for anyone who
+     * cannot see the glyph swap. They carry the action and no count: the number of topics is already
+     * on the subtitle next to it, and on the badge each located topic gets.
+     *
+     * Pure: it builds markup and binds nothing. The map itself is created on the first open
+     * (`_bindTemasMapToggle`), which is what keeps OpenLayers out of the path of a page where nobody
+     * ever opened a map.
+     */
+    _buildTemasMapToggleHtml(located) {
+        if (!located.length)
+            return '';
+        return `<button type="button" class="card-temas-map-toggle" aria-expanded="false" aria-label="Ver mapa" title="Ver mapa">${TEMAS_MAP_TOGGLE_SVG}</button>`;
+    }
+    /**
+     * The body of the topics map: a small map with one numbered circle per located topic. Sits between the header
+     * row and the topic list, hidden until the toggle opens it.
+     *
+     * There is no legend: the numbered reference of each topic is a badge on the topic itself, in the
+     * list right below (`_buildTemasHtml`). A legend repeated the list one scroll away from it and
+     * left the topic without its number where a reader looks for it.
+     *
+     * Returns `''` with no located topic, for the same reason as the toggle: the two are the same
+     * "is there a map to show" decision, and emitting one without the other would leave a body that
+     * nothing opens.
+     */
+    _buildTemasMapBodyHtml(located) {
+        if (!located.length)
+            return '';
+        return `<div class="card-temas-map-body" hidden>
+            <div class="card-temas-map-canvas"></div>
+          </div>`;
+    }
+    /**
+     * Bind the header of a topics map section so it shows and hides its body.
+     *
+     * Same shape as `_bindTaxonomyToggles`: `aria-expanded` is the source of truth for the state,
+     * the `expanded` class on the body is what the component CSS keys on (the UA `[hidden]` rule
+     * loses to any author `display`, which is why the SCSS needs its own override), and the `hidden`
+     * attribute is kept in sync anyway for the case where the stylesheet is not loaded.
+     *
+     * Two things differ from the taxonomy toggles, both forced by where this row lives:
+     *
+     * - It calls `stopPropagation()`. It sits inside `.card-body`, so the click would otherwise
+     *   reach the card-wide expand listener and re-expand a card the user had just collapsed. The
+     *   taxonomy toggle does not need it only because its block is rendered *inside* an already
+     *   expanded card.
+     * - The body is not in the markup beyond its empty shell. The first open builds the map, which
+     *   is also the first time OpenLayers is imported at all.
+     */
+    _bindTemasMapToggle(slot, located) {
+        const toggle = slot.querySelector('.card-temas-map-toggle');
+        const body = slot.querySelector('.card-temas-map-body');
+        const canvas = slot.querySelector('.card-temas-map-canvas');
+        if (!toggle || !body || !canvas || !located.length)
+            return;
+        const openLabel = 'Ver mapa';
+        toggle.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const expanded = toggle.getAttribute('aria-expanded') === 'true';
+            body.hidden = expanded;
+            body.classList.toggle('expanded', !expanded);
+            toggle.setAttribute('aria-expanded', String(!expanded));
+            // The face of the button is the `<svg>`, so the state goes in the two text attributes and
+            // **never** in `textContent`: writing it would wipe the icon out of the button.
+            const nextLabel = expanded ? openLabel : 'Ocultar mapa';
+            toggle.setAttribute('aria-label', nextLabel);
+            toggle.setAttribute('title', nextLabel);
+            if (expanded)
+                return;
+            // Built here, so a map nobody opened costs nothing. The frame is what lets the browser lay
+            // the body out first: the `hidden` line above just took it out of `display: none`, and
+            // OpenLayers measures its target when the map is created, which the fit below needs.
+            requestAnimationFrame(() => {
+                void this._mountTemasMap(canvas, located);
+            });
+        });
+    }
+    /**
+     * Import OpenLayers, once. The promise is cached **even when it rejects**, like
+     * `_ensureApiFacets`: a consumer without `ol` installed should not pay a failed import on every
+     * click of a toggle, and the failure is reported in the map's own place instead.
+     */
+    _loadOpenLayers() {
+        if (!this._olModules) {
+            this._olModules = Promise.all([
+                import('ol/Map.js'),
+                import('ol/View.js'),
+                import('ol/Feature.js'),
+                import('ol/geom/Point.js'),
+                import('ol/geom/LineString.js'),
+                import('ol/geom/Polygon.js'),
+                import('ol/Overlay.js'),
+                import('ol/layer/Vector.js'),
+                import('ol/source/Vector.js'),
+                import('ol/layer/Tile.js'),
+                import('ol/source/XYZ.js'),
+                import('ol/style/Style.js'),
+                import('ol/style/Circle.js'),
+                import('ol/style/Fill.js'),
+                import('ol/style/Stroke.js'),
+                import('ol/style/Text.js'),
+                import('ol/control/Zoom.js'),
+                import('ol/control/Attribution.js'),
+                import('ol/proj.js')
+            ]).then(([map, view, feature, point, lineString, polygon, overlay, vLayer, vSource, tLayer, xyz, style, circle, fill, stroke, text, zoomCtl, attrCtl, proj]) => ({
+                OlMap: map.default,
+                OlView: view.default,
+                OlFeature: feature.default,
+                OlPoint: point.default,
+                LineString: lineString.default,
+                Polygon: polygon.default,
+                OlOverlay: overlay.default,
+                VectorLayer: vLayer.default,
+                VectorSource: vSource.default,
+                TileLayer: tLayer.default,
+                XYZ: xyz.default,
+                Style: style.default,
+                Circle: circle.default,
+                Fill: fill.default,
+                Stroke: stroke.default,
+                Text: text.default,
+                Zoom: zoomCtl.default,
+                Attribution: attrCtl.default,
+                fromLonLat: proj.fromLonLat
+            }));
+        }
+        return this._olModules;
+    }
+    /**
+     * Create the map of one card inside `canvas` — a circle per located topic, numbered like the badge
+     * it has in the list and colored like its tone, spread apart with a connector when they overlap —
+     * with the view fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
+     * goes away, and bind the hover that names a topic.
+     *
+     * A card that already has a map is left alone: the toggle can be closed and reopened as many
+     * times as wanted without rebuilding it, which would redownload the tiles and throw away
+     * whatever pan or zoom the user had done.
+     */
+    async _mountTemasMap(canvas, located) {
+        if (this._temasMaps.has(canvas))
+            return;
+        let ol;
+        try {
+            ol = await this._loadOpenLayers();
+        }
+        catch {
+            canvas.innerHTML = '<div class="card-temas-map-error">No se pudo cargar el mapa.</div>';
+            return;
+        }
+        // The card may have been re-rendered —a search, a filter, a page change— while the import was
+        // in flight, which leaves this canvas detached, with no map to attach to and no one to read it.
+        if (!canvas.isConnected || this._temasMaps.has(canvas))
+            return;
+        // One circle style per tone, shared by every marker of that tone. Unlike an `Icon`, a `Circle`
+        // has no image to decode, so the cache only saves object churn.
+        const circles = new Map();
+        const circleOf = (color) => {
+            let circle = circles.get(color);
+            if (!circle) {
+                circle = new ol.Circle({
+                    radius: TEMAS_MAP_MARKER_RADIUS,
+                    fill: new ol.Fill({ color }),
+                    stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_MARKER_STROKE })
+                });
+                circles.set(color, circle);
+            }
+            return circle;
+        };
+        // The dot that anchors a connector on the own coordinate of a displaced marker, one per tone for
+        // the same reason the markers are cached.
+        const dots = new Map();
+        const dotOf = (color) => {
+            let dot = dots.get(color);
+            if (!dot) {
+                dot = new ol.Circle({
+                    radius: TEMAS_MAP_SPIDER_DOT_RADIUS,
+                    fill: new ol.Fill({ color }),
+                    stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: 1 })
+                });
+                dots.set(color, dot);
+            }
+            return dot;
+        };
+        const markerText = (p) => new ol.Text({
+            text: String(p.index + 1),
+            font: `700 ${TEMAS_MAP_MARKER_FONT}px system-ui, sans-serif`,
+            textAlign: 'center',
+            textBaseline: 'middle',
+            fill: new ol.Fill({ color: TEMAS_MAP_MARKER_TEXT_COLOR })
+        });
+        const featureOf = (p) => {
+            const feature = new ol.OlFeature({
+                geometry: new ol.OlPoint(ol.fromLonLat([p.lon, p.lat]))
+            });
+            // The plain marker: the circle centered on the feature's own coordinate —so the number is too,
+            // no `offset`, unlike the pin's head which sat well above the point it marked— and no connector.
+            const image = circleOf(p.color);
+            const label = markerText(p);
+            const base = new ol.Style({ image, text: label });
+            const connector = new ol.Stroke({ color: p.color, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
+            const arrow = new ol.Fill({ color: p.color });
+            // `style` is **not** a `Feature` constructor option: passed in the options object it lands as
+            // an attribute property and `getStyle()` stays null, so the renderer falls back to the default
+            // style — the cyan `#3399CC` circle. `setStyle()` is the only way to give a feature its style.
+            //
+            // The style is a function and not a fixed style because a marker that overlaps another one is
+            // displaced by `declutter` on every `moveend`: the function reads that displacement from the
+            // feature and, when there is one, paints the connector, its arrow, the anchor dot and the
+            // marker at the displaced point instead of at the topic's own coordinate.
+            feature.setStyle((f) => {
+                const spider = f.get('spider');
+                if (!spider)
+                    return base;
+                return [
+                    new ol.Style({ geometry: spider.line, stroke: connector }),
+                    new ol.Style({ geometry: spider.arrow, fill: arrow }),
+                    new ol.Style({ geometry: spider.origin, image: dotOf(p.color) }),
+                    new ol.Style({ geometry: spider.marker, image, text: label })
+                ];
+            });
+            return feature;
+        };
+        const features = located.map(featureOf);
+        const source = new ol.VectorSource({ features });
+        const layers = [];
+        if (this.temasMapTiles) {
+            layers.push(new ol.TileLayer({
+                source: new ol.XYZ({ url: this.temasMapTiles, attributions: TEMAS_MAP_ATTRIBUTION })
+            }));
+        }
+        layers.push(new ol.VectorLayer({ source }));
+        // The center is only a starting point: `fit` below overrides it. It cannot be left out
+        // because a `View` with no center renders nothing until it gets one.
+        const view = new ol.OlView({
+            center: ol.fromLonLat([located[0].lon, located[0].lat]),
+            zoom: TEMAS_MAP_FIT_MAX_ZOOM
+        });
+        const map = new ol.OlMap({
+            target: canvas,
+            layers,
+            view,
+            // The default set would add `Rotate`, which has no place on a read-only map this small.
+            // `Attribution` is not optional, though: it is the only control that renders the
+            // `attributions` of the base layer, and every tile provider of this kind requires it.
+            controls: [new ol.Zoom(), new ol.Attribution({ collapsible: false })]
+        });
+        // **Before** the fit, and that order is the whole point: the target was `display: none` until
+        // the toggle opened it, so the map still holds the 0x0 size of a hidden element, and fitting
+        // the points into that viewport is what produces a broken view. Same lesson as the
+        // `containerRect` guard of the wheel zoom in lightGallery.
+        map.updateSize();
+        const extent = source.getExtent();
+        if (!extent) {
+            // Only reachable with no features, which the empty `located` check above already rules out.
+            // Disposed right away rather than left holding an empty map that nothing can ever fill.
+            map.setTarget(undefined);
+            map.dispose();
+            return;
+        }
+        view.fit(extent, {
+            padding: [TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING],
+            maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
+            duration: 0
+        });
+        // Hover that names the topic under the pointer. The hit test is a distance against the circle's
+        // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
+        // being plain circles the manual test is exact and needs no feature-to-point mapping.
+        const tooltip = document.createElement('div');
+        tooltip.className = 'card-temas-map-tooltip';
+        const overlay = new ol.OlOverlay({
+            element: tooltip,
+            positioning: 'bottom-center',
+            // The tooltip's bottom edge lands just above the circle's top edge, not on the coordinate.
+            offset: [0, -TEMAS_MAP_MARKER_RADIUS],
+            stopEvent: false
+        });
+        overlay.setMap(map);
+        const clearHover = () => {
+            overlay.setPosition(undefined);
+            canvas.classList.remove('is-hover-marker');
+        };
+        // Screen position of every marker as it is currently painted — its own coordinate, or the
+        // displaced one when it was spiderfied — and the map coordinate the tooltip has to sit on. Both
+        // are kept in sync by `declutter`, and are what the hover reads: the hit test has to point at
+        // what the user sees, not at the coordinate the topic would have without the displacement.
+        const markerScreens = located.map(() => [0, 0]);
+        const markerCoords = located.map((p) => ol.fromLonLat([p.lon, p.lat]));
+        /**
+         * Spread the markers that overlap at the current zoom. Every marker starts at its own
+         * coordinate; the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another are grouped
+         * and re-laid out on a circle around the group's centroid, each with a connector that anchors a
+         * dot on its real location and an arrow that points at its displaced number.
+         *
+         * Runs on every `moveend` —and once right after the fit— because what overlaps changes with the
+         * zoom: a far view clusters markers that a near view separates back into place.
+         */
+        const declutter = () => {
+            const n = located.length;
+            const screens = located.map((p) => map.getPixelFromCoordinate(ol.fromLonLat([p.lon, p.lat])));
+            const used = new Array(n).fill(false);
+            // Back to the own coordinate first: whatever was spiderfied before this zoom may not overlap
+            // anymore, and the style function leaves the connector behind until the property is cleared.
+            clearHover();
+            for (let i = 0; i < n; i++) {
+                const screen = screens[i];
+                if (!screen)
+                    continue;
+                markerScreens[i] = screen;
+                markerCoords[i] = ol.fromLonLat([located[i].lon, located[i].lat]);
+                features[i].set('spider', undefined);
+            }
+            for (let i = 0; i < n; i++) {
+                if (used[i] || !screens[i])
+                    continue;
+                // Breadth-first growth: two markers belong together when either is within the threshold of
+                // **any** member, so a chain of near markers is spread as a single group instead of in
+                // arbitrary pairs.
+                const group = [i];
+                used[i] = true;
+                for (let q = 0; q < group.length; q++) {
+                    const a = screens[group[q]];
+                    for (let j = 0; j < n; j++) {
+                        if (used[j] || !screens[j])
+                            continue;
+                        const b = screens[j];
+                        const dx = a[0] - b[0];
+                        const dy = a[1] - b[1];
+                        if (dx * dx + dy * dy <= TEMAS_MAP_SPIDER_THRESHOLD * TEMAS_MAP_SPIDER_THRESHOLD) {
+                            used[j] = true;
+                            group.push(j);
+                        }
+                    }
+                }
+                // A lone marker is painted on its own coordinate and has nothing to connect.
+                if (group.length < 2)
+                    continue;
+                let cx = 0;
+                let cy = 0;
+                for (const k of group) {
+                    cx += screens[k][0];
+                    cy += screens[k][1];
+                }
+                cx /= group.length;
+                cy /= group.length;
+                // Radius that keeps consecutive markers `2 * (radius + gap)` apart whatever their count;
+                // the ring grows with the count instead of letting the numbers overlap again on it. Starts
+                // at the top and goes clockwise, so the layout is stable between renders.
+                const spread = (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP) / Math.sin(Math.PI / group.length);
+                group.forEach((k, position) => {
+                    const angle = -Math.PI / 2 + (2 * Math.PI * position) / group.length;
+                    const displaced = [cx + Math.cos(angle) * spread, cy + Math.sin(angle) * spread];
+                    const from = screens[k];
+                    // Unit vector from the marker's own position to its displaced position. Connector and
+                    // arrow are built along it, so each one points at its own number.
+                    let ux = displaced[0] - from[0];
+                    let uy = displaced[1] - from[1];
+                    const length = Math.hypot(ux, uy) || 1;
+                    ux /= length;
+                    uy /= length;
+                    const head = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_HEAD_GAP;
+                    const tip = [displaced[0] - ux * head, displaced[1] - uy * head];
+                    const base = [tip[0] - ux * TEMAS_MAP_SPIDER_ARROW_LEN, tip[1] - uy * TEMAS_MAP_SPIDER_ARROW_LEN];
+                    const half = [-uy * TEMAS_MAP_SPIDER_ARROW_HALF, ux * TEMAS_MAP_SPIDER_ARROW_HALF];
+                    const origin = ol.fromLonLat([located[k].lon, located[k].lat]);
+                    const marker = map.getCoordinateFromPixel(displaced);
+                    const tipCoord = map.getCoordinateFromPixel(tip);
+                    features[k].set('spider', {
+                        origin: new ol.OlPoint(origin),
+                        line: new ol.LineString([origin, tipCoord]),
+                        arrow: new ol.Polygon([
+                            [
+                                tipCoord,
+                                map.getCoordinateFromPixel([base[0] + half[0], base[1] + half[1]]),
+                                map.getCoordinateFromPixel([base[0] - half[0], base[1] - half[1]]),
+                                tipCoord
+                            ]
+                        ]),
+                        marker: new ol.OlPoint(marker)
+                    });
+                    markerScreens[k] = displaced;
+                    markerCoords[k] = marker;
+                });
+            }
+        };
+        map.on('moveend', declutter);
+        declutter();
+        // Hover that names the topic under the pointer. The hit test is a distance against the circle's
+        // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
+        // being plain circles the manual test is exact and needs no feature-to-point mapping.
+        const hitTest = (pixel) => {
+            const radius = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING;
+            for (let i = 0; i < located.length; i++) {
+                const screen = markerScreens[i];
+                const dx = pixel[0] - screen[0];
+                const dy = pixel[1] - screen[1];
+                if (dx * dx + dy * dy <= radius * radius)
+                    return i;
+            }
+            return -1;
+        };
+        map.on('pointermove', (e) => {
+            const index = hitTest(e.pixel);
+            if (index < 0) {
+                clearHover();
+                return;
+            }
+            tooltip.textContent = located[index].titulo;
+            overlay.setPosition(markerCoords[index]);
+            canvas.classList.add('is-hover-marker');
+        });
+        // The map stops firing `pointermove` the moment the pointer leaves it, so without this the
+        // tooltip of the last marker would stay up over whatever the pointer moved on to. The node goes
+        // away with the card, so this listener needs no teardown.
+        canvas.addEventListener('pointerleave', clearHover);
+        this._temasMaps.set(canvas, { map, overlay });
+    }
+    /**
+     * Dispose every live topics map. Called from the two places that empty `#timeline-cards`,
+     * because dropping a card's DOM node does not dispose its map: OpenLayers keeps the canvas, the
+     * listeners and the tile source alive, so without this every search, filter, sort or page change
+     * would leak one map per card that had opened its topics map.
+     *
+     * The overlay is let go of explicitly: it is added to the map, not owned by it, and `Map.dispose()`
+     * does not take the overlays with it.
+     */
+    _destroyTemasMaps() {
+        this._temasMaps.forEach((handle, canvas) => {
+            this._temasMaps.delete(canvas);
+            handle.overlay.setMap(null);
+            handle.map.setTarget(undefined);
+            handle.map.dispose();
+        });
     }
     /** Build the "Videos vinculados" HTML block */
     _buildVideosHtml(card) {
@@ -1648,8 +2295,13 @@ export default class Timeline {
         if (descSlot && card.resumen_ia) {
             descSlot.innerHTML = `<div class="card-desc">${card.resumen_ia}</div>`;
         }
-        if (temasSlot)
-            temasSlot.innerHTML = this._buildTemasHtml(card);
+        if (temasSlot) {
+            // The located list is computed once and shared: the markup numbers the legend from it and
+            // the map numbers the markers from it, so both read the same indexes.
+            const located = this._temasLocated(card.temas || []);
+            temasSlot.innerHTML = this._buildTemasHtml(card, located);
+            this._bindTemasMapToggle(temasSlot, located);
+        }
         if (protagFuenteSlot) {
             protagFuenteSlot.innerHTML = this._buildProtagonistaHtml(card) + this._buildFuenteHtml(card);
             const prot = protagFuenteSlot.querySelector('.card-protagonista.has-more');
@@ -1921,6 +2573,9 @@ export default class Timeline {
      * `visible`, which they already have.
      */
     _renderTimeline(cards, instant = false) {
+        // Before the wipe, not after: dropping the cards does not dispose the OpenLayers maps they
+        // were holding. This and `_renderApiLoading` are the only two places that empty the list.
+        this._destroyTemasMaps();
         this.timelineCards.innerHTML = '';
         if (cards.length === 0) {
             const el = document.createElement('div');
@@ -2973,7 +3628,7 @@ export default class Timeline {
      * footer are markup from `_buildLayout` that is never replaced, so binding them on the first build
      * is enough and the rebuilds of the values do not stack listeners.
      *
-     * Keyboard: the trigger opens with `Enter` / `Space` / `↓`, the list walks with the arrows and
+     * Keyboard: the trigger opens with `Enter` / `Space` / `?`, the list walks with the arrows and
      * toggles with `Enter`, and `Escape` closes the list without closing the whole panel (which is
      * what it would do otherwise, since the key bubbles to the same handler that closes the menu).
      */
@@ -3032,7 +3687,7 @@ export default class Timeline {
                 return;
             }
             // <kbd>Home</kbd> / <kbd>End</kbd> van al primer y al último valor que matchea, sin tener que
-            // recorrer los cientos de la lista de a un <kbd>↓</kbd>.
+            // recorrer los cientos de la lista de a un <kbd>?</kbd>.
             if (e.key === 'Home' || e.key === 'End') {
                 e.preventDefault();
                 this._jumpSelectCursor(f, e.key === 'End');
@@ -3086,7 +3741,7 @@ export default class Timeline {
     }
     /**
      * Put the cursor on the first or the last matching value (<kbd>Home</kbd> / <kbd>End</kbd>).
-     * Without these, a group with hundreds of values is only reachable with hundreds of <kbd>↓</kbd>:
+     * Without these, a group with hundreds of values is only reachable with hundreds of <kbd>?</kbd>:
      * the same dead-end the window avoids for the mouse, and this is the listbox behavior people
      * expect from the keys.
      */
@@ -3714,6 +4369,9 @@ export default class Timeline {
         this._apiLoading = true;
         this._apiError = '';
         this.timelineCards.setAttribute('aria-busy', 'true');
+        // Same reason as in `_renderTimeline`: the cards about to be dropped may be holding an
+        // OpenLayers map of their topics, and `dispose()` does not happen on its own.
+        this._destroyTemasMaps();
         this.timelineCards.innerHTML = '';
         this.featuredContainer.innerHTML = '';
         const markup = `
