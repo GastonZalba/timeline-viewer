@@ -260,6 +260,8 @@ Todas las variables CSS custom están definidas al inicio de `styles.scss` bajo 
   --tv-bg-primary: #1a2025;
   --tv-bg-secondary: #1a1a1a;
   --tv-bg-card: #1d2633;
+  --tv-bg-card-discarded: #3a1f26;
+  --tv-bg-card-unvalidated: #3d2a14;
   --tv-bg-overlay: rgba(96, 165, 250, 0.07);
   --tv-bg-hover: rgba(0, 0, 0, 0.5);
   --tv-border-card: #0e1116;
@@ -494,6 +496,9 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 | `.has-taxonomy` | `.publicaciones-section` | El selector de taxonomías está activo (`content` con grupos): con el timeline expandido oculta `#remaining-count` porque el contador pasa a verse en la píldora del selector |
 | `.fullpage` | `.publicaciones-section` | Modo fullpage (`fullpage: true`): timeline siempre abierto y sin colapsar, sin handle de resize, sin scroll interno en `#timeline-cards` y con `.featured-row` pegada al top. Lo agrega `_buildLayout()` |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
+| `.descartada` | `.timeline-card` | Ítem `descartado: true`: fondo de la carta en `--tv-bg-card-discarded` (rojo), con un velo del mismo tono sobre la miniatura (que es opaca y taparía el fondo). La pone `_createTimelineItem()` |
+| `.sin-validar` | `.timeline-card` | Ítem `validado !== true` (mismo criterio que el badge "Sin validar", o sea incluye el `null`): lo mismo que `.descartada` pero en `--tv-bg-card-unvalidated` (naranja). El selector es `:not(.descartada)`, así que un ítem que llega con los dos estados se pinta de rojo |
+| `.card-descartado` | `.card-status-badges > span` | Badge "Descartado": comparte forma con `.card-no-validado` pero conserva el rojo, que es el mismo del fondo de `.descartada` |
 | `.visible` | `.featured-card` | Tarjeta featured animada (entró en viewport) |
 | `.visible` | `.timeline-item` | Timeline item animado (entró en viewport) |
 | `.loaded` | `.card-image` | Imagen cargada (quita shimmer) |

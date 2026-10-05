@@ -2349,11 +2349,11 @@ export default class Timeline {
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
-      <div class="timeline-card no-image not-captured">
+      <div class="timeline-card no-image not-captured${card.descartado === true ? ' descartada' : ''}${card.validado !== true ? ' sin-validar' : ''}">
         <div class="card-status-badges">
           <span class="card-no-validado">Sin capturar</span>
           ${card.validado !== true ? '<span class="card-no-validado">Sin validar</span>' : ''}
-          ${card.descartado === true ? '<span class="card-no-validado">Descartado</span>' : ''}
+          ${card.descartado === true ? '<span class="card-descartado">Descartado</span>' : ''}
         </div>
         <div class="card-body card-body-not-captured">
           <span class="card-not-captured-id"><span class="card-not-captured-strong">ID</span>${card.id}</span>
@@ -2401,10 +2401,10 @@ export default class Timeline {
         <div class="timeline-dot"></div>
         <div class="timeline-hline"></div>
       </div>
-      <div class="timeline-card${card.thumbnail ? '' : ' no-image'}">
+      <div class="timeline-card${card.thumbnail ? '' : ' no-image'}${card.descartado === true ? ' descartada' : ''}${card.validado !== true ? ' sin-validar' : ''}">
         <div class="card-status-badges">
           ${card.validado !== true ? '<span class="card-no-validado">Sin validar</span>' : ''}
-          ${card.descartado === true ? '<span class="card-no-validado">Descartado</span>' : ''}
+          ${card.descartado === true ? '<span class="card-descartado">Descartado</span>' : ''}
         </div>
         ${imgHtml}
         <div class="card-actions"></div>

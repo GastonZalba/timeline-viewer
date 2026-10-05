@@ -13,6 +13,12 @@
   // Fondo de la barra pegada del modo fullpage: el mismo `--tv-bg-card` pero translúcido, para
   // que el `backdrop-filter` de la barra deje ver las tarjetas difuminadas que pasan por detrás.
   --tv-bg-card-glass: rgba(29, 38, 51, 0.7);
+  // Fondo de la carta cuando el ítem viene `descartado: true` (`.timeline-card.descartada`) o
+  // `validado !== true` (`.timeline-card.sin-validar`): el mismo `--tv-bg-card` virado al rojo o al
+  // naranja, para que el estado se lea de un vistazo sin depender del badge. Los velos de la
+  // miniatura son `rgb()` fijos, no variables.
+  --tv-bg-card-discarded: #3a1f26;
+  --tv-bg-card-unvalidated: #3d2a14;
   --tv-bg-overlay: rgba(96, 165, 250, 0.07);
   --tv-bg-hover: rgba(0, 0, 0, 0.5);
   --tv-border-card: #0e1116;
@@ -1765,8 +1771,9 @@
       pointer-events: none;
     }
 
-    .card-no-validado {
-      background: #cb3536;
+    .card-no-validado,
+    .card-descartado {
+      background: #d97706;
       color: #fff;
       font-size: 0.65rem;
       font-weight: 600;
@@ -1774,6 +1781,12 @@
       border-radius: 4px;
       letter-spacing: 0.3px;
       pointer-events: none;
+    }
+
+    // El badge de "Descartado" comparte forma con los otros dos pero no color: el rojo del descarte
+    // es el mismo que el del fondo de la carta de abajo.
+    .card-descartado {
+      background: #cb3536;
     }
 
     &.not-captured {
@@ -1827,6 +1840,38 @@
           &:hover {
             color: var(--tv-accent);
           }
+        }
+      }
+    }
+
+    // Ítem `descartado: true`: toda la carta al rojo (la clase la pone `_createTimelineItem`, en
+    // las dos ramas de markup, así que también cubre single mode). La miniatura es opaca y tapa
+    // ese fondo, así que lleva además un velo rojo: entra por el `background-color` del mismo
+    // `::after` del degradado —que ya está por encima de la imagen—, sin tocar el
+    // `background-image` de la base. El wrap también se tiñe, que es lo que se ve mientras carga.
+    &.descartada {
+      background: var(--tv-bg-card-discarded);
+
+      .card-image-wrap {
+        background: var(--tv-bg-card-discarded);
+
+        &::after {
+          background-color: rgb(239 68 68 / 14%);
+        }
+      }
+    }
+
+    // Ítem `validado !== true` ("Sin validar"): la misma cosa que `.descartada` pero en naranja, y
+    // solo si no está descartado — `:not()` en vez de confiar en el orden del fuente, porque el
+    // descarte pesa más que la validación y los dos estados pueden venir juntos en el mismo ítem.
+    &.sin-validar:not(.descartada) {
+      background: var(--tv-bg-card-unvalidated);
+
+      .card-image-wrap {
+        background: var(--tv-bg-card-unvalidated);
+
+        &::after {
+          background-color: rgb(217 119 6 / 14%);
         }
       }
     }

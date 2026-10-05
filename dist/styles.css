@@ -8,6 +8,8 @@
   --tv-bg-secondary: #1a1a1a;
   --tv-bg-card: #1d2633;
   --tv-bg-card-glass: rgba(29, 38, 51, 0.7);
+  --tv-bg-card-discarded: #3a1f26;
+  --tv-bg-card-unvalidated: #3d2a14;
   --tv-bg-overlay: rgba(96, 165, 250, 0.07);
   --tv-bg-hover: rgba(0, 0, 0, 0.5);
   --tv-border-card: #0e1116;
@@ -1477,8 +1479,9 @@
   gap: 4px;
   pointer-events: none;
 }
-.publicaciones-section .timeline-card .card-no-validado {
-  background: #cb3536;
+.publicaciones-section .timeline-card .card-no-validado,
+.publicaciones-section .timeline-card .card-descartado {
+  background: #d97706;
   color: #fff;
   font-size: 0.65rem;
   font-weight: 600;
@@ -1486,6 +1489,9 @@
   border-radius: 4px;
   letter-spacing: 0.3px;
   pointer-events: none;
+}
+.publicaciones-section .timeline-card .card-descartado {
+  background: #cb3536;
 }
 .publicaciones-section .timeline-card.not-captured {
   cursor: default;
@@ -1532,6 +1538,24 @@
 }
 .publicaciones-section .timeline-card.not-captured .card-body-not-captured .card-not-captured-link:hover {
   color: var(--tv-accent);
+}
+.publicaciones-section .timeline-card.descartada {
+  background: var(--tv-bg-card-discarded);
+}
+.publicaciones-section .timeline-card.descartada .card-image-wrap {
+  background: var(--tv-bg-card-discarded);
+}
+.publicaciones-section .timeline-card.descartada .card-image-wrap::after {
+  background-color: rgba(239, 68, 68, 0.14);
+}
+.publicaciones-section .timeline-card.sin-validar:not(.descartada) {
+  background: var(--tv-bg-card-unvalidated);
+}
+.publicaciones-section .timeline-card.sin-validar:not(.descartada) .card-image-wrap {
+  background: var(--tv-bg-card-unvalidated);
+}
+.publicaciones-section .timeline-card.sin-validar:not(.descartada) .card-image-wrap::after {
+  background-color: rgba(217, 119, 6, 0.14);
 }
 .publicaciones-section .timeline-card.expanded {
   cursor: inherit;
