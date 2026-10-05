@@ -3,6 +3,7 @@ import type OlMap from 'ol/Map.js';
 import type OlView from 'ol/View.js';
 import type OlFeature from 'ol/Feature.js';
 import type OlPoint from 'ol/geom/Point.js';
+import type OlLineString from 'ol/geom/LineString.js';
 import type VectorLayer from 'ol/layer/Vector.js';
 import type VectorSource from 'ol/source/Vector.js';
 import type TileLayer from 'ol/layer/Tile.js';
@@ -41,6 +42,7 @@ interface TemasMapModules {
         geometry?: OlPoint;
     }) => OlFeature;
     OlPoint: typeof OlPoint;
+    OlLineString: typeof OlLineString;
     OlOverlay: typeof OlOverlay;
     VectorLayer: typeof VectorLayer;
     VectorSource: typeof VectorSource;
@@ -326,6 +328,27 @@ export interface TimelineOptions {
      * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar.
      */
     temasMapTiles?: string;
+    /**
+     * Crédito de la capa base del mapa de los temas, como texto (con HTML: el crédito es un link a las
+     * condiciones del proveedor). Por defecto es el de OpenStreetMap.
+     *
+     * **Es la atribución de la capa que se está mostrando, no una etiqueta fija**: la capa base se
+     * declara en `temasMapTiles`, así que la de OpenStreetMap solo corresponde mientras siga siendo la
+     * que se usa. Un consumidor con su propio servidor de tiles tiene que poner acá su propio crédito
+     * —o `''` explícito si su capa no necesita ninguno— porque si no queda la atribución de
+     * OpenStreetMap creditando tiles que no son suyos.
+     *
+     * `''` **no muestra nada**: no es una cadena vacía en el pie del mapa, es directamente la ausencia
+     * del control de atribución, para que tampoco quede el recuadro vacío de OpenLayers.
+     *
+     * Ojo: se inyecta como HTML (no se escapa), igual que el valor por defecto, para que el crédito
+     * pueda ser un link.
+     *
+     * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar. Con
+     * `temasMapTiles: ''` tampoco: sin capa base no hay tiles que acreditar, así que no se muestra
+     * (que es lo que ya pasaba antes de que existiera esta opción).
+     */
+    temasMapAttribution?: string;
     /**
      * Keep the state of the view in the browser URL (default: false), so the address bar is a
      * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
@@ -616,6 +639,14 @@ export default class Timeline {
      * lazily, the first time someone opens one.
      */
     temasMapTiles: string;
+    /**
+     * Credit of the base layer, `''` meaning no attribution at all —and, with it, no attribution
+     * control on the map. Read from the options along with the tiles, because it describes them: it
+     * is the credit of *those* tiles, so the default (OpenStreetMap) only holds while the default
+     * template does. It is empty for nothing by itself, it is just that a consumer whose tiles need
+     * no credit is the one case the map cannot guess.
+     */
+    temasMapAttribution: string;
     /**
      * OpenLayers modules, loaded once the first time a topics map is opened. `null` until then:
      * **never imported eagerly**, so a page without topics that carry a `geom` does not resolve

@@ -1873,6 +1873,9 @@
   background: transparent;
   border-radius: 0;
 }
+.publicaciones-section .timeline-card .card-temas-map-canvas .ol-control.ol-attribution ul {
+  font-size: 11px;
+}
 .publicaciones-section .timeline-card .card-temas-map-canvas .ol-zoom {
   left: auto;
   right: 0.5em;

@@ -113,7 +113,7 @@ new Timeline({ container, items, ... })
 | `_buildTemasMapBodyHtml(located)` | 2564 | Body del mapa (`.card-temas-map-body` + `.card-temas-map-canvas`), oculto hasta el primer open. `''` sin temas ubicados |
 | `_bindTemasMapToggle(slot, located)` | 2588 | Bindea el toggle (alterna `expanded`/`hidden`/`aria-expanded`/labels, con `stopPropagation`) y, en el primer open, monta el mapa en un `requestAnimationFrame` |
 | `_loadOpenLayers()` | 2621 | `import()` dinámico de los módulos de `ol` (Map, View, geometrías, capas, fuentes, estilos, overlay, controles, proj) y del plugin de zoom. Cachea la promesa |
-| `_mountTemasMap(canvas, located)` | 2700 | Crea el mapa, el overlay de tooltip y los features (círculos + texto, estilo fijo), corre `declutter()` (spiderfy: desplaza la geometría de los markers que se solapan, sin líneas ni flechas) en cada `moveend` y bindea el hit test de hover |
+| `_mountTemasMap(canvas, located)` | 2700 | Crea el mapa, el overlay de tooltip y los features (círculos + texto, estilo por función), fuerza el `renderSync()` que hace posible el `declutter()`, corre `declutter()` (spiderfy: separa los markers que se solapan y guarda en `feature.spider` la línea de vuelta al origen y la geometría desplazada) en cada `moveend` y bindea el hit test de hover |
 | `_destroyTemasMaps()` | 3000 | Suelta cada mapa guardado en `_temasMaps` (`overlay.setMap(null)` + `map.setTarget(undefined)` + `dispose()`). Se llama antes de vaciar la lista (`_renderTimeline`, `_renderApiLoading`) |
 
 ### Utilidades
@@ -454,6 +454,7 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 | `singleId` | `string \| null` | Cuando está seteado, renderiza una única tarjeta ya expandida (modo single) |
 | `fullpage` | `boolean` | Modo fullpage (opción del constructor): fuerza `isExpanded`, bloquea el colapso, no emite el resize handle y no renderiza las featured cards |
 | `temasMapTiles` | `string` | Plantilla `{z}/{x}/{y}` de la capa base del mapa de temas (default OpenStreetMap). `''` la apaga y deja solo los puntos |
+| `temasMapAttribution` | `string` | Crédito de la capa base (default OpenStreetMap, como HTML). `''` no muestra atribución: sin capa base (`temasMapTiles: ''`) tampoco, porque no hay tiles que acreditar |
 | `_temasMaps` | `Map<HTMLElement, TemasMapHandle>` | Mapas OpenLayers vivos por canvas, para poder destruirlos cuando la lista se rearma |
 | `lastUpdated` | `string` | Timestamp para el footer |
 | `isExpanded` | `boolean` | Estado actual (featured vs timeline) |

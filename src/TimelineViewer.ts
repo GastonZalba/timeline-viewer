@@ -14,6 +14,7 @@ import type OlMap from 'ol/Map.js';
 import type OlView from 'ol/View.js';
 import type OlFeature from 'ol/Feature.js';
 import type OlPoint from 'ol/geom/Point.js';
+import type OlLineString from 'ol/geom/LineString.js';
 import type VectorLayer from 'ol/layer/Vector.js';
 import type VectorSource from 'ol/source/Vector.js';
 import type TileLayer from 'ol/layer/Tile.js';
@@ -183,17 +184,36 @@ const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
  * Extra gap, in pixels, left between the rings of two neighboring markers when they are spread on a
  * circle. The distance between consecutive markers stays fixed at
  * `2 * (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP)` whatever their count: the radius of the
- * circle grows with the count, which is what keeps the numbers legible when many points overlap.
+ * circle grows with the count, so the count never squeezes the neighbors, and the gap only has to
+ * cover the ring itself —1px is where the white rings of two markers meet and nothing more.
  */
-const TEMAS_MAP_SPIDER_GAP = 6;
+const TEMAS_MAP_SPIDER_GAP = 1;
 
 /**
- * Attribution of the base layer. The tile template is opaque to the component (the consumer
- * hands it over ready to use, key included), so the provider cannot be derived from it and the
- * attribution of the data most such tiles carry —OpenStreetMap— is the one declared here.
- * A consumer on another provider has to adjust it, which the README points out.
+ * Width of the line that ties a displaced marker back to the topic's own coordinate, in screen
+ * pixels. It is the only thing drawn back toward the real position: no arrowhead, no anchor dot.
+ * The line runs from the coordinate to the center of the circle and is painted **before** it, so
+ * the last `TEMAS_MAP_MARKER_RADIUS` px stay hidden under the marker's own fill — which is why it
+ * does not need a gap at its tip the way an arrow would.
+ *
+ * The tone color of the topic, like the marker it explains: the line answers "which one of the
+ * circles is mine", and the answer is the one that carries the same color and number.
  */
-const TEMAS_MAP_ATTRIBUTION =
+const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
+
+/**
+ * Default of `temasMapAttribution`: the credit of the default base layer. The tile template is
+ * opaque to the component (the consumer hands it over ready to use, key included), so the provider
+ * cannot be derived from it, and the attribution of the data most such tiles carry —OpenStreetMap—
+ * is the one declared here.
+ *
+ * A consumer on another provider has to override it, and to pass `''` when their tiles need no
+ * credit, which takes the whole attribution control out of the map.
+ *
+ * It is markup, not plain text, because that is what the attribution is: the credit is a link to the
+ * provider's terms. The default already is one, and the control renders it as HTML.
+ */
+const TEMAS_MAP_ATTRIBUTION_DEFAULT =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 
 /**
@@ -359,6 +379,7 @@ interface TemasMapModules {
   // mistake into a `tsc` error instead of a silent one.
   OlFeature: new (options?: { geometry?: OlPoint }) => OlFeature;
   OlPoint: typeof OlPoint;
+  OlLineString: typeof OlLineString;
   OlOverlay: typeof OlOverlay;
   VectorLayer: typeof VectorLayer;
   VectorSource: typeof VectorSource;
@@ -391,6 +412,18 @@ interface TemasMapPoint {
   lon: number;
   titulo: string;
   color: string;
+}
+
+/**
+ * Displacement of one marker that had to be pulled away from its own coordinate because it
+ * overlapped another marker at the current zoom. The geometries are built in map coordinates on
+ * `moveend`, so the feature's style function only has to hand them to the styles.
+ */
+interface TemasMapSpider {
+  /** Line from the topic's own coordinate to the displaced marker */
+  line: OlLineString;
+  /** Displaced marker */
+  marker: OlPoint;
 }
 
 /**
@@ -654,6 +687,27 @@ export interface TimelineOptions {
    * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar.
    */
   temasMapTiles?: string;
+  /**
+   * Crédito de la capa base del mapa de los temas, como texto (con HTML: el crédito es un link a las
+   * condiciones del proveedor). Por defecto es el de OpenStreetMap.
+   *
+   * **Es la atribución de la capa que se está mostrando, no una etiqueta fija**: la capa base se
+   * declara en `temasMapTiles`, así que la de OpenStreetMap solo corresponde mientras siga siendo la
+   * que se usa. Un consumidor con su propio servidor de tiles tiene que poner acá su propio crédito
+   * —o `''` explícito si su capa no necesita ninguno— porque si no queda la atribución de
+   * OpenStreetMap creditando tiles que no son suyos.
+   *
+   * `''` **no muestra nada**: no es una cadena vacía en el pie del mapa, es directamente la ausencia
+   * del control de atribución, para que tampoco quede el recuadro vacío de OpenLayers.
+   *
+   * Ojo: se inyecta como HTML (no se escapa), igual que el valor por defecto, para que el crédito
+   * pueda ser un link.
+   *
+   * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar. Con
+   * `temasMapTiles: ''` tampoco: sin capa base no hay tiles que acreditar, así que no se muestra
+   * (que es lo que ya pasaba antes de que existiera esta opción).
+   */
+  temasMapAttribution?: string;
   /**
    * Keep the state of the view in the browser URL (default: false), so the address bar is a
    * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
@@ -1152,6 +1206,14 @@ export default class Timeline {
    */
   temasMapTiles: string;
   /**
+   * Credit of the base layer, `''` meaning no attribution at all —and, with it, no attribution
+   * control on the map. Read from the options along with the tiles, because it describes them: it
+   * is the credit of *those* tiles, so the default (OpenStreetMap) only holds while the default
+   * template does. It is empty for nothing by itself, it is just that a consumer whose tiles need
+   * no credit is the one case the map cannot guess.
+   */
+  temasMapAttribution: string;
+  /**
    * OpenLayers modules, loaded once the first time a topics map is opened. `null` until then:
    * **never imported eagerly**, so a page without topics that carry a `geom` does not resolve
    * the peer dependency at all — same reason the social embed SDKs are loaded on demand
@@ -1290,6 +1352,11 @@ export default class Timeline {
     // `=== undefined` and not `||`: an explicit `''` is how a consumer turns the base off, and `||`
     // would swallow it and put the default tiles back on.
     this.temasMapTiles = config.temasMapTiles === undefined ? TEMAS_MAP_TILES_DEFAULT : config.temasMapTiles;
+    // Same `=== undefined` as the tiles: an explicit `''` is how a consumer says "my layer needs no
+    // credit", and `||` would swallow it and put the OpenStreetMap one back on — on a map that is
+    // not showing a single OpenStreetMap tile.
+    this.temasMapAttribution =
+      config.temasMapAttribution === undefined ? TEMAS_MAP_ATTRIBUTION_DEFAULT : config.temasMapAttribution;
     this._olModules = null;
     this._temasMaps = new Map();
     // The URL state is read here, before `_init()`, and not inside it: what it says has to be part of
@@ -2636,6 +2703,7 @@ export default class Timeline {
         import('ol/View.js'),
         import('ol/Feature.js'),
         import('ol/geom/Point.js'),
+        import('ol/geom/LineString.js'),
         import('ol/Overlay.js'),
         import('ol/layer/Vector.js'),
         import('ol/source/Vector.js'),
@@ -2655,6 +2723,7 @@ export default class Timeline {
           view,
           feature,
           point,
+          lineString,
           overlay,
           vLayer,
           vSource,
@@ -2673,6 +2742,7 @@ export default class Timeline {
           OlView: view.default,
           OlFeature: feature.default,
           OlPoint: point.default,
+          OlLineString: lineString.default,
           OlOverlay: overlay.default,
           VectorLayer: vLayer.default,
           VectorSource: vSource.default,
@@ -2753,11 +2823,25 @@ export default class Timeline {
       // an attribute property and `getStyle()` stays null, so the renderer falls back to the default
       // style — the cyan `#3399CC` circle. `setStyle()` is the only way to give a feature its style.
       //
-      // It is a fixed style and not a function because the only thing `declutter` does now is move
-      // the marker: it does it by replacing the feature's own geometry, so the style paints at
-      // whatever coordinate the feature holds and there is no displaced-painting branch to keep in
-      // sync. Markers that overlap are simply drawn elsewhere.
-      feature.setStyle(new ol.Style({ image: circleOf(p.color), text: markerText(p) }));
+      // It is a **function** and not a fixed style because a marker that overlaps another one is
+      // displaced by `declutter` on every `moveend`, and the displacement brings the line that ties it
+      // back to the topic's own coordinate: the function reads that displacement off the feature and,
+      // when there is one, paints the line and the marker at the displaced point instead of at the
+      // topic's own coordinate. The geometries live in the `spider` property, not in the feature's
+      // own, because one feature paints two geometries that are not the same point.
+      const image = circleOf(p.color);
+      const label = markerText(p);
+      const base = new ol.Style({ image, text: label });
+      const connector = new ol.Stroke({ color: p.color, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
+      feature.setStyle((f) => {
+        const spider = f.get('spider') as TemasMapSpider | undefined;
+        if (!spider) return base;
+        // The line first, so the marker is painted over its own end of it.
+        return [
+          new ol.Style({ geometry: spider.line, stroke: connector }),
+          new ol.Style({ geometry: spider.marker, image, text: label })
+        ];
+      });
       return feature;
     };
 
@@ -2765,10 +2849,21 @@ export default class Timeline {
     const source = new ol.VectorSource({ features });
 
     const layers: BaseLayer[] = [];
+    // The credit belongs to the base layer, so it only exists when there is one: with no tiles there
+    // is nothing to attribute. That is why the flag checks the tiles and not just the credit —and it
+    // is what the map already did before the credit became an option, the attribution control having
+    // nothing to render without a source that declares `attributions`. Both knobs are read at mount
+    // time, like every other option of the map.
+    const showAttribution = Boolean(this.temasMapTiles && this.temasMapAttribution);
     if (this.temasMapTiles) {
       layers.push(
         new ol.TileLayer({
-          source: new ol.XYZ({ url: this.temasMapTiles, attributions: TEMAS_MAP_ATTRIBUTION })
+          // `attributions` is omitted rather than passed empty: it is what the attribution control
+          // reads, and an empty value would leave it rendering an empty box over the map.
+          source: new ol.XYZ({
+            url: this.temasMapTiles,
+            ...(showAttribution ? { attributions: this.temasMapAttribution } : {})
+          })
         })
       );
     }
@@ -2785,9 +2880,10 @@ export default class Timeline {
       layers,
       view,
       // The default set would add `Rotate`, which has no place on a read-only map this small.
-      // `Attribution` is not optional, though: it is the only control that renders the
-      // `attributions` of the base layer, and every tile provider of this kind requires it.
-      controls: [new ol.Zoom(), new ol.Attribution({ collapsible: false })]
+      // `Attribution` is conditional for the same reason the base layer is: it renders the
+      // `attributions` the sources declare, so with none —`temasMapAttribution: ''`, or no tiles at
+      // all— it would only paint an empty box where the credit goes.
+      controls: showAttribution ? [new ol.Zoom(), new ol.Attribution({ collapsible: false })] : [new ol.Zoom()]
     });
 
     // **Before** the fit, and that order is the whole point: the target was `display: none` until
@@ -2808,6 +2904,15 @@ export default class Timeline {
       maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
       duration: 0
     });
+    // **Before** `declutter()` below, and for the same kind of reason as the `updateSize()` above: the
+    // render is asynchronous, so at this point the map has never painted and `getPixelFromCoordinate`
+    // —which `declutter` reads every screen position from— returns `null` for every marker. A
+    // `declutter` with no pixels groups nothing, so the spiderfy would only land on the next
+    // `moveend`: with a base layer that came a few hundred ms later, when the tile requests resolved
+    // and moved the view, but with `temasMapTiles: ''` nothing ever moves it and the markers stayed
+    // piled up on top of each other (and, with the lines, on top of a pile of lines) for good.
+    // `renderSync()` is the one public method that paints before returning.
+    map.renderSync();
 
     // Hover that names the topic under the pointer. The hit test is a distance against the circle's
     // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
@@ -2834,9 +2939,10 @@ export default class Timeline {
     // what the user sees, not at the coordinate the topic would have without the displacement.
     const markerScreens: number[][] = located.map(() => [0, 0]);
     const markerCoords: number[][] = located.map((p) => ol.fromLonLat([p.lon, p.lat]));
-    // Own coordinate of each topic, as a geometry ready to be put back on its feature. `declutter`
-    // restores every marker to this one before grouping, so the geometry is only ever replaced, never
-    // accumulated: the marker of a topic that no longer overlaps comes back to its real place.
+    // Own coordinate of each topic, as a geometry ready to be reused. It is what the line of a
+    // displaced marker starts at, and what the marker sits on while it is not displaced —`declutter`
+    // resets every marker before grouping, so the geometry is only ever read, never accumulated: the
+    // marker of a topic that no longer overlaps comes back to its real place.
     const ownPoints: OlPoint[] = located.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
 
     /**
@@ -2844,10 +2950,10 @@ export default class Timeline {
      * coordinate; the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another are grouped
      * and re-laid out on a circle around the group's centroid.
      *
-     * The displacement **is** the whole treatment: the feature's own geometry is replaced, so the
-     * circle and its number simply get painted somewhere else. Nothing is drawn back to the real
-     * coordinate — no anchor dot, no connector, no arrowhead — which is why the style is a fixed one
-     * and why the map needs nothing but `Point` to spread the markers.
+     * A displaced marker is painted from the `spider` property and not from the feature's own
+     * geometry: one feature then paints two geometries that are not the same point —the line back to
+     * the real coordinate and the circle at the displaced one—, which is the whole reason the style
+     * is a function. The line is the only thing drawn back: no arrowhead, no anchor dot.
      *
      * Runs on every `moveend` —and once right after the fit— because what overlaps changes with the
      * zoom: a far view clusters markers that a near view separates back into place.
@@ -2858,14 +2964,14 @@ export default class Timeline {
       const used = new Array<boolean>(n).fill(false);
 
       // Back to the own coordinate first: whatever was displaced before this zoom may not overlap
-      // anymore, and a feature keeps the geometry it was last given.
+      // anymore, and a feature keeps the last `spider` it was given.
       clearHover();
       for (let i = 0; i < n; i++) {
         const screen = screens[i];
         if (!screen) continue;
         markerScreens[i] = screen;
         markerCoords[i] = ownPoints[i].getCoordinates();
-        features[i].setGeometry(ownPoints[i]);
+        features[i].set('spider', undefined);
       }
 
       for (let i = 0; i < n; i++) {
@@ -2907,7 +3013,13 @@ export default class Timeline {
           const angle = -Math.PI / 2 + (2 * Math.PI * position) / group.length;
           const displaced: number[] = [cx + Math.cos(angle) * spread, cy + Math.sin(angle) * spread];
           const coord = map.getCoordinateFromPixel(displaced);
-          features[k].setGeometry(new ol.OlPoint(coord));
+          // The line goes from the topic's own coordinate to the center of the displaced circle: it
+          // ends under the marker's own fill, so there is nothing to trim at the tip and nothing to
+          // anchor at the origin.
+          features[k].set('spider', {
+            line: new ol.OlLineString([ownPoints[k].getCoordinates(), coord]),
+            marker: new ol.OlPoint(coord)
+          } as TemasMapSpider);
           markerScreens[k] = displaced;
           markerCoords[k] = coord;
         });
@@ -2919,15 +3031,24 @@ export default class Timeline {
     // Hover that names the topic under the pointer. The hit test is a distance against the circle's
     // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
     // being plain circles the manual test is exact and needs no feature-to-point mapping.
+    // It keeps the **closest** marker within the radius instead of the first one: spread markers sit
+    // `2 * (radius + gap)` apart, which is less than twice the hit radius, so their targets do
+    // overlap and the pointer in the middle of two of them has to name the one the reader is over.
     const hitTest = (pixel: number[]): number => {
       const radius = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING;
+      let closest = -1;
+      let closestDistance = radius * radius;
       for (let i = 0; i < located.length; i++) {
         const screen = markerScreens[i];
         const dx = pixel[0] - screen[0];
         const dy = pixel[1] - screen[1];
-        if (dx * dx + dy * dy <= radius * radius) return i;
+        const distance = dx * dx + dy * dy;
+        if (distance <= closestDistance) {
+          closest = i;
+          closestDistance = distance;
+        }
       }
-      return -1;
+      return closest;
     };
 
     map.on('pointermove', (e) => {
