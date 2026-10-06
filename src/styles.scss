@@ -1555,12 +1555,14 @@
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--tv-accent) transparent;
+    border-radius: 8px;
   }
 
   // La tarjeta dentro del panel: sin la margen inferior de 40px que usa como separación en la línea
   // de tiempo, y sin el `translateY` de entrada (`.visible` ya lo pone `_openFullMapCard`).
   .fullmap-detail-body .timeline-item {
     margin-bottom: 0;
+    box-shadow: none;
     .timeline-card {
       margin-left: 0;
     }
@@ -3311,9 +3313,10 @@
   .tema-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
     padding-left: 10px;
     border-left: 1px solid #243d64;
+    padding: 5px;
 
     // Referencia del tema en el mapa: el badge que reemplaza a la leyenda que había debajo del mapa.
     // Lo lleva **cada** tema mientras el mapa está abierto, así la lista queda alineada: los que
@@ -3420,9 +3423,10 @@
     // el resaltado se pierda.
     &.tema-selected {
       background: color-mix(in srgb, var(--tema-tone-color, var(--tv-accent)) 18%, transparent);
-      border-left-color: var(--tema-tone-color, var(--tv-accent));
+      border: 1px solid var(--tema-tone-color);
+      border-left: 0;
       box-shadow: inset 2px 0 0 var(--tema-tone-color, var(--tv-accent));
-      border-radius: 0 4px 4px 0;
+      border-radius: 4px;
     }
 
     // El tema que tiene punto en el mapa general: clickeable, así que se lo dice —con el puntero y con
@@ -3435,11 +3439,10 @@
     // parece clickeable.
     &.tema-locatable {
       cursor: pointer;
-      border-radius: 0 4px 4px 0;
 
-      &:hover {
+      &:hover:not(.tema-selected) {
         background: rgb(255 255 255 / 6%);
-        border-left-color: var(--tv-accent);
+        border-left-color: var(--tema-tone-color);
       }
     }
   }

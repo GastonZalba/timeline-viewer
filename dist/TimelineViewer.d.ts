@@ -70,6 +70,13 @@ interface TemasMapPoint {
      * reference badge in the list is placed by this one, the marker number by `index`.
      */
     temaIndex: number;
+    /**
+     * Primary key del subtema (`ItemTema.id_subtema`), que es lo que viaja al mapa general: la
+     * posición sirve para emparejar contra `card.temas` de **esta** tarjeta, pero contra la ficha que
+     * se abre en el panel hace falta una identidad que no dependa de en qué listado paró uno.
+     * Vacío si el dato no lo trae, en cuyo caso el punto existe pero no se puede resaltar.
+     */
+    idSubtema: string;
     lat: number;
     lon: number;
     titulo: string;
@@ -171,12 +178,14 @@ interface FullMapPoint extends TemasMapPlottable {
     /** Id del artículo al que pertenece el tema */
     itemId: number | string;
     /**
-     * Posición del tema en `card.temas`, que es lo que permite scrollear la ficha hasta él y resaltarlo.
-     * En local sale de `_temasLocated`; en API de `tema_index` de `GET {url}/points`, y es `-1` si el
+     * Primary key del subtema, que es lo que permite scrollear la ficha hasta él y resaltarlo.
+     * En local sale de `_temasLocated`; en API de `id_subtema` de `GET {url}/points`, y es `''` si el
      * backend no lo manda —en ese caso la ficha abre sin scrollear ni resaltar, que es el mismo
-     * resultado que un backend viejo daba sin este campo.
+     * resultado que un backend viejo daba sin este campo—. Es **identidad**, no posición: la ficha se
+     * abre con el detalle del artículo y el punto viene de otro listado (el mapa), y lo que los cruza
+     * es una clave única del subtema y no un orden que los dos tendrían que compartir.
      */
-    temaIndex: number;
+    idSubtema: string;
     /** Título del tema (el dato que ya usaba el hover de la tarjeta) */
     titulo: string;
     /** Titular del artículo, la segunda línea del hover del mapa general */
@@ -189,6 +198,15 @@ interface FullMapPoint extends TemasMapPlottable {
     tono_social: TonoSocial;
 }
 export interface ItemTema {
+    /**
+     * Primary key del subtema, **único en toda la colección** (en el mock el formato es `T-000001`).
+     *
+     * Es la identidad con la que el mapa general empareja un punto con la fila de la ficha: viaja en
+     * `GET {url}/points` como `id_subtema` y reemplaza a la posición dentro de `temas` (`tema_index`),
+     * que entre dos listados distintos no identificaba nada. Sin él la ficha abre igual —el artículo
+     * es el mismo—, solo sin scroll ni resaltado.
+     */
+    id_subtema: string;
     titulo: string;
     resumen: string;
     tono_social: TonoSocial;
@@ -302,14 +320,18 @@ export interface TimelineApiFacetsResponse {
  * Solo viaja lo que el mapa dibuja: no es un `TimelineItem` reducido, es un tema suelto.
  */
 export interface TimelineApiPoint {
-    /** Id del **artículo** al que pertenece el tema (no el del tema, que no existe por separado) */
+    /**
+     * Id del **artículo** al que pertenece el tema. El subtema tiene su propio id, que es el
+     * `id_subtema` de abajo: acá viaja el del artículo porque el punto nombra de qué publicación es.
+     */
     id: number | string;
     /**
-     * Posición del tema dentro de `temas` del artículo. Opcional: es lo que permite scrollear la ficha
-     * hasta el tema clickeado y resaltarlo. Un backend que no lo manda deja el `-1` y el mapa sigue
-     * funcionando —solo sin scrollear ni resaltar—, así que agregarlo no rompe a nadie.
+     * Primary key del subtema (`ItemTema.id_subtema`), único en toda la colección. Opcional: es lo que
+     * permite scrollear la ficha hasta el tema clickeado y resaltarlo. Un backend que no lo manda deja
+     * el `''` y el mapa sigue funcionando —solo sin scrollear ni resaltar—, así que agregarlo no rompe
+     * a nadie.
      */
-    tema_index?: number;
+    id_subtema?: string;
     titulo: string;
     nombre_fuente: string;
     tono_social: TonoSocial;
@@ -856,8 +878,8 @@ export default class Timeline {
      * Key of the **topic** whose point is open in the panel, or `null`. It is lo que distingue "el mismo
      * artículo ya abierto" de "este artículo, en este tema": clickear dos puntos del mismo artículo no
      * puede ser un no-op, porque lo que cambia es el tema que se scrollea y resalta. La composición es el
-     * id del artículo más el índice del tema, que es lo único que un backend puede no mandar (`tema_index`
-     * ausente → `-1`) y aun así ser único por punto.
+     * id del artículo más el `id_subtema`, que es lo único que un backend puede no mandar (ausente →
+     * `''`) y aun así ser único por punto.
      */
     _fullMapSelectedKey: string | null;
     /**
@@ -1513,7 +1535,7 @@ export default class Timeline {
      * resaltado tiene que viajar con el dato (es el mismo `.tema-item` que ya existe) para que
      * `_ensureCardDetail` pueda reescribir el detalle sin perderlo.
      *
-     * Un `temaIndex` de `-1` —backend sin `tema_index`— no hace nada: no hay forma de ubicar el tema, y
+     * Un `idSubtema` vacío —backend sin `id_subtema`— no hace nada: no hay forma de ubicar el tema, y
      * mejor la ficha entera a la vista que scrollear a un `.tema-item` equivocado.
      *
      * `scroll` es un parámetro y no una constante porque son los dos callers los que saben si el tema
@@ -1522,16 +1544,16 @@ export default class Timeline {
      * delante del puntero, así que `scrollIntoView` la correría debajo sin que nadie lo pidiera, y en
      * `block: 'center'` hasta la deja en otro lugar del panel del que salió.
      */
-    protected _revealFullMapTema(cardEl: HTMLElement | null, temaIndex: number, scroll: boolean): void;
+    protected _revealFullMapTema(cardEl: HTMLElement | null, idSubtema: string, scroll: boolean): void;
     /**
      * La identidad de un punto para el panel: artículo + tema. Es lo que distingue dos puntos del
      * mismo artículo, y también lo que se usa para descartar una respuesta que llegó tarde y para el
      * predicado de selección del mapa.
      *
-     * El id del tema va como índice, no como título, porque dos temas de un artículo pueden llamarse
-     * igual. Un backend sin `tema_index` deja `-1` y el key queda igual de único: los dos puntos con
-     * índice desconocido de un mismo artículo no se distinguen, pero siguen siendo el mismo artículo, y
-     * lo que la ficha muestra es el artículo.
+     * El id del tema va como `id_subtema`, no como título, porque dos temas de un artículo pueden
+     * llamarse igual. Un backend sin `id_subtema` deja `''` y el key queda igual de único: los dos
+     * puntos sin id de un mismo artículo no se distinguen, pero siguen siendo el mismo artículo, y lo
+     * que la ficha muestra es el artículo.
      */
     protected _fullMapPointKey(point: FullMapPoint): string;
     /**
@@ -1619,8 +1641,15 @@ export default class Timeline {
     protected _bindTaxonomyToggles(root: HTMLElement): void;
     /** Fill the card detail slots and bind their interactions */
     protected _injectCardDetail(cardEl: HTMLElement, card: TimelineItem): void;
-    /** Ensure the full detail of the card is present (fetches it when missing) */
-    protected _ensureCardDetail(cardEl: HTMLElement): Promise<void>;
+    /**
+     * Ensure the full detail of the card is present (fetches it when missing), and resolve with the
+     * payload that was injected — `null` when nothing was injected (already loaded, no api, no id or
+     * a failed fetch).
+     *
+     * The callers that only care about the side effect ignore the value; `_openFullMapCard` needs it
+     * because in api mode the card it holds is a summary, which carries no `temas`.
+     */
+    protected _ensureCardDetail(cardEl: HTMLElement): Promise<TimelineItem | null>;
     /** Process the lazy social embeds (Instagram, Twitter, Facebook) once the card is expanded */
     protected _processCardEmbeds(cardEl: HTMLElement): void;
     /** Insert an element before the timeline footer, or append if no footer */

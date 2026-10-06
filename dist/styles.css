@@ -1277,9 +1277,11 @@
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--tv-accent) transparent;
+  border-radius: 8px;
 }
 .publicaciones-section .fullmap-detail-body .timeline-item {
   margin-bottom: 0;
+  box-shadow: none;
 }
 .publicaciones-section .fullmap-detail-body .timeline-item .timeline-card {
   margin-left: 0;
@@ -2684,9 +2686,10 @@
 .publicaciones-section .tema-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
   padding-left: 10px;
   border-left: 1px solid #243d64;
+  padding: 5px;
 }
 .publicaciones-section .tema-item .tema-map-ref {
   flex: 0 0 auto;
@@ -2765,17 +2768,17 @@
 }
 .publicaciones-section .tema-item.tema-selected {
   background: color-mix(in srgb, var(--tema-tone-color, var(--tv-accent)) 18%, transparent);
-  border-left-color: var(--tema-tone-color, var(--tv-accent));
+  border: 1px solid var(--tema-tone-color);
+  border-left: 0;
   box-shadow: inset 2px 0 0 var(--tema-tone-color, var(--tv-accent));
-  border-radius: 0 4px 4px 0;
+  border-radius: 4px;
 }
 .publicaciones-section .tema-item.tema-locatable {
   cursor: pointer;
-  border-radius: 0 4px 4px 0;
 }
-.publicaciones-section .tema-item.tema-locatable:hover {
+.publicaciones-section .tema-item.tema-locatable:hover:not(.tema-selected) {
   background: rgba(255, 255, 255, 0.06);
-  border-left-color: var(--tv-accent);
+  border-left-color: var(--tema-tone-color);
 }
 .publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list {
   gap: 8px;

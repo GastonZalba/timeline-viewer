@@ -1756,12 +1756,14 @@ export default class Timeline {
             const ref = point
                 ? `<span class="tema-map-ref" title="${toneLabel} · Punto ${point.index + 1} en el mapa">${point.index + 1}</span>`
                 : `<span class="tema-map-ref tema-map-ref-none" title="${toneLabel} · Sin ubicación en el mapa">${TEMAS_MAP_NO_GEOM_SVG}</span>`;
-            // El `data-tema-index` es lo que permite scrollear y resaltar un tema desde fuera de la tarjeta (el
-            // mapa general abre la ficha en el tema del punto clickeado): sin un selector estable el
-            // resaltado tendría que ir por texto, y dos temas con el mismo título no son una excepción
-            // en estos datos.
+            // `data-id-subtema` es la identidad de la fila: es lo que permite scrollear y resaltar un
+            // tema desde fuera de la tarjeta (el mapa general abre la ficha en el tema del punto
+            // clickeado), porque es el mismo campo que trae el punto. `data-tema-index` es la posición
+            // en `card.temas`, la que usa el bind de clicks de la fila para encontrar el tema. Sin una
+            // identidad estable el resaltado tendría que ir por texto, y dos temas con el mismo título
+            // no son una excepción en estos datos. El id viene del pipeline, así que se escapa.
             return `
-          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}" data-tema-index="${i}">
+          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}" data-tema-index="${i}" data-id-subtema="${this._escapeHtml(t.id_subtema ?? '')}">
             ${ref}
             <div class="tema-content">
               <span class="tema-title"><span class="tema-tone">${TONE_LABEL[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
@@ -1814,6 +1816,7 @@ export default class Timeline {
             out.push({
                 index: out.length,
                 temaIndex,
+                idSubtema: tema.id_subtema ?? '',
                 lat: geom.lat,
                 lon: geom.lon,
                 titulo: tema.titulo,
@@ -2591,7 +2594,7 @@ export default class Timeline {
                     return;
                 out.push({
                     itemId: card.id,
-                    temaIndex: point.temaIndex,
+                    idSubtema: point.idSubtema,
                     lat: point.lat,
                     lon: point.lon,
                     titulo: point.titulo,
@@ -2666,7 +2669,7 @@ export default class Timeline {
                 return;
             out.push({
                 itemId: point.id,
-                temaIndex: typeof point.tema_index === 'number' ? point.tema_index : -1,
+                idSubtema: typeof point.id_subtema === 'string' ? point.id_subtema : '',
                 lat: geom.lat,
                 lon: geom.lon,
                 titulo: typeof point.titulo === 'string' ? point.titulo : '',
@@ -2786,16 +2789,20 @@ export default class Timeline {
         // scroll a un tema solo pueden salir **después** de que llegue: en local la lista ya está, pero en
         // API el artículo entero se acaba de pedir y no hay nada que resaltar todavía. Por eso el
         // resaltado va en su propio método, que corre con lo que haya (`null` si el backend no mandó
-        // `tema_index`, o si la lista de temas vino vacía) y no rompe la ficha que ya se ve.
-        void this._ensureCardDetail(cardEl).then(() => {
+        // `id_subtema`, o si la lista de temas vino vacía) y no rompe la ficha que ya se ve.
+        void this._ensureCardDetail(cardEl).then((detail) => {
             // La respuesta tardía es de otro punto: ya no se pinta nada.
             if (this._fullMapSelectedKey !== key)
                 return;
             this._processCardEmbeds(cardEl);
             // La lista de temas recién llegó, así que recién ahora se puede saber cuáles tienen punto y
-            // volverlos clickeables: el bind va después del detalle, no antes.
-            this._bindFullMapCardTemas(cardEl, card);
-            this._revealFullMapTema(cardEl, point.temaIndex, true);
+            // volverlos clickeables: el bind va después del detalle, no antes. El objeto que se bindea es
+            // **el mismo cuyo markup está en el DOM** y no el `card` de arriba: en api ese `card` es un
+            // summary de `allCards` —sin `temas`— y contra eso no se bindea ninguna fila (los artículos
+            // que no están en la página cargada sí traen el detalle entero, que es lo que hacía que el
+            // fallo se viera solo en unos). En local `detail` es `null` y manda `card`, que ya es entero.
+            this._bindFullMapCardTemas(cardEl, detail ?? card);
+            this._revealFullMapTema(cardEl, point.idSubtema, true);
         });
     }
     /**
@@ -2842,9 +2849,9 @@ export default class Timeline {
         const tema = (card.temas || [])[temaIndex];
         const geom = tema ? this._temaGeomOf(tema) : null;
         const view = this._fullMapHandle?.map.getView() || null;
-        if (!geom || !view)
+        if (!tema || !geom || !view)
             return;
-        const key = `${String(card.id)}#${temaIndex}`;
+        const key = `${String(card.id)}#${tema.id_subtema ?? ''}`;
         // El criterio del segundo gesto es la **selección**, no "la última fila clickeada": un tema que ya
         // está seleccionado —venga del click en su punto o de su propia fila— es el que pide el `fit`.
         // Así el gesto es el mismo llegue como llegue, y no hace falta un segundo campo para acordarse de
@@ -2859,7 +2866,7 @@ export default class Timeline {
         }
         // Sin `scroll`: la fila se acaba de clickear, o sea que ya está a la vista. Scrollearla al centro
         // sería mover la lectura del usuario debajo del puntero sin que lo haya pedido.
-        this._revealFullMapTema(cardEl, temaIndex, false);
+        this._revealFullMapTema(cardEl, tema.id_subtema ?? '', false);
         // `_loadOpenLayers` cachea la promesa, así que acá solo es el `await` de algo ya resuelto (el
         // mapa general no puede estar montado sin que `ol` se haya cargado). Sin esto no hay forma
         // proyectar `lon`/`lat` a las coordenadas de la vista, que son EPSG:3857.
@@ -2887,7 +2894,7 @@ export default class Timeline {
      * resaltado tiene que viajar con el dato (es el mismo `.tema-item` que ya existe) para que
      * `_ensureCardDetail` pueda reescribir el detalle sin perderlo.
      *
-     * Un `temaIndex` de `-1` —backend sin `tema_index`— no hace nada: no hay forma de ubicar el tema, y
+     * Un `idSubtema` vacío —backend sin `id_subtema`— no hace nada: no hay forma de ubicar el tema, y
      * mejor la ficha entera a la vista que scrollear a un `.tema-item` equivocado.
      *
      * `scroll` es un parámetro y no una constante porque son los dos callers los que saben si el tema
@@ -2896,16 +2903,15 @@ export default class Timeline {
      * delante del puntero, así que `scrollIntoView` la correría debajo sin que nadie lo pidiera, y en
      * `block: 'center'` hasta la deja en otro lugar del panel del que salió.
      */
-    _revealFullMapTema(cardEl, temaIndex, scroll) {
-        if (!cardEl || temaIndex < 0)
+    _revealFullMapTema(cardEl, idSubtema, scroll) {
+        if (!cardEl || !idSubtema)
             return;
         const items = cardEl.querySelectorAll('.tema-item');
-        // Por posición y no por `[data-tema-index="…"]`: el índice viene del backend, y meter un número
-        // sin validar en un selector es dejar la puerta abierta a un `SyntaxError` (un `1e+21` o un `NaN`
-        // no son un selector válido) — o a inyección, si el backend no cumpliera el contrato. Con
-        // `items[temaIndex]` un índice raro simplemente no encuentra nada. El orden es el de `card.temas`,
-        // que es el mismo que usa `data-tema-index`.
-        const target = items[temaIndex];
+        // Por comparación de `dataset` y no por un selector `[data-id-subtema="…"]`: el id viene del
+        // backend, y meter un valor sin validar en un selector es dejar la puerta abierta a un
+        // `SyntaxError` (un `T-1"` cierra el atributo y rompe la consulta) o a inyección, si el backend
+        // no cumpliera el contrato. Comparando el string, un id raro simplemente no encuentra nada.
+        const target = Array.from(items).find((el) => el.dataset.idSubtema === idSubtema);
         if (!target)
             return;
         // El resaltado es de a uno, no acumulativo: si el usuario va saltando de tema en tema de la misma
@@ -2920,13 +2926,13 @@ export default class Timeline {
      * mismo artículo, y también lo que se usa para descartar una respuesta que llegó tarde y para el
      * predicado de selección del mapa.
      *
-     * El id del tema va como índice, no como título, porque dos temas de un artículo pueden llamarse
-     * igual. Un backend sin `tema_index` deja `-1` y el key queda igual de único: los dos puntos con
-     * índice desconocido de un mismo artículo no se distinguen, pero siguen siendo el mismo artículo, y
-     * lo que la ficha muestra es el artículo.
+     * El id del tema va como `id_subtema`, no como título, porque dos temas de un artículo pueden
+     * llamarse igual. Un backend sin `id_subtema` deja `''` y el key queda igual de único: los dos
+     * puntos sin id de un mismo artículo no se distinguen, pero siguen siendo el mismo artículo, y lo
+     * que la ficha muestra es el artículo.
      */
     _fullMapPointKey(point) {
-        return `${String(point.itemId)}#${point.temaIndex}`;
+        return `${String(point.itemId)}#${point.idSubtema}`;
     }
     /**
      * El panel del mapa general: solo la caja donde entra la tarjeta. El botón de cerrar **no** se
@@ -3297,25 +3303,34 @@ export default class Timeline {
         }
         cardEl.dataset.detailLoaded = '1';
     }
-    /** Ensure the full detail of the card is present (fetches it when missing) */
+    /**
+     * Ensure the full detail of the card is present (fetches it when missing), and resolve with the
+     * payload that was injected — `null` when nothing was injected (already loaded, no api, no id or
+     * a failed fetch).
+     *
+     * The callers that only care about the side effect ignore the value; `_openFullMapCard` needs it
+     * because in api mode the card it holds is a summary, which carries no `temas`.
+     */
     async _ensureCardDetail(cardEl) {
         if (cardEl.dataset.detailLoaded)
-            return;
+            return null;
         if (!this.api)
-            return;
+            return null;
         const id = cardEl.dataset.cardId;
         if (!id)
-            return;
+            return null;
         const cached = this._apiDetails.get(id);
         if (cached) {
             this._injectCardDetail(cardEl, cached);
-            return;
+            return cached;
         }
         const detail = await this._fetchDetail(id);
         if (detail) {
             this._injectCardDetail(cardEl, detail);
             this._preloadEmbedLibraries();
+            return detail;
         }
+        return null;
     }
     /** Process the lazy social embeds (Instagram, Twitter, Facebook) once the card is expanded */
     _processCardEmbeds(cardEl) {

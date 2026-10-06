@@ -295,8 +295,8 @@ function handleItems(url, res) {
  * list, which is why a group the client declares for a field this backend never heard of still
  * narrows the points.
  *
- * Only what the map draws travels: position, topic title and article title. It is not a reduced
- * `TimelineItem`, it is a topic on its own.
+ * Only what the map draws travels: position, topic id, topic title and article title. It is not a
+ * reduced `TimelineItem`, it is a topic on its own.
  */
 function handlePoints(url, res) {
   const params = Object.fromEntries(url.searchParams.entries());
@@ -304,11 +304,11 @@ function handlePoints(url, res) {
 
   const points = [];
   filtered.forEach((item) => {
-    (item.temas || []).forEach((tema, temaIndex) => {
+    (item.temas || []).forEach((tema) => {
       if (!tema || !tema.geom) return;
       points.push({
         id: item.id,
-        tema_index: temaIndex,
+        id_subtema: tema.id_subtema,
         titulo: tema.titulo,
         nombre_fuente: item.nombre_fuente,
         tono_social: tema.tono_social,
