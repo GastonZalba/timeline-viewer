@@ -168,6 +168,41 @@
 .publicaciones-section.expanded .filter-toggle {
   display: inline-flex;
 }
+.publicaciones-section.expanded .fullmap-wrap {
+  position: relative;
+  margin-left: auto;
+}
+.publicaciones-section.expanded .fullmap-toggle {
+  background: none;
+  border: 1px solid var(--tv-accent);
+  color: var(--tv-text-on-primary);
+  padding: 8px;
+  border-radius: 42px;
+  height: 34px;
+  width: 50px;
+  min-width: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(59, 130, 246, 0.25);
+}
+.publicaciones-section.expanded .fullmap-toggle:hover {
+  background: var(--tv-accent);
+}
+.publicaciones-section.expanded .fullmap-toggle[aria-expanded=true] {
+  background: var(--tv-accent);
+}
+.publicaciones-section.expanded .fullmap-toggle svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+.publicaciones-section.expanded .fullmap-toggle:focus-visible {
+  outline: 2px solid var(--tv-accent);
+  outline-offset: 2px;
+}
 .publicaciones-section.expanded .search-wrap {
   display: inline-flex;
 }
@@ -340,7 +375,6 @@
   justify-content: center;
   color: var(--tv-text-on-primary);
   background: var(--tv-tone-negative);
-  margin-left: auto;
 }
 .publicaciones-section .work-notes-toggle:hover,
 .publicaciones-section .filtros-internos-toggle:hover {
@@ -1162,6 +1196,198 @@
 .publicaciones-section .timeline-container.expanded {
   max-height: 99999px;
   overflow: visible;
+}
+.publicaciones-section .timeline-container[hidden] {
+  display: none;
+}
+.publicaciones-section .fullmap-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--tv-bg-primary);
+}
+.publicaciones-section .fullmap-view[hidden] {
+  display: none;
+}
+.publicaciones-section .fullmap-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 42px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 10px auto;
+  font-size: 0.7rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--tv-text-muted);
+  text-align: center;
+  background: rgba(14, 17, 22, 0.85);
+  z-index: 3;
+}
+.publicaciones-section .fullmap-status[hidden] {
+  display: none;
+}
+.publicaciones-section .fullmap-status[data-state=error] {
+  color: var(--tv-tone-negative);
+}
+.publicaciones-section .fullmap-detail {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 4;
+  width: min(420px, 100vw - 32px);
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.publicaciones-section .fullmap-detail[hidden] {
+  display: none;
+}
+.publicaciones-section .fullmap-detail-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--tv-border-section);
+  border-radius: 50%;
+  background: var(--tv-bg-primary);
+  color: var(--tv-text-primary);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.publicaciones-section .fullmap-detail-close:hover {
+  background: var(--tv-bg-secondary);
+  color: #ffffff;
+}
+.publicaciones-section .fullmap-detail-body {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--tv-accent) transparent;
+}
+.publicaciones-section .fullmap-detail-body .timeline-item {
+  margin-bottom: 0;
+}
+.publicaciones-section .fullmap-detail-body .timeline-item .timeline-card {
+  margin-left: 0;
+}
+.publicaciones-section .fullmap-detail-loading {
+  padding: 24px 12px;
+  font-size: 0.75rem;
+  font-weight: 300;
+  font-style: italic;
+  color: var(--tv-text-muted);
+  text-align: center;
+}
+.publicaciones-section .fullmap-canvas {
+  height: 100vh;
+  width: 100vw;
+  min-height: 100vh;
+  overflow: hidden;
+  border: none;
+  border-radius: 0;
+  background: var(--tv-bg-secondary);
+  flex: 1;
+}
+.publicaciones-section .fullmap-canvas.is-hover-marker {
+  cursor: pointer;
+}
+.publicaciones-section .fullmap-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 16px;
+  font-size: 0.72rem;
+  color: var(--tv-text-muted);
+  text-align: center;
+}
+.publicaciones-section .fullmap-canvas .ol-control {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.publicaciones-section .fullmap-canvas .ol-control.ol-attribution ul {
+  font-size: 11px;
+}
+.publicaciones-section .fullmap-canvas .ol-zoom {
+  left: auto;
+  right: 0.5em;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.publicaciones-section .fullmap-canvas .ol-zoom button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.85);
+  font-family: sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.publicaciones-section .fullmap-canvas .ol-zoom button:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+.publicaciones-section .featured-row {
+  position: relative;
+  z-index: 2;
+}
+.publicaciones-section .work-notes-toggle[hidden],
+.publicaciones-section .sort-wrap[hidden] {
+  display: none;
+}
+.publicaciones-section .fullmap-tooltip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: 4px;
+  background: rgba(14, 17, 22, 0.92);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  white-space: normal;
+  pointer-events: none;
+}
+.publicaciones-section .fullmap-tooltip-topic {
+  font-weight: 600;
+}
+.publicaciones-section .fullmap-tooltip-source {
+  opacity: 0.72;
+}
+.publicaciones-section.fullpage .fullmap-view {
+  margin-top: 0;
+}
+@media (max-width: 600px) {
+  .publicaciones-section .fullmap-status {
+    margin: 8px auto;
+  }
 }
 .publicaciones-section .ai-disclaimer {
   display: flex;
@@ -2536,6 +2762,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   word-break: break-word;
+}
+.publicaciones-section .tema-item.tema-selected {
+  background: color-mix(in srgb, var(--tema-tone-color, var(--tv-accent)) 18%, transparent);
+  border-left-color: var(--tema-tone-color, var(--tv-accent));
+  box-shadow: inset 2px 0 0 var(--tema-tone-color, var(--tv-accent));
+  border-radius: 0 4px 4px 0;
+}
+.publicaciones-section .tema-item.tema-locatable {
+  cursor: pointer;
+  border-radius: 0 4px 4px 0;
+}
+.publicaciones-section .tema-item.tema-locatable:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-left-color: var(--tv-accent);
 }
 .publicaciones-section .card-temas-map-body.expanded ~ .card-temas-list {
   gap: 8px;

@@ -24,6 +24,10 @@ import sorters from './sorters.js';
 // tuviera permisos para ellos. Con `stateInUrl` (siempre activo en el demo) es el caso para el que
 // existe el "fallar en silencio": un link que traiga `?tv_<campo interno>=...` se abre filtrado por
 // todo lo demás, sin error y sin dejar el filtro colgado en la URL.
+// ?fullmap agrega el botón de la vista de mapa general (`showFullMap`): baja el timeline y muestra
+// un mapa con un punto por tema ubicado de todo lo que hay en el filtro actual. Es independiente de
+// `?full`: el mapa se abre y se cierra igual con el timeline colapsado o expandido, y con `?full`
+// toma lo que queda de la ventana bajo la barra pegada.
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
 // el botón de compartir con esa misma URL.
@@ -39,6 +43,8 @@ const usePagination = new URLSearchParams(window.location.search).has('paginatio
 const useMany = new URLSearchParams(window.location.search).has('many');
 // ?sininternos: este usuario no tiene los filtros internos, así que no se declaran (ver la nota).
 const useSinInternos = new URLSearchParams(window.location.search).has('sininternos');
+// ?fullmap: la vista de mapa general (`showFullMap`), que no depende de ?full (ver la nota).
+const useFullMap = new URLSearchParams(window.location.search).has('fullmap');
 const singleId = new URLSearchParams(window.location.search).get('id');
 
 /**
@@ -138,6 +144,9 @@ const baseOptions = {
   startExpanded: useExpanded,
   // Con ?full la página entera scrollea y la barra de filtros queda siempre visible.
   fullpage: useFull,
+  // Con ?fullmap el botón de la barra abre un mapa con todos los temas ubicados del filtro actual,
+  // en vez del listado. En modo API los puntos salen de `GET /api/points`.
+  showFullMap: useFullMap,
   relatedLabel: (count) => (count === 1 ? 'publicación relacionada' : 'publicaciones relacionadas'),
   // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos

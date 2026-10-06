@@ -214,6 +214,53 @@
 
     // El buscador es un elemento: se muestra entero recién acá, porque el input que hace de círculo
     // de la lupa no tiene nada que abrir con el timeline colapsado (el resto de la barra tampoco).
+    .fullmap-wrap {
+      position: relative;
+      margin-left: auto;
+    }
+
+    // Botón de la vista de mapa general. Mismo círculo de 34px y mismo fondo que `.sort-toggle` y
+    // `.filter-toggle` —los tres son "cambia qué se ve de la barra"—, con la diferencia de que no tiene
+    // `display: none` en la base: el mapa general no es una parte del timeline, así que se puede abrir
+    // también con el timeline colapsado.
+    .fullmap-toggle {
+      background: none;
+      border: 1px solid var(--tv-accent);
+      color: var(--tv-text-on-primary);
+      padding: 8px;
+      border-radius: 42px;
+      height: 34px;
+      width: 50px;
+      min-width: 50px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(59, 130, 246, 0.25);
+
+      &:hover {
+        background: var(--tv-accent);
+      }
+
+      // El estado sale del `aria-expanded` que escribe el handler, como el del botón del mapa de la
+      // tarjeta: no hay clase que sincronizar, y el fondo lleno dice "estás en el mapa".
+      &[aria-expanded='true'] {
+        background: var(--tv-accent);
+      }
+
+      svg {
+        display: block;
+        width: 15px;
+        height: 15px;
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--tv-accent);
+        outline-offset: 2px;
+      }
+    }
+
     .search-wrap {
       display: inline-flex;
     }
@@ -437,7 +484,6 @@
     justify-content: center;
     color: var(--tv-text-on-primary);
     background: var(--tv-tone-negative);
-    margin-left: auto;
 
     &:hover {
       background: var(--tv-tone-negative);
@@ -1383,6 +1429,283 @@
     &.expanded {
       max-height: 99999px;
       overflow: visible;
+    }
+  }
+
+  // El mapa general baja el timeline con el atributo `hidden`, y esa regla necesita su propio
+  // `display: none`: la `[hidden]` de la UA cede ante el `display: visible` de `.expanded` de arriba
+  // (mismo motivo que `.taxonomy-row[hidden]` y `.card-taxonomy-extra`).
+  .timeline-container[hidden] {
+    display: none;
+  }
+
+  // Vista de mapa general (`showFullMap`): el mapa entra donde estaba el timeline, así que es
+  // hermano de `.timeline-container` y no hijo suyo —el contenedor lleva `max-height: 0` mientras
+  // está colapsado, y un mapa adentro no tendría alto en el modo normal—.
+  //
+  // El alto tiene que ser un número y no un `auto`: OpenLayers mide su target al crearse y sin una
+  // caja con resolución el `View.fit` de los puntos no tiene viewport contra el que ajustarse.
+  .fullmap-view {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: var(--tv-bg-primary);
+  }
+
+  // Necesita su propio `display: none`: el `display: flex` de arriba le gana a la regla `[hidden]`
+  // de la UA, así que sin esto la vista se montaría encima del timeline apenas se renderiza el
+  // layout. Es el mismo corte que `.timeline-container[hidden]` de más abajo.
+  .fullmap-view[hidden] {
+    display: none;
+  }
+
+  // El mensaje (cargando / sin puntos / error) vive **arriba** del canvas, no sobre él: ponerlo encima
+  // taparía los marcadores, y mientras se está pidiendo no hay nada que tapar todavía.
+  .fullmap-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 42px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 10px auto;
+    font-size: 0.7rem;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--tv-text-muted);
+    text-align: center;
+    background: rgb(14 17 22 / 85%);
+    z-index: 3;
+
+    &[hidden] {
+      display: none;
+    }
+
+    // El error se distingue por el color y no por un ícono: es el único de los tres que es un fallo
+    // en vez de un estado, y el tono negativo ya está en las variables del componente.
+    &[data-state='error'] {
+      color: var(--tv-tone-negative);
+    }
+  }
+
+  // Ficha del punto clickeado. Va **absoluta** sobre el canvas y no como un tercer hijo del `flex
+  // column`: si fuera un hermano más, `.fullmap-canvas` conserva su `100vh` y la vista pasaría a
+  // medir más que el viewport (con scroll, o con la ficha cortada abajo). Absoluta, se superpone al
+  // mapa sin empujarlo.
+  //
+  // Abajo a la izquierda y no centrada: el centro es donde el usuario está mirando y clickeando para
+  // elegir puntos, así que taparlo con la ficha obliga a cerrarla antes de seguir explorando.
+  .fullmap-detail {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 4;
+    width: min(420px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+
+    &[hidden] {
+      display: none;
+    }
+  }
+
+  // El botón de cerrar vive **dentro** de la tarjeta, no en un header del panel: `.timeline-card` es
+  // `position: relative`, así que el `top/right` lo pegan a su esquina. Por eso el panel no tiene
+  // header —la caja es solo el contenedor con scroll—.
+  //
+  // Como el panel no tiene fondo propio, el botón necesita el suyo para separarse del mapa: sin esto
+  // es un "×" suelto sobre los tiles, y con el fondo del componente casi transparente encima de un
+  // mapa claro tampoco se lee. `z-index` arriba de `.card-status-badges` (que está en `2`) porque
+  // comparten esquina.
+  .fullmap-detail-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--tv-border-section);
+    border-radius: 50%;
+    background: var(--tv-bg-primary);
+    color: var(--tv-text-primary);
+    font-size: 1.15rem;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+    transition:
+      background 0.2s ease,
+      color 0.2s ease;
+
+    &:hover {
+      background: var(--tv-bg-secondary);
+      color: #ffffff;
+    }
+  }
+
+  .fullmap-detail-body {
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--tv-accent) transparent;
+  }
+
+  // La tarjeta dentro del panel: sin la margen inferior de 40px que usa como separación en la línea
+  // de tiempo, y sin el `translateY` de entrada (`.visible` ya lo pone `_openFullMapCard`).
+  .fullmap-detail-body .timeline-item {
+    margin-bottom: 0;
+    .timeline-card {
+      margin-left: 0;
+    }
+  }
+
+  .fullmap-detail-loading {
+    padding: 24px 12px;
+    font-size: 0.75rem;
+    font-weight: 300;
+    font-style: italic;
+    color: var(--tv-text-muted);
+    text-align: center;
+  }
+
+  .fullmap-canvas {
+    height: 100vh;
+    width: 100vw;
+    min-height: 100vh;
+    overflow: hidden;
+    border: none;
+    border-radius: 0;
+    background: var(--tv-bg-secondary);
+    flex: 1;
+  }
+
+  .fullmap-canvas.is-hover-marker {
+    cursor: pointer;
+  }
+
+  .fullmap-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 0 16px;
+    font-size: 0.72rem;
+    color: var(--tv-text-muted);
+    text-align: center;
+  }
+
+  // Controles de OpenLayers: los mismos botones redondos que viste el mapa de la tarjeta, pero con
+  // los selectores scopeados bajo `.fullmap-canvas` para no tocar los de un mapa ajeno del
+  // consumidor —y para ganarle en especificidad a `ol.css`, que el demo carga **después** de este
+  // stylesheet.
+  .fullmap-canvas .ol-control {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+
+    &.ol-attribution ul {
+      font-size: 11px;
+    }
+  }
+
+  .fullmap-canvas .ol-zoom {
+    left: auto;
+    right: 0.5em;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .fullmap-canvas .ol-zoom button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.4);
+    color: rgba(255, 255, 255, 0.85);
+    font-family: sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: rgba(0, 0, 0, 0.6);
+    }
+  }
+
+  // La barra de herramientas tiene que quedar **encima** del mapa: sin esto, el `z-index: 1` de
+  // `.fullmap-view` la taparía y con ella el botón que cierra el mapa.
+  .featured-row {
+    position: relative;
+    z-index: 2;
+  }
+
+  // Con el mapa abierto el orden y las notas de trabajo se apagan (`hidden`, escrito por
+  // `_applyFullMapState`): no hay lista que ordenar, y el mapa es "trabajo oculto" de por sí. El
+  // buscador y el filtro **no**, porque son los que acotan lo que el mapa muestra.
+  //
+  // `.work-notes-toggle` necesita su propio `display: none` porque se pone `inline-flex` en
+  // `&.expanded`, y ese `display` de autor le gana a la regla `[hidden]` de la UA. Es el mismo corte
+  // que `.fullmap-view[hidden]` de más arriba; `.sort-wrap` no lo necesita (no tiene `display` propio)
+  // pero se lista con el otro para que el par se lea junto y ninguno se olvide.
+  .work-notes-toggle[hidden],
+  .sort-wrap[hidden] {
+    display: none;
+  }
+
+  // Globo del hover. A diferencia del de la tarjeta son dos renglones (el tema y el titular de su
+  // artículo), así que es un `flex column` y no un bloque de texto: sin él el segundo renglón se
+  // pegaría al primero.
+  .fullmap-tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 260px;
+    padding: 5px 9px;
+    border-radius: 4px;
+    background: rgb(14 17 22 / 92%);
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.68rem;
+    line-height: 1.3;
+    white-space: normal;
+    pointer-events: none;
+  }
+
+  .fullmap-tooltip-topic {
+    font-weight: 600;
+  }
+
+  .fullmap-tooltip-source {
+    opacity: 0.72;
+  }
+
+  // En fullpage el mapa sigue tomando el viewport entero: la barra se le monta encima por `z-index`, así
+  // que no hay alto que reservar y no hace falta ningún `calc()` con `--tv-sticky-top`.
+  &.fullpage .fullmap-view {
+    margin-top: 0;
+  }
+
+  @media (max-width: 600px) {
+    // Las declaraciones van directo en el `@media` y no anidadas adentro de `.fullmap-canvas`, por
+    // el mismo motivo que el `@media` de `.filter-menu`: anidadas compilarían a un descendiente de
+    // dos clases que ningún nodo puede ser, y el bloque entero no aplicaría.
+    .fullmap-status {
+      margin: 8px auto;
     }
   }
 
@@ -3082,6 +3405,42 @@
       overflow: hidden;
       text-overflow: ellipsis;
       word-break: break-word;
+    }
+
+    // El tema que se clickeó en el mapa general: la ficha se abre en él, así que tiene que quedar
+    // marcado aunque el scroll ya lo haya dejado en el medio de la lista.
+    //
+    // El color es el **tono del tema** (`--tema-tone-color`, que cada `.tone-tema-*` define) y no
+    // `--tv-accent`: es el mismo color con el que se pinta su círculo en el mapa, y esa es la
+    // correspondencia que el ojo necesita para unir "el punto que clickeé" con "esta fila". El
+    // `padding` se come para que el fondo no se corte contra el borde izquierdo.
+    //
+    // Es una clase, no un elemento: la fila ya existe (la escribe `_buildTemasHtml`) y el mapa
+    // general solo la marca, así que `_ensureCardDetail` puede reescribir el detalle entero sin que
+    // el resaltado se pierda.
+    &.tema-selected {
+      background: color-mix(in srgb, var(--tema-tone-color, var(--tv-accent)) 18%, transparent);
+      border-left-color: var(--tema-tone-color, var(--tv-accent));
+      box-shadow: inset 2px 0 0 var(--tema-tone-color, var(--tv-accent));
+      border-radius: 0 4px 4px 0;
+    }
+
+    // El tema que tiene punto en el mapa general: clickeable, así que se lo dice —con el puntero y con
+    // un hover— antes de que lo cliqueen. El hover es **sutil** a propósito: la fila ya tiene su chip
+    // de tono y su resumen, y un fondo fuerte compite con el resaltado de arriba, que es el estado que
+    // de verdad importa (el que se quedó elegido).
+    //
+    // La clase la pone `_bindFullMapCardTemas`, o sea que el criterio "tiene `geom`" vive en el TS y
+    // no se reimplementa acá: un tema sin ubicación nunca recibe esta clase y por lo tanto nunca
+    // parece clickeable.
+    &.tema-locatable {
+      cursor: pointer;
+      border-radius: 0 4px 4px 0;
+
+      &:hover {
+        background: rgb(255 255 255 / 6%);
+        border-left-color: var(--tv-accent);
+      }
     }
   }
 

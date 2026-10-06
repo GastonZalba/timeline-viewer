@@ -281,7 +281,49 @@ function handleItems(url, res) {
   );
 }
 
-/** GET /api/facets — static values of the whole collection (requested once, at startup) */
+/**
+ * GET /api/points — one flat point per located topic of everything the query matches, for the
+ * general map of the `showFullMap` option.
+ *
+ * It exists because the list endpoint cannot answer this: `toSummary` projects only what the
+ * collapsed card renders, and `temas` (which is where `geom` lives) only travels with
+ * `GET /api/:id`. Collecting the geometry from the list would mean one request per article.
+ *
+ * The query is the same one as the list minus the cursor (`page`, `pageSize`) and the order
+ * (`sort`, `sortBy`): the map fits every point at once and has no order, so there is nothing to page
+ * or to sort. `parseFilters` treats whatever is left as a filter field, exactly as it does for the
+ * list, which is why a group the client declares for a field this backend never heard of still
+ * narrows the points.
+ *
+ * Only what the map draws travels: position, topic title and article title. It is not a reduced
+ * `TimelineItem`, it is a topic on its own.
+ */
+function handlePoints(url, res) {
+  const params = Object.fromEntries(url.searchParams.entries());
+  const filtered = poolItems(normalize(params.q || ''), parseFilters(params));
+
+  const points = [];
+  filtered.forEach((item) => {
+    (item.temas || []).forEach((tema, temaIndex) => {
+      if (!tema || !tema.geom) return;
+      points.push({
+        id: item.id,
+        tema_index: temaIndex,
+        titulo: tema.titulo,
+        nombre_fuente: item.nombre_fuente,
+        tono_social: tema.tono_social,
+        geom: { lat: tema.geom.lat, lon: tema.geom.lon }
+      });
+    });
+  });
+
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ points, total: points.length }));
+}
+
+/**
+ * GET /api/facets — static values of the whole collection (requested once, at startup)
+ */
 function handleFacets(res) {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(
@@ -318,8 +360,16 @@ const server = http.createServer((req, res) => {
   }
 
   // Must be matched before the /api/:id branch below, otherwise "facets" would be read as an id.
+  // Same for "points", and for the same reason.
   if (pathname === '/api/facets' || pathname === '/api/facets/') {
     if (req.method === 'GET') return handleFacets(res);
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+    return;
+  }
+
+  if (pathname === '/api/points' || pathname === '/api/points/') {
+    if (req.method === 'GET') return handlePoints(url, res);
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
     return;
@@ -406,4 +456,5 @@ server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   console.log(`Mock API available at http://localhost:${PORT}/api`);
   console.log(`Static facets available at http://localhost:${PORT}/api/facets`);
+  console.log(`Map points available at http://localhost:${PORT}/api/points`);
 });

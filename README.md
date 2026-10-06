@@ -83,6 +83,7 @@ The `Timeline` constructor accepts a single config object:
 | `singleId`       | `string`                       | —          | Optional. When set (e.g. `'/FUE-0001'` or `'FUE-0001'`), renders a **single already-expanded card** with its full detail and no timeline chrome (no featured stack, filters, search, sort, pagination or status bar). The card cannot be collapsed. With `internalButtons: true`, a toolbar with the red work-notes toggle is shown above the card. Works in both local (`items`) and API mode. The navigation links block under the card is not configured here: it comes from the item's own `taxonomias` field. See [Single view taxonomies](#single-view-taxonomies) |
 | `temasMapTiles`  | `string`                       | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | Optional. Tile template for the [topics map](#topics-map) (any `{z}/{x}/{y}` XYZ provider). Passing `''` explicitly opts out of the base layer, leaving the map with only the article's own points |
 | `temasMapAttribution` | `string` | `© OpenStreetMap` (a link to its copyright page) | Optional. Credit of the base layer, shown at the bottom of the [topics map](#topics-map). It is the credit of *those* tiles, so **override it when you override `temasMapTiles`**: with your own XYZ provider, `''` takes the attribution out of the map entirely (no empty box left behind). Injected as **HTML (not escaped)**, so the credit can be a link. Ignored when `temasMapTiles` is `''`: with no base layer there are no tiles to attribute |
+| `showFullMap` | `boolean` | `false` | When `true`, adds a toolbar button that swaps the whole timeline for a **general map**: one marker per located topic of everything that matches the current search and filters, over the same toolbar. The button exists even with the timeline collapsed, and the toolbar stays on top of the map so the search box and the filter panel keep scoping it. The sort control and the work-notes toggle are hidden while the map is up (there is no list to order, and a map *is* hidden work notes). A filter change re-plots the markers **in place**: the base layer and the view (pan and zoom) are kept, so the map does not flash and the framing you set stays. Clicking a marker opens that article's card in a panel at the bottom left, **expanded** and scrolled to the clicked topic, which is highlighted; the clicked marker stays marked until the panel closes. Clicking the empty map closes it. Ignored in single mode (`singleId`). See [General map](#general-map) |
 
 ### Item fields
 
@@ -145,11 +146,14 @@ Mientras una respuesta de lista está en vuelo, el componente muestra **tarjetas
 |-------------------|------------------------------------------------------------------------|------------------------------|
 | `GET {url}`       | Lista paginada con búsqueda, filtros y orden                        | Objeto con `items` y `total` |
 | `GET {url}/facets` | Valores estáticos de la colección completa: conteos de los filtros, total y `lastUpdated`. Se pide **una sola vez**, al iniciar, en paralelo con la primera página | Objeto con `facets`, `total` y `lastUpdated` opcional |
+| `GET {url}/points` | Un punto por tema ubicado de lo que matchea la búsqueda y los filtros, sin paginar. Solo se pide si `showFullMap` está activo y el mapa general se abrió | Objeto con `points` (y `total`) |
 | `GET {url}/:id`   | Detalle completo de un artículo (cargado lazy al expandir la tarjeta, y en single mode) | El `TimelineItem` completo, **sin envolver** (no lleva `{"item": ...}`) |
 
 > El campo `items` de la respuesta es la lista paginada que devuelve el servidor y **no** tiene relación con la opción `content` ni con el alias legacy `items`. En modo API no se renderiza el selector de taxonomías.
 
-> `GET {url}/facets` tiene prioridad sobre `GET {url}/:id`: una ruta `/facets` no puede ser un id de artículo.
+> `GET {url}/facets` y `GET {url}/points` tienen prioridad sobre `GET {url}/:id`: una ruta `/facets` o `/points` no puede ser un id de artículo.
+
+> Los puntos de `GET {url}/points` son planos y llevan `id` (el del **artículo**), `tema_index` (opcional), `titulo`, `nombre_fuente`, `tono_social` y `geom`. El `tema_index` es lo que permite abrir la ficha scrolleada hasta el tema clickeado; sin él el mapa funciona igual, solo sin scroll ni resaltado.
 
 #### Parámetros de `GET {url}`
 
@@ -290,6 +294,18 @@ Each card's "Temas destacados" header carries an icon-only **map toggle** ("Ver 
 - **Hover.** The circle under the pointer grows and a tooltip shows the topic title; the canvas switches to a pointer cursor. A topic without `geom` is still listed — it just stays off the map.
 - **Spiderfy.** Topics whose circles would overlap at the current zoom are pushed apart along a circle around their centroid. The displaced circle keeps its tone color and its number, and is tied to its real position by a thin line of its own tone, with no arrowhead and no dot at the origin. The layout is recomputed on every `moveend`, so zooming in gradually returns the circles to their true coordinates.
 - **Teardown.** The maps are disposed (`dispose()` + overlay removal) whenever the list is rebuilt or replaced by the loading placeholders, so a re-render never leaks an OpenLayers instance.
+
+### General map
+
+The `showFullMap` option adds a toolbar button that swaps the whole timeline for one map with a marker per located topic of everything that matches the current search and filters. It is the same OpenLayers machinery as the per-card topics map, at collection scale.
+
+- **One marker per located topic**, not per article: an article with three located topics contributes three markers. Unnumbered circles, colored by the topic's `tono_social`, with the topic title and the article's headline on hover.
+- **The toolbar stays on top of the map**, because the search box and the filter panel are what scope it. The sort control and the work-notes toggle are hidden while the map is up: there is no list to order, and a map *is* hidden work notes.
+- **Filters scope it like they scope the list**, with one difference: a filter on `tonos_sociales` narrows the markers **per topic**. The toolbar filter matches per article ("this article has a negative topic"), which is right for the list and wrong for a map of topics — so picking "Negativo" shows the negative topics and only those, instead of every topic of the articles that happened to have one.
+- **No flash, no re-framing.** A filter change re-plots the markers in place: the base layer and the view are kept, so the tiles are not re-fetched and the pan and zoom you set are not undone. Only a filter that leaves no point at all tears the map down.
+- **Click a marker** to open that article's card in a panel at the bottom left — the same card as in the list, not a reduced version of it, and **expanded**, because the click names a topic. The panel scrolls to that topic and highlights it in its own tone color; clicking another topic of the same card re-scrolls and re-highlights it, and only the new one stays marked. The clicked circle grows and gets a ring of its own tone for as long as the panel is open, and loses it when the panel closes. The card's info menu still carries the link to its individual view (`link_view_entry`, absolutized like the share button); there is no second copy of it in the panel. Clicking the empty map closes the panel. In API mode the article is fetched whole on demand (`GET {url}/:id`), since `/points` only carries the topic.
+- **`GET {url}/points` may carry `tema_index`.** It is the position of the topic inside the article's `temas`, and it is what lets the panel scroll to and highlight the right row. It is optional: a backend that does not send it still gets a working map, just without the scroll and the highlight.
+- **Lazy and torn down** exactly like the card maps: OpenLayers is imported on the first open, and the map is disposed when it is closed for good or when the view goes away.
 
 ### Content taxonomies
 

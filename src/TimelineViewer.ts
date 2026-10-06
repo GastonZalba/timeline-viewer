@@ -202,6 +202,38 @@ const TEMAS_MAP_SPIDER_GAP = 1;
 const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
 
 /**
+ * How much bigger the circle of the **selected** marker gets, in screen pixels, and how thick the ring
+ * it grows around itself is.
+ *
+ * The selection is the point the article panel is showing, and it has to read at a glance over a
+ * raster base layer where the marker might sit on a tone-colored tile. Growing the circle is what
+ * separates it from its neighbors —the spiderfy already guarantees they are at least
+ * `2 * (radius + gap)` apart, so this does not make two markers touch— and the ring is what holds the
+ * shape together while it grows.
+ *
+ * The ring is **almost black**, not the tone color like the plain marker's white one: the fill already
+ * is the tone color, so a ring of the same hue would only widen a solid blob of it instead of drawing
+ * a marker. A dark outline is what separates the fill from whatever the tiles have under it, and it is
+ * the same `#0e1116` as the number painted on top, so the selected circle reads as one object.
+ */
+const TEMAS_MAP_SELECTED_RADIUS_DELTA = 4;
+const TEMAS_MAP_SELECTED_RING_WIDTH = 2;
+const TEMAS_MAP_SELECTED_RING_COLOR = '#0e1116';
+
+/**
+ * Z index of the selected marker's style.
+ *
+ * The selected circle is the **largest** one, so without a z index it gets overlapped: the circles
+ * around it are full-size and paint after it, and a tone-colored marker sitting on a tone-colored
+ * tile or a tone-colored neighbor ends up eating the very ring that was supposed to say "this one".
+ * OpenLayers sorts the styles of a vector layer by `zIndex`, so a single value above the default is
+ * all it takes. The spiderfied variant needs it too —the displaced circle is a second style of the
+ * same feature, built in the `declutter` pass— which is why the z index rides on the style and not on
+ * the feature.
+ */
+const TEMAS_MAP_SELECTED_Z_INDEX = 1;
+
+/**
  * Default of `temasMapAttribution`: the credit of the default base layer. The tile template is
  * opaque to the component (the consumer hands it over ready to use, key included), so the provider
  * cannot be derived from it, and the attribution of the data most such tiles carry —OpenStreetMap—
@@ -264,6 +296,31 @@ const TEMAS_MAP_NO_GEOM_SVG =
  */
 const TEMAS_MAP_TOGGLE_CHEVRON_SVG =
   '<svg class="card-temas-map-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6,9 12,15 18,9"/></svg>';
+
+/**
+ * States of the general map (`showFullMap`), written as the `data-state` of `#fullmap-status` so the
+ * SCSS can leave the box alone in the one state that has no text, and so the message is a single
+ * attribute instead of three class names the TS would have to keep in sync.
+ */
+const FULLMAP_STATE_LOADING = 'loading';
+const FULLMAP_STATE_EMPTY = 'empty';
+const FULLMAP_STATE_ERROR = 'error';
+
+/**
+ * Los dos rótulos del botón del mapa general, y el ícono de cada estado.
+ *
+ * El botón cambia **de glifo**, no solo de color: con el mapa abierto ya no es "abrime el mapa" sino
+ * "sacáme del mapa y mostrame el listado", y un ícono de mapa plegado sobre un mapa desplegado obliga
+ * a leer el `title` para saber qué hace. El `X` va con `stroke` y no con `fill` porque una cruz son dos
+ * trazos; el `viewBox` de 24 es el de los otros íconos de línea de la barra (la lupa).
+ *
+ * Los rótulos van en `title` **y** en `aria-label`: el primero es lo que se lee al pasar el mouse y el
+ * segundo lo que anuncia el lector de pantalla, y son los mismos textos.
+ */
+const FULLMAP_OPEN_LABEL = 'Ver mapa';
+const FULLMAP_EXIT_LABEL = 'Salir del mapa y ver como listado';
+const FULLMAP_CLOSE_SVG =
+  '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>';
 
 /**
  * Values shown per filter group before the "Ver más (N)" toggle appears, when the `maxVisible`
@@ -336,6 +393,28 @@ const URL_STATE_KEYS = {
 } as const;
 
 const TONE_LABEL: Record<string, string> = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro' };
+
+/**
+ * The filter field whose active values the general map applies **per topic**, not per article.
+ *
+ * It is the article-level array of tones, and that is exactly the point: the same group that narrows
+ * the list to "the articles with a negative topic" has to narrow the map to "the negative topics", or
+ * the map draws every topic of those articles. Hardcoded, like the tone colors and the tone labels, and
+ * for the same reason: it is part of the data model, not a per-consumer configuration. A group declared
+ * on any other field keeps filtering per article only — which is all a topic knows about — and the map
+ * follows it.
+ */
+const FULLMAP_TONE_FIELD = 'tonos_sociales';
+
+/**
+ * Milisegundos que dura el desplazamiento de la vista cuando se elige un tema desde la ficha.
+ *
+ * No es cero a propósito —a diferencia del `fit` de apertura, que tiene que estar listo antes del
+ * primer pintado—: acá la vista ya está mostrando algo y el salto sería un corte. Con duración
+ * OpenLayers interpola el centro y el zoom, que además dispara los `moveend` que re-declutterean los
+ * markers en el camino.
+ */
+const FULLMAP_FOCUS_DURATION = 400;
 
 /**
  * Normalize a text so it can be searched as a plain substring: without accents and without case,
@@ -412,6 +491,12 @@ interface TemasMapPoint {
   lon: number;
   titulo: string;
   color: string;
+  /**
+   * El tono del **tema**, que es lo que el mapa general filtra y lo que el color de arriba sale.
+   * Viaja como dato y no se deduce del color porque el filtro de tonos tiene que poder comparar
+   * contra el tono real, y contra un `hex` no se puede.
+   */
+  tono_social: TonoSocial;
 }
 
 /**
@@ -431,9 +516,110 @@ interface TemasMapSpider {
  * away: the map because it keeps its canvas, listeners and tile source alive, and the overlay because
  * `Map.dispose()` does not take the overlays that were added to it with it.
  */
-interface TemasMapHandle {
+interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
   map: OlMap;
   overlay: OlOverlay;
+  /**
+   * Reemplazar los puntos conservando la vista. El mapa de la tarjeta no lo usa (sus puntos son los
+   * de la tarjeta, que no cambian sin que se rehaga la tarjeta): existe para el mapa general, que sí
+   * cambia de set cuando cambia un filtro.
+   *
+   * Va declarado como **método** y no como propiedad con `=>` a propósito: los handles de las dos
+   * vistas se guardan en campos de tipo `TemasMapHandle<TemasMapPlottable>` (el más ancho), y con la
+   * firma de propiedad `strictFunctionTypes` haría el tipo invariante y no los aceptaría. Los métodos
+   * son bivariantes, que es justo lo que hace falta acá.
+   */
+  updatePoints(points: P[]): void;
+  /**
+   * Repintar los markers para que el predicado `isSelected` se vuelva a evaluar.
+   *
+   * El estilo de cada marker es una **función**, así que no alcanza con cambiar el estado: sin este
+   * `changed()` los círculos seguirían siendo los del momento en que se creó el feature. Solo lo
+   * necesita el mapa general (el de la tarjeta nunca selecciona nada) y por eso es un método
+   * explícito y no una parte de `updatePoints`: abrir y cerrar la ficha no cambia los puntos.
+   */
+  refreshStyles(): void;
+}
+
+/**
+ * Lo mínimo que un punto necesita para existir en un mapa: dónde está y de qué color se lo pinta.
+ * Es lo que separa lo que las dos vistas comparten (todo el armadilio de `ol`) de lo que
+ * distingue a cada una: el número y el `temaIndex` son de la tarjeta, el `nombre_fuente` es del mapa
+ * general.
+ */
+interface TemasMapPlottable {
+  lat: number;
+  lon: number;
+  color: string;
+}
+
+/**
+ * Lo que las dos vistas del mapa le pasan distinto al mismo armadilio de OpenLayers
+ * (`_mountTemasMapOn`). Sin esto habría que duplicar las ~200 líneas del agrupamiento de marcadores
+ * superpuestos, que son las que más caro salen de mantener.
+ */
+interface TemasMapMountOptions<P> {
+  /**
+   * Texto pintado en el centro del marcador, o `null` para un círculo pelado. El mapa general pasa
+   * `null`: su número global no apuntaría a ninguna lista visible, así que el hover pasa a ser la
+   * única etiqueta y el círculo se deja más chico para el mismo espacio.
+   */
+  markerLabel: ((point: P) => string) | null;
+  /** Markup del globo de hover sobre un marcador */
+  hoverHtml: (point: P) => string;
+  /** Clase del globo de hover */
+  tooltipClass: string;
+  /** Clase del mensaje que se escribe en el canvas cuando no se pudo cargar `ol` */
+  errorClass: string;
+  /**
+   * Click sobre un marcador, o `null` para un mapa que no reacciona al click. Lo usa solo el mapa
+   * general: el de la tarjeta abre su propio detalle desde el botón de la tarjeta, así que ahí el
+   * click no tiene nada que hacer y no se bindea (un listener que no hace nada tampoco es inocuo:
+   * frena el drag del mapa).
+   */
+  onMarkerClick: ((point: P) => void) | null;
+  /**
+   * Click en el mapa que **no** cae sobre un marcador, o `null` si no hace falta. Va aparte de
+   * `onMarkerClick` y no como un punto más porque "no hay punto" no es un punto: el mapa general lo
+   * usa para cerrar el panel de la ficha, que es lo que uno espera al clickear el vacío.
+   */
+  onMarkerMiss: (() => void) | null;
+  /**
+   * Si el punto es el que está abierto en la ficha, o `false`/`null` si este mapa no marca ninguno.
+   *
+   * Va como **predicado**, no como un `Set` de ids, porque el estilo se resuelve por feature y en
+   * cada repintado: con un `Set` el mapa habría que enterarse de los cambios a mano. Con el predicado,
+   * abrir o cerrar la ficha es solo cambiar qué devuelve y pedir un repintado (`refreshStyles`).
+   */
+  isSelected?: ((point: P) => boolean) | null;
+}
+
+/**
+ * Un punto del mapa general: un tema localizado más el artículo al que pertenece. Es la misma
+ * unidad que `TemasMapPoint` más el `nombre_fuente`, que es lo que el hover necesita para nombrar de
+ * dónde viene el tema —en el mapa de la tarjeta el titular ya está escrito justo arriba, y acá
+ * no hay lista que lo diga—.
+ */
+interface FullMapPoint extends TemasMapPlottable {
+  /** Id del artículo al que pertenece el tema */
+  itemId: number | string;
+  /**
+   * Posición del tema en `card.temas`, que es lo que permite scrollear la ficha hasta él y resaltarlo.
+   * En local sale de `_temasLocated`; en API de `tema_index` de `GET {url}/points`, y es `-1` si el
+   * backend no lo manda —en ese caso la ficha abre sin scrollear ni resaltar, que es el mismo
+   * resultado que un backend viejo daba sin este campo.
+   */
+  temaIndex: number;
+  /** Título del tema (el dato que ya usaba el hover de la tarjeta) */
+  titulo: string;
+  /** Titular del artículo, la segunda línea del hover del mapa general */
+  nombre_fuente: string;
+  /**
+   * El tono del **tema**, que es lo que el filtro de tonos acota punto por punto. Viaja como dato y no
+   * se deduce del `color` porque contra un `hex` no se puede filtrar. Es el mismo valor que pinta el
+   * `color`, así que los dos no pueden discrepar.
+   */
+  tono_social: TonoSocial;
 }
 
 export interface ItemTema {
@@ -543,6 +729,40 @@ export interface TimelineApiFacetsResponse {
    */
   total?: number;
   lastUpdated?: string;
+}
+
+/**
+ * Un punto de `GET {url}/points`: un tema con ubicación, aplanado. Los mismos campos que el mapa de
+ * la tarjeta usa, más el artículo al que pertenece, que es lo que permite nombrar el tema sin
+ * volver a pedir el ítem entero.
+ *
+ * Solo viaja lo que el mapa dibuja: no es un `TimelineItem` reducido, es un tema suelto.
+ */
+export interface TimelineApiPoint {
+  /** Id del **artículo** al que pertenece el tema (no el del tema, que no existe por separado) */
+  id: number | string;
+  /**
+   * Posición del tema dentro de `temas` del artículo. Opcional: es lo que permite scrollear la ficha
+   * hasta el tema clickeado y resaltarlo. Un backend que no lo manda deja el `-1` y el mapa sigue
+   * funcionando —solo sin scrollear ni resaltar—, así que agregarlo no rompe a nadie.
+   */
+  tema_index?: number;
+  titulo: string;
+  nombre_fuente: string;
+  tono_social: TonoSocial;
+  geom: TemaGeom;
+}
+
+/**
+ * Respuesta de `GET {url}/points`: los puntos de **todo** lo que matchea la consulta, no de una
+ * página. Acepta los mismos params que la lista salvo los de paginación (`page`, `pageSize`) y los
+ * de orden (`sort`, `sortBy`): el mapa los muestra todos a la vez y no los ordena, así que pedir
+ * una página u ordenar son cosas que el endpoint no tiene dónde poner.
+ */
+export interface TimelineApiPointsResponse {
+  points: TimelineApiPoint[];
+  /** Cantidad de puntos devueltos. Opcional: el mapa no lo necesita, es dato informative */
+  total?: number;
 }
 
 export interface SingleTaxonomyItem {
@@ -708,6 +928,34 @@ export interface TimelineOptions {
    * (que es lo que ya pasaba antes de que existiera esta opción).
    */
   temasMapAttribution?: string;
+  /**
+   * Vista de mapa general (default: false): agrega un botón en la barra de herramientas que
+   * reemplaza el timeline por **un solo mapa con los puntos de todo lo que hay en pantalla**, en
+   * lugar de un mapa por tarjeta.
+   *
+   * El punto es un tema con `geom` —el mismo que el mapa de la tarjeta— y el color es el de su
+   * tono, así que el mapa general se lee como la unión de los mapas de las tarjetas. Los puntos
+   * corresponden al **scope filtrado**: búsqueda, filtros y taxonomía los narrowean igual que a la
+   * lista, y por lo tanto un cambio de cualquiera de ellos vuelve a pedir los puntos y a ajustar la
+   * vista. Un tema sin `geom` no aporta punto, como en el mapa de la tarjeta.
+   *
+   * Un círculo por tema, **sin número**: el número del mapa de la tarjeta apunta al badge del tema
+   * en la lista de arriba, y acá no hay lista. El hover es lo que nombra cada punto, con el título
+   * del tema y el titular del artículo.
+   *
+   * Los superpuestos se apartan con el mismo agrupamiento del mapa de la tarjeta, así que hacer
+   * zoom separa lo que se ve amontonado.
+   *
+   * En modo API los puntos **no** salen de la lista paginada (que no lleva `temas`, solo llegan con
+   * `GET {url}/:id`): se piden con `GET {url}/points`, un endpoint propio. Es el único punto donde
+   * hace falta, así que sin la opción no hay request nuevo ni carga de `ol`.
+   *
+   * No tiene nada que ver con `fullpage`: se puede usar con o sin él. Combinado con `fullpage` el
+   * mapa toma el alto que queda bajo la barra pegada; sin él, uno fijo.
+   *
+   * No aplica a single mode (`singleId`), que ya renderiza una única tarjeta expandida.
+   */
+  showFullMap?: boolean;
   /**
    * Keep the state of the view in the browser URL (default: false), so the address bar is a
    * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
@@ -1214,6 +1462,55 @@ export default class Timeline {
    */
   temasMapAttribution: string;
   /**
+   * General map (`showFullMap`): whether the toolbar button that swaps the timeline for one map with
+   * every point on screen is rendered at all.
+   */
+  showFullMap: boolean;
+  /** Null when `showFullMap` is off, or in single mode: no button means no view either */
+  fullMapToggle: HTMLElement | null;
+  fullMapView: HTMLElement | null;
+  fullMapCanvas: HTMLElement | null;
+  fullMapStatus: HTMLElement | null;
+  /** The panel that holds the summary card of the clicked point, over the map */
+  fullMapDetail: HTMLElement | null;
+  /**
+   * Whether the general map is the thing on screen. It is the one state of the view that is neither
+   * "collapsed" nor "expanded": the timeline is `hidden` while the map is up, and the toolbar keeps
+   * working over it —which is the whole point, because the filters that scope the map are in the same
+   * toolbar.
+   */
+  _fullMapOpen: boolean;
+  /**
+   * Live general map, if it is mounted. Kept apart from `_temasMaps` on purpose: that one is wiped
+   * by `_destroyTemasMaps` on every re-render of the timeline, and this map has to survive all of
+   * them —it is not on screen anymore to be rebuilt.
+   */
+  _fullMapHandle: TemasMapHandle | null;
+  /** Last points resolved for the general map, kept only to tell "still loading" from "no points" */
+  _fullMapPoints: FullMapPoint[];
+  /**
+   * Monotonic counter of the point resolutions, so a response that arrives after a newer filter
+   * change does not paint the map of a view that no longer exists. Same trick as `_apiSeq`.
+   */
+  _fullMapSeq: number;
+  /**
+   * Id of the article whose card the general map panel is showing, or `null` when it is closed.
+   *
+   * Un *artículo*, no un punto: un artículo con varios temas ubicados llega por cualquiera de sus
+   * markers y el panel muestra el artículo entero. Sirve para descartar la respuesta de una ficha
+   * que ya no es la abierta (el artículo cambió mientras se esperaba la API) y para saber si hay algo
+   * que cerrar. Lo que distingue un punto de otro del mismo artículo es `_fullMapSelectedKey`.
+   */
+  _fullMapCardId: string | null;
+  /**
+   * Key of the **topic** whose point is open in the panel, or `null`. It is lo que distingue "el mismo
+   * artículo ya abierto" de "este artículo, en este tema": clickear dos puntos del mismo artículo no
+   * puede ser un no-op, porque lo que cambia es el tema que se scrollea y resalta. La composición es el
+   * id del artículo más el índice del tema, que es lo único que un backend puede no mandar (`tema_index`
+   * ausente → `-1`) y aun así ser único por punto.
+   */
+  _fullMapSelectedKey: string | null;
+  /**
    * OpenLayers modules, loaded once the first time a topics map is opened. `null` until then:
    * **never imported eagerly**, so a page without topics that carry a `geom` does not resolve
    * the peer dependency at all — same reason the social embed SDKs are loaded on demand
@@ -1359,6 +1656,18 @@ export default class Timeline {
       config.temasMapAttribution === undefined ? TEMAS_MAP_ATTRIBUTION_DEFAULT : config.temasMapAttribution;
     this._olModules = null;
     this._temasMaps = new Map();
+    this.showFullMap = config.showFullMap === true;
+    this.fullMapToggle = null;
+    this.fullMapView = null;
+    this.fullMapCanvas = null;
+    this.fullMapStatus = null;
+    this.fullMapDetail = null;
+    this._fullMapOpen = false;
+    this._fullMapHandle = null;
+    this._fullMapPoints = [];
+    this._fullMapSeq = 0;
+    this._fullMapCardId = null;
+    this._fullMapSelectedKey = null;
     // The URL state is read here, before `_init()`, and not inside it: what it says has to be part of
     // the **first** render (the markup of the toolbar, the selected sorter, the taxonomy pill) and of
     // the first API request, or the shared link would open on the wrong view and then correct itself.
@@ -1824,11 +2133,43 @@ export default class Timeline {
             </div>`;
   }
 
+  /**
+   * Botón de la vista de mapa general, en la barra de herramientas y al lado del buscador: es lo
+   * único que cambia **qué** se muestra, y el buscador es lo que acota lo que el mapa muestra.
+   *
+   * Sin la opción no hay markup, como con `sorters` y `filters`: es el mismo patrón de "lo que no
+   * se declara no existe". Reusa el ícono de mapa plegado del botón de la tarjeta
+   * (`TEMAS_MAP_TOGGLE_SVG`) porque es la misma acción a otra escala.
+   */
+  protected _buildFullMapToggleHtml(): string {
+    if (!this.showFullMap) return '';
+    return `<div class="fullmap-wrap">
+            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="fullmap-view" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}</button>
+          </div>`;
+  }
+
+  /**
+   * La vista del mapa general, hermana de `.timeline-container` y no dentro de ella: el contenedor
+   * del timeline lleva `max-height: 0` mientras está colapsado, así que un mapa adentro no tendría
+   * alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa hasta el primer
+   * click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada que mostrar.
+   */
+  protected _buildFullMapViewHtml(): string {
+    if (!this.showFullMap) return '';
+    return `<div class="fullmap-view" id="fullmap-view" hidden>
+          <div class="fullmap-status" id="fullmap-status" hidden></div>
+          <div class="fullmap-canvas" id="fullmap-canvas"></div>
+          <div class="fullmap-detail" id="fullmap-detail" hidden></div>
+        </div>`;
+  }
+
   /** Build the main DOM layout and cache element references */
   protected _buildLayout() {
     const internalButtonsHtml = this._buildInternalButtonsHtml();
     const filterMenuHtml = this._buildFilterMenuHtml();
     const sortMenuHtml = this._buildSortMenuHtml();
+    const fullMapHtml = this._buildFullMapToggleHtml();
+    const fullMapViewHtml = this._buildFullMapViewHtml();
     this.container.innerHTML = `
       <section class="publicaciones-section" id="publicaciones-section">
         <div class="featured-row">
@@ -1846,6 +2187,7 @@ export default class Timeline {
             ${filterMenuHtml}
             ${sortMenuHtml}
             ${internalButtonsHtml}
+            ${fullMapHtml}
           </div>
           <div class="featured-cards" id="featured-cards" title="Expandir publicaciones"></div>
         </div>
@@ -1867,11 +2209,12 @@ export default class Timeline {
               </div>
             </div>
           </div>
-          <div class="ai-disclaimer">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.7a.9.9 0 0 1 1.7 0l1.4 4.2a.9.9 0 0 0 .6.6l4.2 1.4a.9.9 0 0 1 0 1.7l-4.2 1.4a.9.9 0 0 0-.6.6l-1.4 4.2a.9.9 0 0 1-1.7 0l-1.4-4.2a.9.9 0 0 0-.6-.6l-4.2-1.4a.9.9 0 0 1 0-1.7l4.2-1.4a.9.9 0 0 0 .6-.6z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+<div class="ai-disclaimer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 2.7a.9.9 0 0 1 1.7 0l1.4 4.2a.9.9 0 0 0 .6.6l4.2 1.4a.9.9 0 0 1 0 1.7l-4.2 1.4a.9.9 0 0 0-.6.6l-1.4 4.2a.9.9 0 0 1-1.7 0l-1.4-4.2a.9.9 0 0 0-.6-.6l-4.2-1.4a.9.9 0 0 1 0-1.7l4.2-1.4a.9.9 0 0 0 .6-.6l1.4-4.2a.9.9 0 0 1 0-1.7z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
             <span>El contenido fue procesado con IA y puede contener imprecisiones</span>
           </div>
         </div>
+        ${fullMapViewHtml}
       </section>
     `;
     this.section = this.container.querySelector('#publicaciones-section') as HTMLElement;
@@ -1897,6 +2240,11 @@ export default class Timeline {
     this.taxonomySelectLabel = this.container.querySelector('#taxonomy-select-label') as HTMLElement | null;
     this.taxonomySelectCount = this.container.querySelector('#taxonomy-select-count') as HTMLElement | null;
     this.taxonomySelect = this.container.querySelector('#taxonomy-select') as HTMLSelectElement | null;
+    this.fullMapToggle = this.container.querySelector('#fullmap-toggle') as HTMLElement | null;
+    this.fullMapView = this.container.querySelector('#fullmap-view') as HTMLElement | null;
+    this.fullMapCanvas = this.container.querySelector('#fullmap-canvas') as HTMLElement | null;
+    this.fullMapStatus = this.container.querySelector('#fullmap-status') as HTMLElement | null;
+    this.fullMapDetail = this.container.querySelector('#fullmap-detail') as HTMLElement | null;
     // La clase le dice al SCSS que reescriba el layout (barra sticky, sin límite de altura,
     // sin ícono). El botón de expandir queda como contador: sin colapso posible, así que se
     // marca deshabilitado en vez de bindear un click que no hace nada.
@@ -2541,8 +2889,12 @@ export default class Timeline {
             const ref = point
               ? `<span class="tema-map-ref" title="${toneLabel} · Punto ${point.index + 1} en el mapa">${point.index + 1}</span>`
               : `<span class="tema-map-ref tema-map-ref-none" title="${toneLabel} · Sin ubicación en el mapa">${TEMAS_MAP_NO_GEOM_SVG}</span>`;
+            // El `data-tema-index` es lo que permite scrollear y resaltar un tema desde fuera de la tarjeta (el
+            // mapa general abre la ficha en el tema del punto clickeado): sin un selector estable el
+            // resaltado tendría que ir por texto, y dos temas con el mismo título no son una excepción
+            // en estos datos.
             return `
-          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}">
+          <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}" data-tema-index="${i}">
             ${ref}
             <div class="tema-content">
               <span class="tema-title"><span class="tema-tone">${TONE_LABEL[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
@@ -2563,8 +2915,12 @@ export default class Timeline {
    * goes into a single `View.fit`, so one `lat: 999` or one `NaN` coming out of the scraping
    * pipeline would drag every other point out of view, not just fail to add one. Out of range
    * is treated exactly like missing, so the topic is still listed above and only skips its marker.
+   *
+   * The parameter is typed as "anything with a `geom`" and not as an `ItemTema` because it is the
+   * same validator for the two sources of points: a topic of a card in memory and a topic of
+   * `GET {url}/points`. Both are pipeline data, so both can arrive broken.
    */
-  protected _temaGeomOf(tema: ItemTema | undefined): TemaGeom | null {
+  protected _temaGeomOf(tema: { geom?: TemaGeom | null } | null | undefined): TemaGeom | null {
     const geom = tema?.geom;
     if (!geom || typeof geom !== 'object') return null;
     const { lat, lon } = geom;
@@ -2592,7 +2948,8 @@ export default class Timeline {
         lat: geom.lat,
         lon: geom.lon,
         titulo: tema.titulo,
-        color: TEMAS_MAP_TONE_COLOR[tema.tono_social] || TEMAS_MAP_TONE_FALLBACK
+        color: TEMAS_MAP_TONE_COLOR[tema.tono_social] || TEMAS_MAP_TONE_FALLBACK,
+        tono_social: tema.tono_social
       });
     });
     return out;
@@ -2765,8 +3122,8 @@ export default class Timeline {
   /**
    * Create the map of one card inside `canvas` — a circle per located topic, numbered like the badge
    * it has in the list and colored like its tone, pushed apart when they overlap — with the view
-   * fitted to those points, keep it in `_temasMaps` so it can be disposed when the card
-   * goes away, and bind the hover that names a topic.
+   * fitted to those points, and keep it in `_temasMaps` so it can be disposed when the card
+   * goes away. The map itself is `_mountTemasMapOn`, shared with the general one.
    *
    * A card that already has a map is left alone: the toggle can be closed and reopened as many
    * times as wanted without rebuilding it, which would redownload the tiles and throw away
@@ -2774,16 +3131,50 @@ export default class Timeline {
    */
   protected async _mountTemasMap(canvas: HTMLElement, located: TemasMapPoint[]): Promise<void> {
     if (this._temasMaps.has(canvas)) return;
+    const handle = await this._mountTemasMapOn(canvas, located, {
+      markerLabel: (p) => String(p.index + 1),
+      hoverHtml: (p) => this._escapeHtml(p.titulo),
+      tooltipClass: 'card-temas-map-tooltip',
+      errorClass: 'card-temas-map-error',
+      onMarkerClick: null,
+      onMarkerMiss: null,
+      isSelected: null
+    });
+    if (!handle) return;
+    this._temasMaps.set(canvas, handle);
+  }
+
+  /**
+   * Arma el mapa de una lista de puntos dentro de `canvas` y devuelve su handle, o `null` si no se
+   * pudo armar (sin `ol`, o con el canvas ya desconectado).
+   *
+   * Es el cuerpo que compartían el mapa de cada tarjeta y el mapa general, y lo único que cambia
+   * entre los dos son las cuatro cosas de `options`: el texto del marcador, el markup del hover y
+   * las dos clases del canvas. Todo lo demás —capa base, crédito, el `updateSize` antes del `fit`,
+   * el `renderSync` antes de agrupar, el agrupamiento de superpuestos y su línea, el hit test del
+   * hover— es el mismo código, y duplicarlo es duplicar justo lo que más caro sale mantener: el
+   * orden de esas cuatro llamadas.
+   *
+   * `points` es genérico a propósito: de acá solo se leen `lat`, `lon` y `color`, así que el mismo
+   * método monta los `TemasMapPoint` de una tarjeta y los `FullMapPoint` del mapa general sin que
+   * ninguno de los dos tenga que saber del otro.
+   */
+  protected async _mountTemasMapOn<P extends TemasMapPlottable>(
+    canvas: HTMLElement,
+    points: P[],
+    options: TemasMapMountOptions<P>
+  ): Promise<TemasMapHandle<P> | null> {
     let ol: TemasMapModules;
     try {
       ol = await this._loadOpenLayers();
     } catch {
-      canvas.innerHTML = '<div class="card-temas-map-error">No se pudo cargar el mapa.</div>';
-      return;
+      canvas.innerHTML = `<div class="${options.errorClass}">No se pudo cargar el mapa.</div>`;
+      return null;
     }
-    // The card may have been re-rendered —a search, a filter, a page change— while the import was
-    // in flight, which leaves this canvas detached, with no map to attach to and no one to read it.
-    if (!canvas.isConnected || this._temasMaps.has(canvas)) return;
+    // El owner del mapa pudo volverlo a renderizar —una búsqueda, un filtro, un cambio de página—
+    // mientras tardaba el import, lo que deja este canvas desconectado, sin mapa al cual atarse y sin
+    // nadie que lo lea.
+    if (!canvas.isConnected || !points.length) return null;
 
     // One circle style per tone, shared by every marker of that tone. Unlike an `Icon`, a `Circle`
     // has no image to decode, so the cache only saves object churn.
@@ -2801,9 +3192,29 @@ export default class Timeline {
       return circle;
     };
 
-    const markerText = (p: TemasMapPoint) =>
-      new ol.Text({
-        text: String(p.index + 1),
+    // El círculo del punto abierto: más grande y con un anillo casi negro, que es lo que dice "este es
+    // el que elegiste" sin tener que inventar un ícono. Va en su propia caché y no agranda el de
+    // `circleOf`: los markers no elegidos no pueden verse afectados.
+    const selectedCircles = new Map<string, CircleStyle>();
+    const selectedCircleOf = (color: string): CircleStyle => {
+      let circle = selectedCircles.get(color);
+      if (!circle) {
+        circle = new ol.Circle({
+          radius: TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA,
+          fill: new ol.Fill({ color }),
+          stroke: new ol.Stroke({ color: TEMAS_MAP_SELECTED_RING_COLOR, width: TEMAS_MAP_SELECTED_RING_WIDTH })
+        });
+        selectedCircles.set(color, circle);
+      }
+      return circle;
+    };
+
+    // El número va solo si la vista lo necesita (ver `markerLabel`): en el mapa general no hay
+    // lista a la que apunte, así que el círculo se pinta pelado y el hover queda de etiqueta.
+    const markerText = (p: P): TextStyle | null => {
+      if (!options.markerLabel) return null;
+      return new ol.Text({
+        text: options.markerLabel(p),
         font: `700 ${TEMAS_MAP_MARKER_FONT}px system-ui, sans-serif`,
         textAlign: 'center',
         textBaseline: 'middle',
@@ -2811,8 +3222,9 @@ export default class Timeline {
         offsetY: TEMAS_MAP_MARKER_TEXT_OFFSET_Y,
         fill: new ol.Fill({ color: TEMAS_MAP_MARKER_TEXT_COLOR })
       });
+    };
 
-    const featureOf = (p: TemasMapPoint) => {
+    const featureOf = (p: P) => {
       const feature = new ol.OlFeature({
         geometry: new ol.OlPoint(ol.fromLonLat([p.lon, p.lat]))
       });
@@ -2829,23 +3241,60 @@ export default class Timeline {
       // when there is one, paints the line and the marker at the displaced point instead of at the
       // topic's own coordinate. The geometries live in the `spider` property, not in the feature's
       // own, because one feature paints two geometries that are not the same point.
-      const image = circleOf(p.color);
-      const label = markerText(p);
-      const base = new ol.Style({ image, text: label });
+      //
+      // El punto va en la propiedad `point` del feature y no cerrado en la función por lo mismo: la
+      // selección se resuelve en cada repintado, así que la función tiene que poder leer el estado de
+      // **ahora** y no el del momento en que se creó el feature.
       const connector = new ol.Stroke({ color: p.color, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
+      feature.set('point', p);
+      // El estilo "pelado" se cachea por `color + seleccionado` porque se resuelve en cada repintado de
+      // cada marker: sin el cache, mover el mapa crearía un `Style` por feature por frame.
+      const plainStyles = new Map<string, OlStyle>();
+      const plainStyle = (point: P): OlStyle => {
+        const selected = Boolean(options.isSelected?.(point));
+        const key = `${point.color}|${selected ? 1 : 0}`;
+        const hit = plainStyles.get(key);
+        if (hit) return hit;
+        const style = new ol.Style({
+          image: selected ? selectedCircleOf(point.color) : circleOf(point.color),
+          text: markerText(point) || undefined,
+          // El z index solo en el seleccionado. Los demás se quedan en `undefined`, que OpenLayers
+          // ordena como 0, así que el orden entre ellos sigue siendo el que dejaría el `declutter`.
+          zIndex: selected ? TEMAS_MAP_SELECTED_Z_INDEX : undefined
+        });
+        plainStyles.set(key, style);
+        return style;
+      };
       feature.setStyle((f) => {
+        const point = (f.get('point') as P | undefined) || p;
+        const base = plainStyle(point);
         const spider = f.get('spider') as TemasMapSpider | undefined;
         if (!spider) return base;
         // The line first, so the marker is painted over its own end of it.
         return [
+          // La línea **no** sube de z index: si subiera, cruzaría por encima de los círculos
+          // vecinos en vez de meterse debajo de ellos, que es lo que se lee bien con el punto
+          // desplazado. El z index del círculo sí es el del `base`, porque es un segundo estilo del
+          // mismo feature y sin él el punto desplazado se quedaría atrás igual que el resto.
           new ol.Style({ geometry: spider.line, stroke: connector }),
-          new ol.Style({ geometry: spider.marker, image, text: label })
+          new ol.Style({
+            geometry: spider.marker,
+            image: base.getImage() || undefined,
+            text: base.getText() || undefined,
+            zIndex: base.getZIndex()
+          })
         ];
       });
       return feature;
     };
 
-    const features = located.map(featureOf);
+    // Todo lo que depende del set de puntos es **mutable**, porque el mapa general lo cambia en vivo al
+    // cambiar un filtro (ver `updatePoints`). Lo que había antes era reconstruir el mapa entero, y eso
+    // tiraba abajo dos cosas que el usuario no pidió que se movieran: la capa de tiles, que volvía a
+    // pedir los PNG (el flash del fondo vacío) y el `View.fit`, que se llevaba la vista que el
+    // usuario había dejado puesta. Ahora solo se reemplazan los features de la capa vectorial.
+    let current = points;
+    let features = current.map(featureOf);
     const source = new ol.VectorSource({ features });
 
     const layers: BaseLayer[] = [];
@@ -2872,7 +3321,7 @@ export default class Timeline {
     // The center is only a starting point: `fit` below overrides it. It cannot be left out
     // because a `View` with no center renders nothing until it gets one.
     const view = new ol.OlView({
-      center: ol.fromLonLat([located[0].lon, located[0].lat]),
+      center: ol.fromLonLat([points[0].lon, points[0].lat]),
       zoom: TEMAS_MAP_FIT_MAX_ZOOM
     });
     const map = new ol.OlMap({
@@ -2893,11 +3342,11 @@ export default class Timeline {
     map.updateSize();
     const extent = source.getExtent();
     if (!extent) {
-      // Only reachable with no features, which the empty `located` check above already rules out.
+      // Only reachable with no features, which the empty `points` check above already rules out.
       // Disposed right away rather than left holding an empty map that nothing can ever fill.
       map.setTarget(undefined);
       map.dispose();
-      return;
+      return null;
     }
     view.fit(extent, {
       padding: [TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING],
@@ -2918,7 +3367,10 @@ export default class Timeline {
     // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
     // being plain circles the manual test is exact and needs no feature-to-point mapping.
     const tooltip = document.createElement('div');
-    tooltip.className = 'card-temas-map-tooltip';
+    // La clase viene de la opción y no es fija: el SCSS del globo de la tarjeta está scopeado bajo
+    // `.card-temas-map-canvas`, así que en el mapa general no aplicaría y el texto quedaría blanco
+    // sobre el fondo claro del mapa.
+    tooltip.className = options.tooltipClass;
     const overlay = new ol.OlOverlay({
       element: tooltip,
       positioning: 'bottom-center',
@@ -2937,13 +3389,13 @@ export default class Timeline {
     // displaced one when it was spiderfied — and the map coordinate the tooltip has to sit on. Both
     // are kept in sync by `declutter`, and are what the hover reads: the hit test has to point at
     // what the user sees, not at the coordinate the topic would have without the displacement.
-    const markerScreens: number[][] = located.map(() => [0, 0]);
-    const markerCoords: number[][] = located.map((p) => ol.fromLonLat([p.lon, p.lat]));
+    let markerScreens: number[][] = current.map(() => [0, 0]);
+    let markerCoords: number[][] = current.map((p) => ol.fromLonLat([p.lon, p.lat]));
     // Own coordinate of each topic, as a geometry ready to be reused. It is what the line of a
     // displaced marker starts at, and what the marker sits on while it is not displaced —`declutter`
     // resets every marker before grouping, so the geometry is only ever read, never accumulated: the
     // marker of a topic that no longer overlaps comes back to its real place.
-    const ownPoints: OlPoint[] = located.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
+    let ownPoints: OlPoint[] = current.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
 
     /**
      * Spread the markers that overlap at the current zoom. Every marker starts at its own
@@ -2959,8 +3411,8 @@ export default class Timeline {
      * zoom: a far view clusters markers that a near view separates back into place.
      */
     const declutter = () => {
-      const n = located.length;
-      const screens = located.map((p) => map.getPixelFromCoordinate(ol.fromLonLat([p.lon, p.lat])));
+      const n = current.length;
+      const screens = current.map((p) => map.getPixelFromCoordinate(ol.fromLonLat([p.lon, p.lat])));
       const used = new Array<boolean>(n).fill(false);
 
       // Back to the own coordinate first: whatever was displaced before this zoom may not overlap
@@ -3038,7 +3490,7 @@ export default class Timeline {
       const radius = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING;
       let closest = -1;
       let closestDistance = radius * radius;
-      for (let i = 0; i < located.length; i++) {
+      for (let i = 0; i < current.length; i++) {
         const screen = markerScreens[i];
         const dx = pixel[0] - screen[0];
         const dy = pixel[1] - screen[1];
@@ -3057,7 +3509,9 @@ export default class Timeline {
         clearHover();
         return;
       }
-      tooltip.textContent = located[index].titulo;
+      // `innerHTML` and not `textContent` because the general map writes two lines —the topic and the
+      // headline of its article—. The markup is built by the caller and its texts come escaped.
+      tooltip.innerHTML = options.hoverHtml(current[index]);
       overlay.setPosition(markerCoords[index]);
       canvas.classList.add('is-hover-marker');
     });
@@ -3066,7 +3520,67 @@ export default class Timeline {
     // away with the card, so this listener needs no teardown.
     canvas.addEventListener('pointerleave', clearHover);
 
-    this._temasMaps.set(canvas, { map, overlay });
+    // Click sobre un marcador. Reusa el mismo hit test del hover, así que el punto que se abre es
+    // exactamente el que el puntero nombraba —y no el primero que pasó por el radio—. El click en el
+    // vacío es un caso aparte: no hay punto, así que va por su propio callback y no con un punto
+    // `undefined` que cada consumidor tendría que adivinar.
+    if (options.onMarkerClick || options.onMarkerMiss) {
+      map.on('singleclick', (e) => {
+        const index = hitTest(e.pixel);
+        if (index < 0) {
+          options.onMarkerMiss?.();
+          return;
+        }
+        options.onMarkerClick?.(current[index]);
+      });
+    }
+
+    /**
+     * Reemplazar los puntos sin tocar la vista.
+     *
+     * Es el camino que usa el mapa general cuando cambia un filtro: **no** vuelve a armar el mapa. La
+     * capa de tiles y el `View` son los mismos objetos, así que no hay flash del fondo ni `fit` que
+     * se lleve el zoom y el paneo que el usuario dejó puestos —que es lo que se perdía reconstruyendo
+     * el mapa entero en cada cambio de filtro.
+     *
+     * Lo único que se rehace son los tres arrays que el `declutter` y el hit test leen, y en el mismo
+     * orden que al montar: primero `clearHover`, porque el índice que el hover tiene guardado
+     * pertenece al set viejo; después los features, y recién entonces el `declutter`.
+     *
+     * Un set vacío no hace nada: un mapa sin puntos no es un mapa, y el que decide qué mostrar sin
+     * puntos es `_refreshFullMap` (que escribe el mensaje), no esto.
+     */
+    const updatePoints = (next: P[]): void => {
+      if (!next.length) return;
+      clearHover();
+      current = next;
+      features = current.map(featureOf);
+      markerScreens = current.map(() => [0, 0]);
+      markerCoords = current.map((p) => ol.fromLonLat([p.lon, p.lat]));
+      ownPoints = current.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
+      // `clear()` y no reemplazar la `source`: el `VectorLayer` —y con él la capa de tiles y el
+      // `View`— queda siendo el mismo objeto, que es justo lo que hay que preservar.
+      source.clear();
+      source.addFeatures(features);
+      // El render es asincrónico, así que sin esto el `declutter` leería píxeles de una vista que
+      // todavía no se pintó con los features nuevos. Mismo corte que el `renderSync()` del montaje.
+      map.renderSync();
+      declutter();
+    };
+
+    /**
+     * Repintar los markers para que `isSelected` se vuelva a leer. `changed()` por feature es lo que
+     * hace que el renderer vuelva a llamar a la función de estilo; sin él, abrir o cerrar la ficha no
+     * se vería en el mapa.
+     *
+     * No toca el `declutter`: la selección no mueve ningún marker (el círculo crece, no se desplaza),
+     * así que las distancias del agrupamiento siguen siendo las mismas.
+     */
+    const refreshStyles = (): void => {
+      features.forEach((feature) => feature.changed());
+    };
+
+    return { map, overlay, updatePoints, refreshStyles };
   }
 
   /**
@@ -3085,6 +3599,565 @@ export default class Timeline {
       handle.map.setTarget(undefined);
       handle.map.dispose();
     });
+  }
+
+  /**
+   * Bind the click of the general map's button. It is a switch between **two views**, not an expand:
+   * the timeline goes `hidden` while the map is up and comes back exactly as it was, so nothing
+   * about `isExpanded` is touched here —that state belongs to the timeline and only `_toggleExpand`
+   * and its two helpers write it.
+   * Its pan and zoom are what the user moved, so they are not touched: the map survives the toggle
+   * hidden and the view stays where it was left.
+   */
+  protected _bindFullMapToggle(): void {
+    if (!this.fullMapToggle) return;
+    this.fullMapToggle.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      this._fullMapOpen = !this._fullMapOpen;
+      this._applyFullMapState();
+      if (!this._fullMapOpen) return;
+      if (this._fullMapHandle) {
+        // El mapa sigue vivo detrás del `hidden`, con el pan y el zoom que el usuario dejó. Lo único
+        // que hay que reflotar es el tamaño: la caja cambió de `display: none` a visible.
+        this._fullMapHandle.map.updateSize();
+        return;
+      }
+      void this._refreshFullMap();
+    });
+  }
+
+  /**
+   * Reflect `_fullMapOpen` on the DOM: which of the two views is on screen, and what the button says.
+   *
+   * The timeline **and** the featured stack go down together: the stack is the collapsed form of the
+   * same list, so leaving it up would show two views of the publications at once —and its click is
+   * bound to `_toggleExpand`, whose whole job is to bring back the thing the map replaced.
+   *
+   * Both go with the **attribute**, so `.timeline-container` needs its own `display` rule in the SCSS
+   * —the UA `[hidden]` yields to any author `display`, and that rule sets one (see
+   * `.taxonomy-row[hidden]` and `.card-taxonomy-extra` for the same reason). `.featured-cards` has no
+   * `display` of its own, so the UA rule covers it with no extra rule.
+   */
+  protected _applyFullMapState(): void {
+    const open = this._fullMapOpen;
+    this.timelineContainer.hidden = open;
+    this.featuredContainer.hidden = open;
+    if (this.fullMapView) this.fullMapView.hidden = !open;
+    // La ficha del punto es parte de la vista del mapa: al cerrarlo se va con ella, o quedaría
+    // flotando sobre el listado.
+    if (!open) this._closeFullMapCard();
+    // Con el mapa abierto, el orden y las notas de trabajo no tienen nada que ordenar ni que mostrar:
+    // no hay lista, y ocultar el trabajo de un mapa es exactamente el modo "escondido" del botón. Se
+    // apagan por `hidden` —no por clase— porque es el mismo estado que se leería al volver al listado,
+    // y por lo tanto no puede quedar en un `display` que alguien tenga que rememberar.
+    //
+    // El panel de filtros y el buscador **no** se tocan: son los que acotan lo que el mapa muestra, y
+    // para eso tienen que quedar accesibles desde arriba del mapa.
+    const sortWrap = this.sortMenu ? (this.sortMenu.closest('.sort-wrap') as HTMLElement | null) : null;
+    if (sortWrap) sortWrap.hidden = open;
+    if (this.workNotesToggle) this.workNotesToggle.hidden = open;
+    if (open) {
+      // Los menús flotantes se cierran siempre, y no solo los que se ocultan: sobre el mapa un panel
+      // de filtros abierto queda flotando sin nada detrás. `_closeOtherMenus` no alcanza con un solo
+      // `except` (deja abierto justamente el que se le pasa), así que los tres se cierran por su cuenta.
+      if (this.filterMenu) this.filterMenu.classList.remove('open');
+      this.filterToggle?.classList.remove('open');
+      if (this.sortMenu) this.sortMenu.classList.remove('open');
+      this.sortToggle?.classList.remove('open');
+      this.sortToggle?.setAttribute('aria-expanded', 'false');
+      if (this.filtrosInternosMenu) this.filtrosInternosMenu.classList.remove('open');
+      this.filtrosInternosToggle?.classList.remove('open');
+    }
+    if (!this.fullMapToggle) return;
+    this.fullMapToggle.setAttribute('aria-expanded', String(open));
+    const label = open ? FULLMAP_EXIT_LABEL : FULLMAP_OPEN_LABEL;
+    this.fullMapToggle.setAttribute('aria-label', label);
+    this.fullMapToggle.setAttribute('title', label);
+    // El ícono va con el estado: el del mapa cuando el listado es lo que se está viendo, la `X` cuando
+    // lo que está en pantalla es el mapa. El `aria-hidden` del svg lo saca del árbol de accesibilidad,
+    // así que el nombre del botón es solo el `aria-label` de arriba en los dos casos.
+    this.fullMapToggle.innerHTML = open ? FULLMAP_CLOSE_SVG : TEMAS_MAP_TOGGLE_SVG;
+  }
+
+  /**
+   * Resolve the points of the general map and paint them.
+   *
+   * It is the only trigger, and it runs in three situations: el primer click del botón, y cada
+   * cambio del scope filtrado con el mapa ya en pantalla. Con el mapa cerrado no hace nada —ni
+   * request, ni `ol`— porque abrirlo vuelve a llamarlo: es el mismo patrón lazy del mapa de la
+   * tarjeta, aplicado a la vista entera.
+   *
+   * Each resolution goes through `_fullMapSeq`, for the same reason `_fetchPage` does it: the answer
+   * to an old query arriving after a newer one would paint the map of a view that no longer exists.
+   *
+   * Con el mapa ya montado no se vuelve a montar: se le cambian los puntos al mapa vivo
+   * (`updatePoints`). Reconstruirlo era lo que producía el flash —la capa de tiles se tiraba abajo y
+   * volvía a pedir los PNG— y además se llevaba el `View.fit`, con lo que cada cambio de filtro
+   * devolvía la vista al centro y perdía el pan y el zoom que el usuario había dejado.
+   *
+   * El estado de carga tampoco se escribe cuando ya hay un mapa en pantalla: el mensaje "Cargando…"
+   * taparía el mapa para reemplazarlo por el mismo mapa. El `hidden` del estado previo lo resuelve
+   * `_setFullMapStatus`, y el error y el vacío sí se muestran —en esos dos casos no hay mapa que dejar
+   * en paz: en el vacío hay que tirar los puntos viejos abajo.
+   */
+  protected async _refreshFullMap(): Promise<void> {
+    const canvas = this.fullMapCanvas;
+    if (!canvas) return;
+    const seq = ++this._fullMapSeq;
+    const mounted = Boolean(this._fullMapHandle);
+    if (!mounted) this._setFullMapStatus(FULLMAP_STATE_LOADING, 'Cargando los puntos del mapa…');
+    const loaded = this.api ? await this._fetchApiPoints() : this._fullMapPointsFrom(this.allCards);
+    // La vista pudo cerrarse, o el filtro cambiar otra vez, mientras se pedían los puntos.
+    if (seq !== this._fullMapSeq || !this._fullMapOpen || !canvas.isConnected) return;
+    if (loaded === null) {
+      this._setFullMapStatus(FULLMAP_STATE_ERROR, 'No se pudieron cargar los puntos del mapa.');
+      return;
+    }
+    this._fullMapPoints = loaded;
+    if (!loaded.length) {
+      // Sin puntos no hay mapa: los viejos no significan nada para el filtro actual. Se destruye
+      // **una vez**, acá, y no en cada cambio como antes.
+      this._destroyFullMap();
+      this._setFullMapStatus(FULLMAP_STATE_EMPTY, 'Ninguna publicación del filtro actual tiene un tema ubicado.');
+      return;
+    }
+    this._setFullMapStatus(null, '');
+    if (this._fullMapHandle) {
+      this._fullMapHandle.updatePoints(loaded);
+      return;
+    }
+    this._fullMapHandle = await this._mountFullMap(canvas, loaded);
+  }
+
+  /**
+   * The points of the general map out of the cards on screen, one per located topic.
+   *
+   * It reuses `_temasLocated`, so "which topic has a usable point, and what color is its tone" is
+   * decided by the same pass in both maps: the general map cannot disagree with the cards about what
+   * is located. A `capturado: false` item has no `temas` and so contributes nothing, without needing
+   * a special case.
+   */
+  protected _fullMapPointsFrom(cards: TimelineItem[]): FullMapPoint[] {
+    const tones = this._fullMapToneFilter();
+    const out: FullMapPoint[] = [];
+    cards.forEach((card) => {
+      if (!card.temas || !card.temas.length) return;
+      this._temasLocated(card.temas).forEach((point) => {
+        // El filtro de tono acota por **subtema**, no por el artículo entero: el filtro ya dejó pasar
+        // los artículos que tienen algún tema del tono pedido, y sin este segundo corte el mapa
+        // mostraría también los subtemas de los otros tonos de esos mismos artículos. Con el corte,
+        // "Negativo" son los subtemas negativos y solo ellos.
+        if (tones && !tones.has(point.tono_social)) return;
+        out.push({
+          itemId: card.id,
+          temaIndex: point.temaIndex,
+          lat: point.lat,
+          lon: point.lon,
+          titulo: point.titulo,
+          nombre_fuente: card.nombre_fuente,
+          color: point.color,
+          tono_social: point.tono_social
+        });
+      });
+    });
+    return out;
+  }
+
+  /**
+   * Los tonos que el mapa general tiene que filtrar **por subtema**, o `null` si no hay filtro de tono
+   * activo (o ni siquiera hay grupo de tono declarado).
+   *
+   * El filtro de la barra es un filtro de artículo —`tonos_sociales` es un array del ítem—: matchea por
+   * "este artículo tiene algún tema negativo". Para la lista está bien, porque el artículo es lo que se
+   * ve. Para el mapa no: el mapa **no** muestra artículos, muestra subtemas, así que el mismo token tiene
+   * que acotar la lista de marcadores a los del tono, o el mapa queda mostrando los positivos y neutros
+   * de los artículos negativos.
+   *
+   * El `Set` sale de `_filterActiveTokens` y no de `_filterActiveValues` a propósito: el segundo devuelve
+   * los tokens tal como se declararon, que pueden ser un CSV (el `[null, false]` del "Sin descartar" es un
+   * valor, pero varios pueden venir pegados), y comparar contra eso no filtraría nada. `_filterToken` ya
+   * normaliza a `String`, así que el `has()` es directo contra el `tono_social` del subtema.
+   */
+  protected _fullMapToneFilter(): Set<string> | null {
+    const group = this.filters.find((f) => f.field === FULLMAP_TONE_FIELD);
+    if (!group) return null;
+    const tokens = this._filterActiveTokens(group);
+    if (!tokens.length) return null;
+    return new Set(tokens);
+  }
+
+  /**
+   * Los puntos del mapa general en modo API, con `GET {url}/points`.
+   *
+   * The list endpoint cannot answer this: its items are summaries that carry no `temas`, and the
+   * geometry only travels with `GET {url}/:id` —so collecting it from the list would mean one request
+   * per article. The dedicated endpoint returns one flat point per located topic of the filtered set
+   * in a single request, which is the whole reason it exists.
+   *
+   * The query is the one from `_buildFilterQueryParams`: the search and the filters, with **no**
+   * `page`/`pageSize` (there is no page: the map fits everything) and no `sort`/`sortBy` (the map
+   * doesn't order). `null` means the request failed, which the caller shows apart from "the filter
+   * matched nothing with a location".
+   */
+  protected async _fetchApiPoints(): Promise<FullMapPoint[] | null> {
+    let raw: TimelineApiPoint[];
+    try {
+      const data = await this._apiFetch<TimelineApiPointsResponse>('/points', this._buildFilterQueryParams());
+      raw = (data && data.points) || [];
+    } catch {
+      return null;
+    }
+    const tones = this._fullMapToneFilter();
+    const out: FullMapPoint[] = [];
+    raw.forEach((point) => {
+      // A `null` here means a malformed response, not an empty one: skip that point, keep the rest.
+      if (!point || typeof point !== 'object') return;
+      const geom = this._temaGeomOf(point);
+      if (!geom) return;
+      const tone = point.tono_social;
+      // Mismo corte por subtema que el modo local: el backend ya filtró por artículo, y este lado
+      // acota los marcadores al tono. Va **después** de validar la geometría y antes de pintar, así
+      // que un punto inválido se descarta por su motivo y no por el tono.
+      if (tones && !tones.has(String(tone))) return;
+      out.push({
+        itemId: point.id,
+        temaIndex: typeof point.tema_index === 'number' ? point.tema_index : -1,
+        lat: geom.lat,
+        lon: geom.lon,
+        titulo: typeof point.titulo === 'string' ? point.titulo : '',
+        nombre_fuente: typeof point.nombre_fuente === 'string' ? point.nombre_fuente : '',
+        color: TEMAS_MAP_TONE_COLOR[tone] || TEMAS_MAP_TONE_FALLBACK,
+        tono_social: tone
+      });
+    });
+    return out;
+  }
+
+  /**
+   * Mount the general map itself. Same machinery as a card's, with the two differences the scale
+   * forces: **no number** in the marker (a global index would point at no list) and a hover with two
+   * lines, because without the card there is nothing under the map saying which article a topic
+   * belongs to.
+   *
+   * Both texts are escaped: they come from the pipeline (locally) or from the backend (API), and
+   * this is the one hover that goes through `innerHTML` instead of `textContent` —which is also why
+   * `_mountTemasMap` escapes its own single title there.
+   */
+  protected async _mountFullMap(
+    canvas: HTMLElement,
+    points: FullMapPoint[]
+  ): Promise<TemasMapHandle<FullMapPoint> | null> {
+    return this._mountTemasMapOn(canvas, points, {
+      markerLabel: null,
+      hoverHtml: (p) =>
+        `<span class="fullmap-tooltip-topic">${this._escapeHtml(p.titulo)}</span>` +
+        `<span class="fullmap-tooltip-source">${this._escapeHtml(p.nombre_fuente)}</span>`,
+      tooltipClass: 'fullmap-tooltip',
+      errorClass: 'fullmap-error',
+      onMarkerClick: (p) => this._openFullMapCard(p),
+      onMarkerMiss: () => this._closeFullMapCard(),
+      // El punto abierto se reconoce por su key, no por su posición en el array: el click reordena
+      // el mapa entero (`current`), así que un `índice === seleccionado` marcaría el punto equivocado
+      // apenas cambia un filtro.
+      isSelected: (p) => this._fullMapSelectedKey !== null && this._fullMapPointKey(p) === this._fullMapSelectedKey
+    });
+  }
+
+  /**
+   * Abrir la tarjeta de un punto del mapa general, en el panel sobre el mapa, y llevar el **tema** del punto a primer plano: la tarjeta se renderiza expandida y scrolleada hasta ese tema,
+   * resaltado.
+   *
+   * "Expandida" y no la versión resumida porque el click dice "este tema": un panel colapsado
+   * escondería justo lo que se pidió ver, y abrirlo a mano para después buscar el tema sería un
+   * segundo paso. Sigue siendo la misma tarjeta del timeline —se reusa `_createTimelineItem` entero—
+   * así que el panel no puede divergir de la lista (mismos badges, misma miniatura, mismo pie de
+   * acciones).
+   *
+   * El id del click es el de la **tarjeta**, no el del tema: el panel muestra el artículo, y un
+   * artículo con diez temas tiene un solo panel. En API los puntos solo traen el id, así que el
+   * artículo entero se pide con `_fetchDetail` (que ya cachea en `_apiDetails`).
+   */
+  protected async _openFullMapCard(point: FullMapPoint): Promise<void> {
+    const panel = this.fullMapDetail;
+    if (!panel) return;
+    const id = String(point.itemId);
+    const key = this._fullMapPointKey(point);
+    // Un artículo con varios temas llega por el click de cualquiera de ellos: si el panel ya está
+    // mostrando **ese** punto, no se vuelve a renderizar, para no perder el scroll de la ficha.
+    const sameCard = this._fullMapCardId === id && !panel.hidden;
+    if (sameCard && this._fullMapSelectedKey === key) return;
+    this._fullMapCardId = id;
+    this._fullMapSelectedKey = key;
+    // El marcador clickeado se marca en el mapa, así que el mapa tiene que repintar aunque no haya
+    // cambiado ningún punto. Va antes de cualquier `await`: abrir la ficha no puede dejar el círculo
+    // viejo mientras viaja el request.
+    this._fullMapHandle?.refreshStyles();
+    panel.hidden = false;
+    panel.innerHTML = `<div class="fullmap-detail-loading">Cargando la publicación…</div>`;
+
+    let card = this.allCards.find((it) => String(it.id) === id) || null;
+    if (!card && this.api) card = await this._fetchDetail(id);
+    // El click en otro punto mientras se esperaba: la respuesta ya no pinta de nada.
+    if (this._fullMapSelectedKey !== key) return;
+    if (!card) {
+      panel.innerHTML = `<div class="fullmap-detail-loading">No se encontró la publicación ${this._escapeHtml(id)}.</div>`;
+      return;
+    }
+
+    const itemEl = this._createTimelineItem(card, 0);
+    // La columna de fecha es de la línea de tiempo: acá no hay línea vertical ni dots, y sin la
+    // fecha la cabecera de la tarjeta queda desalineada contra el panel.
+    const dateCol = itemEl.querySelector('.timeline-date-col');
+    if (dateCol) dateCol.remove();
+    // El colapso no tiene sentido acá: la tarjeta se abre siempre expandida, y sin este botón tampoco
+    // queda un "−" que la cerraría y dejaría el panel con el scroll perdido.
+    const collapseBtn = itemEl.querySelector('.card-collapse');
+    if (collapseBtn) collapseBtn.remove();
+    itemEl.classList.add('visible');
+    // Sin `.timeline-card` no hay nada que expandir, scrollear ni resaltar, y `_ensureCardDetail` no
+    // tolera `null`: es la única forma de que `_createTimelineItem` devuelva una tarjeta sin la caja,
+    // así que es un caso patológico y no vale la pena un panel con el "Cargando…" pegado.
+    const cardEl = itemEl.querySelector('.timeline-card') as HTMLElement | null;
+    if (!cardEl) return;
+    cardEl.classList.add('expanded');
+    panel.innerHTML = this._buildFullMapDetailHtml();
+    panel.querySelector('.fullmap-detail-body')?.appendChild(itemEl);
+    // El botón va **dentro** de la tarjeta y no en un header del panel: `.timeline-card` es
+    // `position: relative`, así que el `top/right` del SCSS lo pegan a su esquina. Se agrega después
+    // de `_createTimelineItem` porque hace falta el nodo de la tarjeta, y se sube con el mouse para
+    // que el click no caiga en el listener de expandir de la tarjeta (que abriría el detalle otra vez
+    // en vez de cerrar el panel).
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'fullmap-detail-close';
+    closeBtn.title = 'Cerrar';
+    closeBtn.setAttribute('aria-label', 'Cerrar la ficha');
+    closeBtn.innerHTML = '&times;';
+    closeBtn.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      this._closeFullMapCard();
+    });
+    cardEl.appendChild(closeBtn);
+    // El detalle (`_ensureCardDetail`) es lo que trae la lista de temas, así que el resaltado y el
+    // scroll a un tema solo pueden salir **después** de que llegue: en local la lista ya está, pero en
+    // API el artículo entero se acaba de pedir y no hay nada que resaltar todavía. Por eso el
+    // resaltado va en su propio método, que corre con lo que haya (`null` si el backend no mandó
+    // `tema_index`, o si la lista de temas vino vacía) y no rompe la ficha que ya se ve.
+    void this._ensureCardDetail(cardEl).then(() => {
+      // La respuesta tardía es de otro punto: ya no se pinta nada.
+      if (this._fullMapSelectedKey !== key) return;
+      this._processCardEmbeds(cardEl);
+      // La lista de temas recién llegó, así que recién ahora se puede saber cuáles tienen punto y
+      // volverlos clickeables: el bind va después del detalle, no antes.
+      this._bindFullMapCardTemas(cardEl, card);
+      this._revealFullMapTema(cardEl, point.temaIndex, true);
+    });
+  }
+
+  /**
+   * En modo mapa, volver clickeable cada tema de la ficha que tiene punto en el mapa.
+   *
+   * Solo los que tienen `geom` —`_temaGeomOf`—: un tema sin ubicación no tiene a dónde llevar la
+   * vista, y un control que parece clickeable y no hace nada es peor que uno que no lo parece. Por
+   * eso el binding va por `.tema-item` **con** coordenadas y no por todas las filas, y la clase
+   * `.tema-locatable` es lo que le pone el puntero y el hover: el "es clickeable" es un dato, y el
+   * SCSS lo lee de la clase en vez de repetir el criterio geométrico.
+   *
+   * Va después de `_ensureCardDetail` porque es el detalle el que trae la lista de temas: en local ya
+   * estaba, y en API no hay nada a lo que bindear hasta que llega.
+   */
+  protected _bindFullMapCardTemas(cardEl: HTMLElement, card: TimelineItem): void {
+    const temas = card.temas || [];
+    cardEl.querySelectorAll('.tema-item').forEach((el) => {
+      const index = Number((el as HTMLElement).dataset.temaIndex);
+      const tema = temas[index];
+      if (!tema || !this._temaGeomOf(tema)) return;
+      el.classList.add('tema-locatable');
+      el.addEventListener('click', (e: Event) => {
+        // El card entero tiene un listener que expande y pide el detalle (ver `_createTimelineItem`).
+        // Sin el corte, cada click en un tema haría las dos cosas.
+        e.stopPropagation();
+        this._focusFullMapTema(cardEl, card, index);
+      });
+    });
+  }
+
+  /**
+   * Llevar la vista del mapa a un tema elegido desde la ficha, y dejarlo como punto seleccionado.
+   *
+   * Son dos gestos en un mismo click, y el orden importa: primero se selecciona —para que el círculo
+   * crezca y quede arriba, que es lo que conecta la fila con el punto— y después se mueve la vista.
+   *
+   * El **zoom no cambia** en el primer click: el mapa puede estar mostrando medio país, y llevar el
+   * centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que hace útil la fila.
+   * El segundo click sobre el tema que ya está seleccionado es el que hace `fit`, que sí acerca: es
+   * el gesto de "ya sé cuál es, llévame hasta ahí", y como no tiene nada nuevo que seleccionar no
+   * necesita volver a marcar nada.
+   */
+  protected _focusFullMapTema(cardEl: HTMLElement, card: TimelineItem, temaIndex: number): void {
+    const tema = (card.temas || [])[temaIndex];
+    const geom = tema ? this._temaGeomOf(tema) : null;
+    const view = this._fullMapHandle?.map.getView() || null;
+    if (!geom || !view) return;
+    const key = `${String(card.id)}#${temaIndex}`;
+    // El criterio del segundo gesto es la **selección**, no "la última fila clickeada": un tema que ya
+    // está seleccionado —venga del click en su punto o de su propia fila— es el que pide el `fit`.
+    // Así el gesto es el mismo llegue como llegue, y no hace falta un segundo campo para acordarse de
+    // la última fila.
+    const alreadySelected = this._fullMapSelectedKey === key;
+    if (!alreadySelected) {
+      this._fullMapCardId = String(card.id);
+      this._fullMapSelectedKey = key;
+      // El círculo tiene que crecer y subir **antes** de que se mueva la vista, o el usuario ve el
+      // mapa viajar sin ver qué punto es el que lo provoke.
+      this._fullMapHandle?.refreshStyles();
+    }
+    // Sin `scroll`: la fila se acaba de clickear, o sea que ya está a la vista. Scrollearla al centro
+    // sería mover la lectura del usuario debajo del puntero sin que lo haya pedido.
+    this._revealFullMapTema(cardEl, temaIndex, false);
+    // `_loadOpenLayers` cachea la promesa, así que acá solo es el `await` de algo ya resuelto (el
+    // mapa general no puede estar montado sin que `ol` se haya cargado). Sin esto no hay forma
+    // proyectar `lon`/`lat` a las coordenadas de la vista, que son EPSG:3857.
+    void this._loadOpenLayers().then((ol) => {
+      const center = ol.fromLonLat([geom.lon, geom.lat]);
+      if (alreadySelected) {
+        // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
+        // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
+        // queda centrado. Es el "llévame hasta ahí" del segundo click.
+        view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: FULLMAP_FOCUS_DURATION });
+        return;
+      }
+      // El primer click mueve el centro **sin** cambiar el zoom: el mapa puede estar mostrando medio
+      // país, y llevar el centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que
+      // hace útil la fila. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
+      // que re-declutterean los markers por el camino.
+      view.animate({ center, duration: FULLMAP_FOCUS_DURATION });
+    });
+  }
+
+  /**
+   * Llevar el tema del punto clickeado a la vista: lo resalta y, si hace falta, scrollea el panel
+   * hasta él.
+   *
+   * El resaltado es una clase en el `.tema-item` y **no** un elemento nuevo ni un scroll: el
+   * resaltado tiene que viajar con el dato (es el mismo `.tema-item` que ya existe) para que
+   * `_ensureCardDetail` pueda reescribir el detalle sin perderlo.
+   *
+   * Un `temaIndex` de `-1` —backend sin `tema_index`— no hace nada: no hay forma de ubicar el tema, y
+   * mejor la ficha entera a la vista que scrollear a un `.tema-item` equivocado.
+   *
+   * `scroll` es un parámetro y no una constante porque son los dos callers los que saben si el tema
+   * estaba o no a la vista: viniendo de un click en el mapa **hay** que scrollear (la lista puede
+   * tener veinte temas y el elegido ninguno), y viniendo de un click en la fila **no** —la fila está
+   * delante del puntero, así que `scrollIntoView` la correría debajo sin que nadie lo pidiera, y en
+   * `block: 'center'` hasta la deja en otro lugar del panel del que salió.
+   */
+  protected _revealFullMapTema(cardEl: HTMLElement | null, temaIndex: number, scroll: boolean): void {
+    if (!cardEl || temaIndex < 0) return;
+    const items = cardEl.querySelectorAll('.tema-item');
+    // Por posición y no por `[data-tema-index="…"]`: el índice viene del backend, y meter un número
+    // sin validar en un selector es dejar la puerta abierta a un `SyntaxError` (un `1e+21` o un `NaN`
+    // no son un selector válido) — o a inyección, si el backend no cumpliera el contrato. Con
+    // `items[temaIndex]` un índice raro simplemente no encuentra nada. El orden es el de `card.temas`,
+    // que es el mismo que usa `data-tema-index`.
+    const target = items[temaIndex];
+    if (!target) return;
+    // El resaltado es de a uno, no acumulativo: si el usuario va saltando de tema en tema de la misma
+    // tarjeta, el anterior tiene que apagarse o todos los clickeados quedan marcados.
+    items.forEach((el) => el.classList.remove('tema-selected'));
+    target.classList.add('tema-selected');
+    if (scroll) target.scrollIntoView({ block: 'center' });
+  }
+
+  /**
+   * La identidad de un punto para el panel: artículo + tema. Es lo que distingue dos puntos del
+   * mismo artículo, y también lo que se usa para descartar una respuesta que llegó tarde y para el
+   * predicado de selección del mapa.
+   *
+   * El id del tema va como índice, no como título, porque dos temas de un artículo pueden llamarse
+   * igual. Un backend sin `tema_index` deja `-1` y el key queda igual de único: los dos puntos con
+   * índice desconocido de un mismo artículo no se distinguen, pero siguen siendo el mismo artículo, y
+   * lo que la ficha muestra es el artículo.
+   */
+  protected _fullMapPointKey(point: FullMapPoint): string {
+    return `${String(point.itemId)}#${point.temaIndex}`;
+  }
+
+  /**
+   * El panel del mapa general: solo la caja donde entra la tarjeta. El botón de cerrar **no** se
+   * agrega acá sino dentro de la tarjeta, arriba a la derecha (`.timeline-card` es `position:
+   * relative`), que es donde el ojo ya está: en un header aparte seemed to float, y con el panel sin
+   * fondo propio quedaba pegado a la nada.
+   *
+   * El link a la vista individual tampoco va acá: la tarjeta ya lo trae en su propio menú de
+   * información, donde el ID es un `<a target="_blank">` si el ítem trae `link_view_entry`.
+   */
+  protected _buildFullMapDetailHtml(): string {
+    return `<div class="fullmap-detail-body"></div>`;
+  }
+
+  /**
+   * Cerrar el panel de la tarjeta del mapa general. Va en el botón "×" de la ficha y también en el
+   * click del mapa de fondo, que es lo que uno espera: clickear en el vacío cierra lo que está
+   * abierto sin tener que buscar el botón.
+   *
+   * El orden importa: se limpia `_fullMapSelectedKey` **antes** de vaciar el panel, porque es la key
+   * que usa el predicado del mapa para saber si algo está seleccionado. Vaciar el `innerHTML` después
+   * no importa para eso —el predicado no lee el DOM—, pero sí para el resaltado del tema, que
+   * desaparece con la tarjeta.
+   */
+  protected _closeFullMapCard(): void {
+    const wasSelected = this._fullMapSelectedKey !== null;
+    this._fullMapCardId = null;
+    this._fullMapSelectedKey = null;
+    // El círculo seleccionado vuelve al suyo: sin esto el mapa seguiría marcando un punto cuya ficha
+    // ya no existe.
+    if (wasSelected) this._fullMapHandle?.refreshStyles();
+    if (!this.fullMapDetail) return;
+    this.fullMapDetail.hidden = true;
+    this.fullMapDetail.innerHTML = '';
+  }
+
+  /**
+   * Dispose the general map. Same teardown as `_destroyTemasMaps` and for the same two reasons: the
+   * overlay is added to the map, not owned by it, and dropping the DOM node would leave the canvas,
+   * the listeners and the tile source vivos.
+   *
+   * It exists as its own method —and not as one more entry of `_temasMaps`— because
+   * `_destroyTemasMaps` runs on every re-render of the timeline and this map has to survive all of
+   * them: while the general map is on screen the cards are re-rendered anyway, and with a shared
+   * registry the map would be thrown away on the first filter change.
+   */
+  protected _destroyFullMap(): void {
+    const handle = this._fullMapHandle;
+    if (!handle) return;
+    this._fullMapHandle = null;
+    handle.overlay.setMap(null);
+    handle.map.setTarget(undefined);
+    handle.map.dispose();
+  }
+
+  /**
+   * Write (or clear) the message above the general map's canvas. `state` is the `data-state` the
+   * SCSS keys on and `null` means "nothing to say", which also hides the box: with points on screen
+   * it would take height away from the map for nothing.
+   *
+   * Every message is in Spanish because that is the language of the whole component, and all of them
+   * are of the visible kind only in API mode, because in local mode the points are already in memory
+   * and there is no request to wait for.
+   */
+  protected _setFullMapStatus(state: string | null, text: string): void {
+    const el = this.fullMapStatus;
+    if (!el) return;
+    if (state === null) {
+      el.textContent = '';
+      el.hidden = true;
+      el.removeAttribute('data-state');
+      return;
+    }
+    el.textContent = text;
+    el.setAttribute('data-state', state);
+    el.hidden = false;
   }
 
   /** Build the "Videos vinculados" HTML block */
@@ -3821,6 +4894,11 @@ export default class Timeline {
     // esta guarda también cubre los otros dos caminos que llegan acá (#featured-cards y la
     // fila de arriba) sin tener que repetir la condición en cada listener.
     if (this.fullpage) return;
+    // Con el mapa general en pantalla el timeline está `hidden`, así que colapsarlo o abrirlo no se
+    // vería: lo que haría es dejar el estado cambiado a ciegas, y al cerrar el mapa el usuario se
+    // encontraría con el timeline abierto sin haberlo pedido. Congelado queda, entonces, y al cerrar
+    // el mapa reaparece exactamente como estaba.
+    if (this._fullMapOpen) return;
     this.isExpanded = !this.isExpanded;
 
     if (this.isExpanded) {
@@ -5105,11 +6183,27 @@ export default class Timeline {
    */
   protected _buildQueryParams(page: number): Record<string, string> {
     const params: Record<string, string> = {
+      ...this._buildFilterQueryParams(),
       page: String(page),
       pageSize: String(this._apiPageSize()),
       sort: this._sortAsc ? 'asc' : 'desc',
       sortBy: this._sortField
     };
+    return params;
+  }
+
+  /**
+   * The params that describe **what** the view is showing —the search term and the active tokens of
+   * every filter group— with no cursor, no page size and no order. It is what narrows the set, and it
+   * is the part that both the list and the general map's `GET {url}/points` need: the map fits every
+   * point at once and has no order, so the three params of the cursor are the only ones it drops.
+   *
+   * Spread as the **base** of the object in `_buildQueryParams` instead of appended to it, so
+   * `q` and the filters keep coming out in the same place of the query string and the params the
+   * list sends don't change at all.
+   */
+  protected _buildFilterQueryParams(): Record<string, string> {
+    const params: Record<string, string> = {};
     if (this.searchTerm.trim()) params.q = this.searchTerm.trim();
     this.filters.forEach((f) => {
       const active = this._filterActiveValues(f);
@@ -5530,6 +6624,11 @@ export default class Timeline {
    */
   protected _applyFilters(immediate = false): void {
     this._syncFilterToggleState();
+    // El mapa general muestra **el mismo scope filtrado** que la lista, así que un cambio acá también
+    // lo cambia a él. Va acá y no en `_renderAll` porque `_renderAll` también corre en un cambio de
+    // página, que no narrowea nada: con el mapa abierto el filtro tiene que re-preguntar los puntos,
+    // y con el mapa cerrado no hay ni request ni trabajo que hacer (abrirlo lo llama igual).
+    if (this._fullMapOpen) void this._refreshFullMap();
     if (this.api) {
       // The results on screen no longer match the panel, so they go away right now instead of
       // sitting there stale until the response: `_renderApiLoading` puts the skeletons in their
@@ -6087,13 +7186,14 @@ export default class Timeline {
       if (this.isExpanded) return;
       if (
         (e.target as HTMLElement).closest(
-          '.expand-toggle, .featured-cards, .sort-wrap, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .filtros-internos-toggle, .filtros-internos-wrap'
+          '.expand-toggle, .featured-cards, .sort-wrap, .filter-toggle, .filter-menu, .search-wrap, .work-notes-toggle, .filtros-internos-toggle, .filtros-internos-wrap, .fullmap-toggle, .fullmap-wrap'
         )
       )
         return;
       this._toggleExpand();
     });
     this._bindSortToggle();
+    if (this.showFullMap) this._bindFullMapToggle();
     if (this.taxonomySelect) {
       this.taxonomySelect.addEventListener('change', () => this._onTaxonomyChange());
     }
