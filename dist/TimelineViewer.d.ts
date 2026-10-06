@@ -1410,6 +1410,17 @@ export default class Timeline {
      */
     protected _bindFullMapToggle(): void;
     /**
+     * Keep the topic panel of the general map below the toolbar.
+     *
+     * The map view is `fixed inset: 0` and floats **under** `.featured-row` (the toolbar, `z-index: 2`),
+     * so a `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
+     * viewport —under the bar, which covers its top and its close button and makes the card unusable.
+     * The toolbar's height is not a constant (fullpage pill, collapsed panel, wrap on small screens), so
+     * its live bottom is written into a CSS variable that the SCSS reads in the panel's `calc()`. Same
+     * measurement as `_scrollToTimelineTop()`, which reads the same row for the scroll target.
+     */
+    protected _syncFullMapDetailTop(): void;
+    /**
      * Reflect `_fullMapOpen` on the DOM: which of the two views is on screen, and what the button says.
      *
      * The timeline **and** the featured stack go down together: the stack is the collapsed form of the

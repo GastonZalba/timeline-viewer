@@ -1499,13 +1499,19 @@
   //
   // Abajo a la izquierda y no centrada: el centro es donde el usuario está mirando y clickeando para
   // elegir puntos, así que taparlo con la ficha obliga a cerrarla antes de seguir explorando.
+  //
+  // El tope no puede ser una constante: la barra de herramientas (`--tv-fullmap-top`, escrita por
+  // `_syncFullMapDetailTop()` con el bottom real de `.featured-row`) sube y baja con su propio alto
+  // (píldora de fullpage, panel colapsado, wrap en móvil), y con un tope fijo la ficha se clampa
+  // debajo de una barra que la tapa —incluido el botón de cerrar, arriba a la derecha de la tarjeta.
+  // El fallback de 8px conserva el `100vh - 32px` de antes cuando la variable no llegó a escribirse.
   .fullmap-detail {
     position: absolute;
     left: 16px;
     bottom: 16px;
     z-index: 4;
     width: min(420px, calc(100vw - 32px));
-    max-height: calc(100vh - 32px);
+    max-height: calc(100vh - var(--tv-fullmap-top, 8px) - 24px);
     display: flex;
     flex-direction: column;
     overflow: hidden;

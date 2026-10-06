@@ -84,12 +84,14 @@ const TAXONOMY_VISIBLE_LINKS = 3;
 const TEMAS_MAP_FIT_PADDING = 28;
 
 /**
- * Ceiling for the fit of the topics map. It only matters for the degenerate extents —a single
- * point, two identical points, or a column of points with no width— where the extent has no
- * size to divide by and `fit` would zoom in until it hits its own limit. 16 is a street-level
- * zoom, which is what "these topics happen in one place" should look like.
+ * Ceiling of the topics map, used everywhere a zoom is bounded: the fit of the opening (which only
+ * matters for the degenerate extents —a single point, two identical points, or a column of points
+ * with no width— where the extent has no size to divide by and `fit` would zoom in until it hits
+ * its own limit), the fit that brings a clicked topic into view, the zoom a cluster click animates
+ * to, and the `maxZoom` of the `View` itself, so the zoom controls and the pinch stop there too.
+ * 17 is a street-level zoom, which is what "these topics happen in one place" should look like.
  */
-const TEMAS_MAP_FIT_MAX_ZOOM = 16;
+const TEMAS_MAP_FIT_MAX_ZOOM = 17;
 
 /**
  * Raster base of the topics map when the consumer does not pass one: the public OpenStreetMap
@@ -212,8 +214,9 @@ const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
  * whatever the count.
  *
  * The threshold only picks the mode the far view starts in; what guarantees the spiderfy never
- * grows past a readable ring on **any** zoom is its own cap, `TEMAS_MAP_SPIDER_MAX_GROUP`. That
- * pairing is why this value can be conservative: 7 is country scale on the default view.
+ * grows past a readable ring in the range where clustering is available is its own cap,
+ * `TEMAS_MAP_SPIDER_MAX_GROUP`. That pairing is why this value can be conservative: 7 is country
+ * scale on the default view. Above `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` the cap is off by design.
  */
 const TEMAS_MAP_CLUSTER_MAX_ZOOM = 7;
 
@@ -227,12 +230,30 @@ const TEMAS_MAP_CLUSTER_MAX_ZOOM = 7;
 const TEMAS_MAP_CLUSTER_DISTANCE = 40;
 
 /**
- * Biggest group the spiderfy spreads before it draws a cluster instead, whatever the zoom. This is
- * the safety net of `TEMAS_MAP_CLUSTER_MAX_ZOOM`: a mis-set threshold —or a dataset denser than the
- * one it was set for— would otherwise bring back the giant ring, and the cap makes that failure
- * impossible by construction. 12 is a ring of ≈39px, about the size of a small cluster.
+ * Biggest group the spiderfy spreads before it draws a cluster instead, below
+ * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`. This is the safety net of `TEMAS_MAP_CLUSTER_MAX_ZOOM`: a
+ * mis-set threshold —or a dataset denser than the one it was set for— would otherwise bring back
+ * the giant ring, and the cap makes that failure impossible by construction. 12 is a ring of
+ * ≈39px, about the size of a small cluster.
  */
 const TEMAS_MAP_SPIDER_MAX_GROUP = 12;
+
+/**
+ * Zoom from which the spiderfy cap above stops applying: **every** group is spread on its ring,
+ * however many points it has, and nothing is ever drawn as a count cluster again.
+ *
+ * The reason is clickability, and it is structural rather than cosmetic. A cluster answers a click
+ * with a zoom-in animation (`TEMAS_MAP_CLUSTER_ZOOM_STEP`), which only dissolves it if the points
+ * were merely close on screen —topics at (or near) the same coordinate never separate at any zoom—
+ * and the animation stops at `TEMAS_MAP_FIT_MAX_ZOOM` anyway. At street level, then, a cluster is a
+ * dead end: clicking it changes nothing and the points inside can never be reached. Past this zoom
+ * the map is already saying "this exact place", so the honest reading is the spread one: every
+ * topic visible and clickable, even when the ring grows large (accepted on purpose — a giant ring
+ * at a close zoom is information, a count you cannot open is not).
+ *
+ * Below it nothing changes: the far view still clusters, and the spiderfy still caps its groups.
+ */
+const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 16;
 
 /**
  * Radius of a cluster marker, in screen pixels: the 18px marker plus the room a count of up to
@@ -254,8 +275,9 @@ const TEMAS_MAP_CLUSTER_FILL_DARK = '#0e1116';
 const TEMAS_MAP_CLUSTER_TEXT_COLOR = '#ffffff';
 /**
  * Zoom levels a click on a cluster adds to the view. Two steps dissolve a cluster from any
- * starting zoom without the dead click a `fit` to the members' extent would produce when that
- * extent already fills the viewport — a fit that would not zoom in looks like nothing happened.
+ * starting zoom below `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` —where clusters still exist— without the
+ * dead click a `fit` to the members' extent would produce when that extent already fills the
+ * viewport — a fit that would not zoom in looks like nothing happened.
  */
 const TEMAS_MAP_CLUSTER_ZOOM_STEP = 2;
 /**
@@ -3514,7 +3536,12 @@ export default class Timeline {
     // because a `View` with no center renders nothing until it gets one.
     const view = new ol.OlView({
       center: ol.fromLonLat([points[0].lon, points[0].lat]),
-      zoom: TEMAS_MAP_FIT_MAX_ZOOM
+      zoom: TEMAS_MAP_FIT_MAX_ZOOM,
+      // The ceiling has to live on the `View` too: without it the controls, the pinch and the
+      // wheel climb to OpenLayers' own default (28) and "the max zoom of this map" stops meaning
+      // anything — while every programmatic move (the opening fit, the focus of a clicked topic,
+      // the zoom a cluster click animates to) is already clamped to `TEMAS_MAP_FIT_MAX_ZOOM`.
+      maxZoom: TEMAS_MAP_FIT_MAX_ZOOM
     });
     const map = new ol.OlMap({
       target: canvas,
@@ -3592,20 +3619,26 @@ export default class Timeline {
     /**
      * Decide, for the current zoom, how every overlapping group is drawn, and rebuild `targets`.
      *
-     * Two modes, picked by `TEMAS_MAP_CLUSTER_MAX_ZOOM`:
+     * Three modes: the first two picked by `TEMAS_MAP_CLUSTER_MAX_ZOOM`, the third by
+     * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`:
      *
-     * - **Spiderfy** (near view): every marker starts at its own coordinate, and the ones that sit
-     *   closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another are re-laid out on a circle around the
-     *   group's centroid, each with the line back to its real coordinate. Unchanged from the
-     *   original behavior, except that a group bigger than `TEMAS_MAP_SPIDER_MAX_GROUP` is no longer
-     *   spread —that ring grows with the count and is what broke the far view— and is clustered
-     *   instead.
+     * - **Spiderfy** (near view, below `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`): every marker starts at its
+     *   own coordinate, and the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another
+     *   are re-laid out on a circle around the group's centroid, each with the line back to its
+     *   real coordinate. Unchanged from the original behavior, except that a group bigger than
+     *   `TEMAS_MAP_SPIDER_MAX_GROUP` is no longer spread —that ring grows with the count and is
+     *   what broke the far view— and is clustered instead.
      * - **Cluster** (far view): every group within `TEMAS_MAP_CLUSTER_DISTANCE` becomes **one**
      *   marker —a circle with the count— at the group's centroid. The leader feature paints it, the
      *   rest paint nothing, and the only lines on screen are the ones the spiderfy still owns at a
      *   near view.
+     * - **Close view** (`TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` and up): the spiderfy with its cap off —
+     *   every group is spread, however many points it has, and nothing clusters. A cluster at this
+     *   zoom is a dead end (the click that would dissolve it is clamped by `TEMAS_MAP_FIT_MAX_ZOOM`,
+     *   and same-coordinate points never separate anyway), so all the topics have to be on screen
+     *   to be clickable. The ring growing past the canvas with a huge group is the accepted cost.
      *
-     * In both modes the **selected** point of the general map is left out of every group: its row
+     * In every mode the **selected** point of the general map is left out of every group: its row
      * says "it is here", and at a far view —where a click on a row does not change the zoom— it
      * would otherwise be buried inside a count. It paints alone, with its selected circle, on top.
      *
@@ -3627,6 +3660,10 @@ export default class Timeline {
       // view never does; the fallback keeps the old behavior rather than the new one.
       const zoom = map.getView().getZoom();
       const clusterMode = (zoom ?? TEMAS_MAP_CLUSTER_MAX_ZOOM) < TEMAS_MAP_CLUSTER_MAX_ZOOM;
+      // The cap of `TEMAS_MAP_SPIDER_MAX_GROUP` turns off at a close zoom, where a cluster could
+      // not be dissolved by clicking it (see `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`). The two flags can
+      // never be on together —7 vs 16—, so `clusterMode` below keeps deciding alone.
+      const noCluster = (zoom ?? TEMAS_MAP_NO_CLUSTER_MIN_ZOOM) >= TEMAS_MAP_NO_CLUSTER_MIN_ZOOM;
       const threshold = clusterMode ? TEMAS_MAP_CLUSTER_DISTANCE : TEMAS_MAP_SPIDER_THRESHOLD;
 
       // Back to the own coordinate first: whatever was displaced or absorbed before this zoom may
@@ -3679,7 +3716,7 @@ export default class Timeline {
         cx /= group.length;
         cy /= group.length;
 
-        if (clusterMode || group.length > TEMAS_MAP_SPIDER_MAX_GROUP) {
+        if (clusterMode || (group.length > TEMAS_MAP_SPIDER_MAX_GROUP && !noCluster)) {
           // One circle with the count, at the centroid. The color is the tone the members share, or
           // the dark neutral when they are a mix —painting a mixed group green because its first
           // member is green would say something the data does not.
@@ -3918,6 +3955,25 @@ export default class Timeline {
   }
 
   /**
+   * Keep the topic panel of the general map below the toolbar.
+   *
+   * The map view is `fixed inset: 0` and floats **under** `.featured-row` (the toolbar, `z-index: 2`),
+   * so a `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
+   * viewport —under the bar, which covers its top and its close button and makes the card unusable.
+   * The toolbar's height is not a constant (fullpage pill, collapsed panel, wrap on small screens), so
+   * its live bottom is written into a CSS variable that the SCSS reads in the panel's `calc()`. Same
+   * measurement as `_scrollToTimelineTop()`, which reads the same row for the scroll target.
+   */
+  protected _syncFullMapDetailTop(): void {
+    const panel = this.fullMapDetail;
+    if (!panel) return;
+    const toolbarBottom = this.featuredRow ? this.featuredRow.getBoundingClientRect().bottom : 0;
+    // Clamped so a toolbar scrolled out of view (or a `rect` above the viewport) never lifts the top
+    // of the panel into negative space.
+    panel.style.setProperty('--tv-fullmap-top', `${Math.max(toolbarBottom, 0)}px`);
+  }
+
+  /**
    * Reflect `_fullMapOpen` on the DOM: which of the two views is on screen, and what the button says.
    *
    * The timeline **and** the featured stack go down together: the stack is the collapsed form of the
@@ -3948,6 +4004,9 @@ export default class Timeline {
     if (sortWrap) sortWrap.hidden = open;
     if (this.workNotesToggle) this.workNotesToggle.hidden = open;
     if (open) {
+      // El tope de la ficha del punto se mide con el mapa ya visible: la barra puede haber cambiado de
+      // alto desde la última vez (wrap en móvil, apertura del buscador) y el `calc()` del SCSS lo lee.
+      this._syncFullMapDetailTop();
       // Los menús flotantes se cierran siempre, y no solo los que se ocultan: sobre el mapa un panel
       // de filtros abierto queda flotando sin nada detrás. `_closeOtherMenus` no alcanza con un solo
       // `except` (deja abierto justamente el que se le pasa), así que los tres se cierran por su cuenta.
@@ -4184,6 +4243,9 @@ export default class Timeline {
     // viejo mientras viaja el request.
     this._fullMapHandle?.refreshStyles();
     panel.hidden = false;
+    // Re-medir justo antes de mostrar: entre la apertura del mapa y el click en un punto la barra pudo
+    // cambiar de alto, y el panel se ancla a su bottom real (ver `_syncFullMapDetailTop`).
+    this._syncFullMapDetailTop();
     panel.innerHTML = `<div class="fullmap-detail-loading">Cargando la publicación…</div>`;
 
     let card = this.allCards.find((it) => String(it.id) === id) || null;
@@ -7568,6 +7630,13 @@ export default class Timeline {
       if (!(e.target as HTMLElement).closest('.search-wrap')) {
         this._closeSearch();
       }
+    });
+
+    // Con el mapa general abierto, la barra de herramientas puede cambiar de alto al redimensionar
+    // (wrap en móvil, cambio de orientación): el panel del punto tiene que volver a medir su tope real.
+    // Correr solo con el mapa abierto es lo que mantiene el listener en nada el resto del tiempo.
+    window.addEventListener('resize', () => {
+      if (this._fullMapOpen) this._syncFullMapDetailTop();
     });
   }
 }

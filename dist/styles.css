@@ -1241,7 +1241,7 @@
   bottom: 16px;
   z-index: 4;
   width: min(420px, 100vw - 32px);
-  max-height: calc(100vh - 32px);
+  max-height: calc(100vh - var(--tv-fullmap-top, 8px) - 24px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
