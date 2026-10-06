@@ -448,6 +448,13 @@ const ALL_TAXONOMIES_LABEL = 'Ver todo';
 /** `_contentIndex` value that means "every taxonomy" instead of a single group */
 const ALL_TAXONOMIES_INDEX = -1;
 
+/**
+ * Result sets bigger than this get the count row **twice**: the one `_renderStatus` writes at the
+ * end of the list, and a mirror of it at the top of it (right below the taxonomy row, when there
+ * is one). Below that threshold the single row at the end is enough, which is how it always was.
+ */
+const STATUS_TOP_MIN_ITEMS = 3;
+
 const RESIZE_MIN_HEIGHT = 180;
 const RESIZE_MAX_HEIGHT = 1200;
 const RESIZE_STEP = 24;
@@ -557,7 +564,7 @@ interface TemasMapModules {
   Text: typeof TextStyle;
   Zoom: typeof ZoomControl;
   Attribution: typeof AttributionControl;
-  getProjection: typeof GetProjection,
+  getProjection: typeof GetProjection;
   fromLonLat: typeof FromLonLat;
 }
 
@@ -6913,6 +6920,16 @@ export default class Timeline {
   }
 
   /**
+   * The **total** behind the count row (the "de Y" of "Mostrando A-B de Y"): what the whole
+   * filtered result is, never what is on screen. API mode reads the `total` the server sent with
+   * the page, local mode the filtered pool. Shared by the row at the end and by its mirror at the
+   * top so the two can never disagree on it.
+   */
+  protected _statusTotal(): number {
+    return this.api ? this._apiTotal : this.allCards.length;
+  }
+
+  /**
    * The count line of the status row: "Mostrando 11-20 de 55 publicaciones", or `''` when there is
    * nothing to count. A **range** of positions rather than a bare amount, because what is on screen
    * is always a slice of the result set and never the whole thing.
@@ -6936,12 +6953,54 @@ export default class Timeline {
    * show. The caller skips the row when this returns `''`.
    */
   protected _statusCountText(): string {
-    const total = this.api ? this._apiTotal : this.allCards.length;
+    const total = this._statusTotal();
     const count = this.api ? this.allCards.length : this._localDisplayCards().length;
     if (total <= 0 || count === 0) return '';
     const start = this.pagination ? (this._currentPage() - 1) * this._pageSize() + 1 : 1;
     const end = Math.min(start + count - 1, total);
     return `Mostrando ${start}-${end} de ${total} publicaciones`;
+  }
+
+  /**
+   * Write (or take down) the count row at the **top** of the list: the mirror of the one
+   * `_renderStatus` puts at its end, with the very same text, and only when the result set is
+   * bigger than `STATUS_TOP_MIN_ITEMS`.
+   *
+   * It is inserted as the first child of `#timeline-cards`, which is exactly "below the taxonomy
+   * row": that row lives right above `#timeline-cards` in the layout, so the two are neighbours
+   * whether taxonomies exist or not.
+   *
+   * It deliberately carries neither `.timeline-item` nor `.timeline-status-item`:
+   *
+   * - Not `.timeline-item`, because every article selector —the ones in this repo's suites, and
+   *   the documented pattern for consumers' ones— is `.timeline-item:not(<control rows>)`: a
+   *   control row that is a `.timeline-item` without one of those extra classes reads as an
+   *   article.
+   * - Not `.timeline-status-item`, because the two helpers that own the bottom row look it up
+   *   with `querySelector`, which returns the first match in document order — and this row is
+   *   always the first child, so it would be the one `_renderStatus` removes on the next pass,
+   *   and the anchor `_insertBeforeTrailing` would insert appended cards above it.
+   *
+   * It owns no state: it is rebuilt from `_statusCountText()` on every `_renderStatus`, so it can
+   * never disagree with the row at the end, and it takes itself down when there is no count to
+   * show (empty result, error, first API page still loading). While the skeletons are up
+   * `_renderStatus` returns before getting here, and the list they replaced already took the row
+   * with it.
+   */
+  protected _renderTopStatus(): void {
+    this.timelineCards.querySelectorAll('.timeline-status-top').forEach((el) => el.remove());
+    if (this._statusTotal() <= STATUS_TOP_MIN_ITEMS) return;
+    const text = this._statusCountText();
+    if (!text) return;
+    const el = document.createElement('div');
+    el.className = 'timeline-status-top';
+    el.innerHTML = `
+      <div class="timeline-date-col">
+        <div class="timeline-dot timeline-footer-dot"></div>
+      </div>
+      <div class="timeline-status-text">${text}</div>
+    `;
+    this.timelineCards.insertBefore(el, this.timelineCards.firstChild);
   }
 
   /**
@@ -6962,6 +7021,7 @@ export default class Timeline {
     // already matches the page that is coming. Adding a row on top of them would only pile a
     // second, wrong line ("Cargando más publicaciones...") under the placeholders.
     if (this.timelineCards.querySelector('.timeline-skeleton-item')) return;
+    this._renderTopStatus();
     const prev = this.timelineCards.querySelector('.timeline-status-item');
     if (prev) prev.remove();
     let text = '';
