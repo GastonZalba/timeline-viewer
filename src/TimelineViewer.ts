@@ -28,7 +28,7 @@ import type ZoomControl from 'ol/control/Zoom.js';
 import type AttributionControl from 'ol/control/Attribution.js';
 import type OlOverlay from 'ol/Overlay.js';
 import type BaseLayer from 'ol/layer/Base.js';
-import type { fromLonLat as FromLonLat } from 'ol/proj.js';
+import type { fromLonLat as FromLonLat, get as GetProjection } from 'ol/proj.js';
 
 declare const instgrm: { Embeds: { process: () => void } } | undefined;
 declare const twttr: { widgets: { load: (el?: HTMLElement) => void } } | undefined;
@@ -557,6 +557,7 @@ interface TemasMapModules {
   Text: typeof TextStyle;
   Zoom: typeof ZoomControl;
   Attribution: typeof AttributionControl;
+  getProjection: typeof GetProjection,
   fromLonLat: typeof FromLonLat;
 }
 
@@ -3272,7 +3273,8 @@ export default class Timeline {
           Text: text.default,
           Zoom: zoomCtl.default,
           Attribution: attrCtl.default,
-          fromLonLat: proj.fromLonLat
+          fromLonLat: proj.fromLonLat,
+          getProjection: proj.get
         })
       );
     }
@@ -3509,7 +3511,7 @@ export default class Timeline {
     // usuario había dejado puesta. Ahora solo se reemplazan los features de la capa vectorial.
     let current = points;
     let features = current.map(featureOf);
-    const source = new ol.VectorSource({ features });
+    const source = new ol.VectorSource({ features, wrapX: false });
 
     const layers: BaseLayer[] = [];
     // The credit belongs to the base layer, so it only exists when there is one: with no tiles there
@@ -3525,6 +3527,7 @@ export default class Timeline {
           // reads, and an empty value would leave it rendering an empty box over the map.
           source: new ol.XYZ({
             url: this.temasMapTiles,
+            wrapX: false,
             ...(showAttribution ? { attributions: this.temasMapAttribution } : {})
           })
         })
@@ -3541,7 +3544,10 @@ export default class Timeline {
       // wheel climb to OpenLayers' own default (28) and "the max zoom of this map" stops meaning
       // anything — while every programmatic move (the opening fit, the focus of a clicked topic,
       // the zoom a cluster click animates to) is already clamped to `TEMAS_MAP_FIT_MAX_ZOOM`.
-      maxZoom: TEMAS_MAP_FIT_MAX_ZOOM
+      maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
+      // Limit the view to the world extent so we don't pan outside the planet and avoid
+      // the black edges that appear when wrapX is disabled.
+      extent: ol.getProjection('EPSG:3857')?.getExtent() || undefined
     });
     const map = new ol.OlMap({
       target: canvas,
@@ -4226,6 +4232,10 @@ export default class Timeline {
    * El id del click es el de la **tarjeta**, no el del tema: el panel muestra el artículo, y un
    * artículo con diez temas tiene un solo panel. En API los puntos solo traen el id, así que el
    * artículo entero se pide con `_fetchDetail` (que ya cachea en `_apiDetails`).
+   *
+   * Es además la única superficie de tarjetas alcanzable con el timeline **colapsado** (el botón del
+   * mapa general no se esconde con el timeline cerrado), así que no puede depender de que
+   * `_toggleExpand` o `_init` ya hayan corrido `_preloadEmbedLibraries()`: por eso lo llama ella misma.
    */
   protected async _openFullMapCard(point: FullMapPoint): Promise<void> {
     const panel = this.fullMapDetail;
@@ -4299,6 +4309,14 @@ export default class Timeline {
     void this._ensureCardDetail(cardEl).then((detail) => {
       // La respuesta tardía es de otro punto: ya no se pinta nada.
       if (this._fullMapSelectedKey !== key) return;
+      // El preload no puede depender de que el timeline se haya expandido antes: esta ficha es la
+      // única superficie de tarjetas alcanzable con el timeline colapsado (el botón del mapa general
+      // no se esconde y `_bindFullMapToggle` no toca `isExpanded`), y los otros dos caminos que lo
+      // llaman no llegan acá — en local `_ensureCardDetail` corta en `!this.api`, y en api con el
+      // artículo fuera de la página cargada el detalle se inyectó al crear la tarjeta, así que corta
+      // por `detailLoaded`. Va antes de `_processCardEmbeds` porque el blockquote de Instagram nace
+      // a los 150ms y su polling de `instgrm` dura 15s: el script tiene que estar en camino ya.
+      this._preloadEmbedLibraries();
       this._processCardEmbeds(cardEl);
       // La lista de temas recién llegó, así que recién ahora se puede saber cuáles tienen punto y
       // volverlos clickeables: el bind va después del detalle, no antes. El objeto que se bindea es
