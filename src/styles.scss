@@ -1656,15 +1656,9 @@
     z-index: 2;
   }
 
-  // Con el mapa abierto el orden y las notas de trabajo se apagan (`hidden`, escrito por
+  // Con el mapa abierto el orden se apaga (`hidden`, escrito por
   // `_applyFullMapState`): no hay lista que ordenar, y el mapa es "trabajo oculto" de por sí. El
   // buscador y el filtro **no**, porque son los que acotan lo que el mapa muestra.
-  //
-  // `.work-notes-toggle` necesita su propio `display: none` porque se pone `inline-flex` en
-  // `&.expanded`, y ese `display` de autor le gana a la regla `[hidden]` de la UA. Es el mismo corte
-  // que `.fullmap-view[hidden]` de más arriba; `.sort-wrap` no lo necesita (no tiene `display` propio)
-  // pero se lista con el otro para que el par se lea junto y ninguno se olvide.
-  .work-notes-toggle[hidden],
   .sort-wrap[hidden] {
     display: none;
   }
