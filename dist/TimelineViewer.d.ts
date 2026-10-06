@@ -108,7 +108,9 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
      */
     updatePoints(points: P[]): void;
     /**
-     * Repintar los markers para que el predicado `isSelected` se vuelva a evaluar.
+     * Repintar los markers para que el predicado `isSelected` se vuelva a evaluar, y re-agrupar lo
+     * que la selección cambió (el punto abierto queda fuera de los clústeres y de los grupos del
+     * spiderfy).
      *
      * El estilo de cada marker es una **función**, así que no alcanza con cambiar el estado: sin este
      * `changed()` los círculos seguirían siendo los del momento en que se creó el feature. Solo lo
@@ -142,6 +144,12 @@ interface TemasMapMountOptions<P> {
     markerLabel: ((point: P) => string) | null;
     /** Markup del globo de hover sobre un marcador */
     hoverHtml: (point: P) => string;
+    /**
+     * Markup del globo de hover sobre un clúster, o `undefined` para el default `"N temas"`. Ninguna
+     * de las dos vistas lo pasa hoy: el conteo se lee igual en los dos, pero la opción existe para un
+     * consumidor que quiera sumarle el aviso de que el click acerca.
+     */
+    clusterHoverHtml?: (count: number) => string;
     /** Clase del globo de hover */
     tooltipClass: string;
     /** Clase del mensaje que se escribe en el canvas cuando no se pudo cargar `ol` */

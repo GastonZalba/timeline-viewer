@@ -1358,7 +1358,6 @@
   position: relative;
   z-index: 2;
 }
-.publicaciones-section .work-notes-toggle[hidden],
 .publicaciones-section .sort-wrap[hidden] {
   display: none;
 }

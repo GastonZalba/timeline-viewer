@@ -202,6 +202,70 @@ const TEMAS_MAP_SPIDER_GAP = 1;
 const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
 
 /**
+ * Zoom below which overlapping markers are drawn as a single cluster marker —one circle carrying
+ * the count of the topics it stands for— instead of being spread apart by the spiderfy.
+ *
+ * The breakage it prevents is screen-space, not geographic: at a far view hundreds of points land
+ * inside a few dozen pixels, and the spiderfy answers with a ring whose radius grows with the count
+ * (`(radius + gap) / sin(PI / n)` ≈ 3.2·n px) — an n of 200 is a 640px ring whose lines cross the
+ * whole map. A cluster says the same thing ("there are n topics here") in one fixed 30px circle,
+ * whatever the count.
+ *
+ * The threshold only picks the mode the far view starts in; what guarantees the spiderfy never
+ * grows past a readable ring on **any** zoom is its own cap, `TEMAS_MAP_SPIDER_MAX_GROUP`. That
+ * pairing is why this value can be conservative: 7 is country scale on the default view.
+ */
+const TEMAS_MAP_CLUSTER_MAX_ZOOM = 7;
+
+/**
+ * Screen distance, in pixels, below which two markers become one cluster at the far view. It is
+ * wider than `TEMAS_MAP_SPIDER_THRESHOLD` on purpose: a cluster marker is a 30px circle (radius plus
+ * ring), so clusters have to sit further apart than two 18px markers do, or two counts read as one
+ * blob. Below this distance a pair of points merges into one icon with the total, which is the
+ * standard reading of a general view — nothing is lost, the count says how many are in there.
+ */
+const TEMAS_MAP_CLUSTER_DISTANCE = 40;
+
+/**
+ * Biggest group the spiderfy spreads before it draws a cluster instead, whatever the zoom. This is
+ * the safety net of `TEMAS_MAP_CLUSTER_MAX_ZOOM`: a mis-set threshold —or a dataset denser than the
+ * one it was set for— would otherwise bring back the giant ring, and the cap makes that failure
+ * impossible by construction. 12 is a ring of ≈39px, about the size of a small cluster.
+ */
+const TEMAS_MAP_SPIDER_MAX_GROUP = 12;
+
+/**
+ * Radius of a cluster marker, in screen pixels: the 18px marker plus the room a count of up to
+ * three digits needs at `TEMAS_MAP_CLUSTER_FONT`.
+ */
+const TEMAS_MAP_CLUSTER_RADIUS = 14;
+/** Width of the white ring around a cluster marker, in screen pixels */
+const TEMAS_MAP_CLUSTER_STROKE = 2;
+/** Font size, in px, of the count painted in the center of a cluster marker */
+const TEMAS_MAP_CLUSTER_FONT = 12;
+/**
+ * Fill of a cluster whose members do not share a tone. Dark for the same reason the marker's number
+ * is: it is painted over a raster map, and a dark disc with white ink reads on any tile. The color
+ * is the same `#0e1116` as `TEMAS_MAP_MARKER_TEXT_COLOR`, so the two kinds of circle feel like one
+ * family.
+ */
+const TEMAS_MAP_CLUSTER_FILL_DARK = '#0e1116';
+/** Color of the count painted on a cluster: white, over the tone color or over the dark fill */
+const TEMAS_MAP_CLUSTER_TEXT_COLOR = '#ffffff';
+/**
+ * Zoom levels a click on a cluster adds to the view. Two steps dissolve a cluster from any
+ * starting zoom without the dead click a `fit` to the members' extent would produce when that
+ * extent already fills the viewport — a fit that would not zoom in looks like nothing happened.
+ */
+const TEMAS_MAP_CLUSTER_ZOOM_STEP = 2;
+/**
+ * Duration, in ms, of the zoom a click on a cluster animates. Not zero for the same reason as
+ * `FULLMAP_FOCUS_DURATION`: the view is on screen, and the interpolation is what fires the
+ * `moveend`s that re-run `declutter` on the way to the new zoom, dissolving the cluster as it goes.
+ */
+const TEMAS_MAP_CLUSTER_ZOOM_DURATION = 400;
+
+/**
  * How much bigger the circle of the **selected** marker gets, in screen pixels, and how thick the ring
  * it grows around itself is.
  *
@@ -519,6 +583,47 @@ interface TemasMapSpider {
 }
 
 /**
+ * One cluster marker as `declutter` leaves it: how many topics it stands for, the color to paint it
+ * with —the tone the members share, or the dark fallback when they are a mix— and the geometry it
+ * is painted at, the centroid of the group, which is not the leader feature's own coordinate.
+ * That is the whole reason the style stays a function: it paints this geometry instead of the
+ * feature's own, the same way it paints the displaced circle of a spiderfied marker.
+ */
+interface TemasMapCluster {
+  count: number;
+  color: string;
+  marker: OlPoint;
+}
+
+/**
+ * Something the pointer can land on at the current zoom: a marker —at its own coordinate, or at
+ * the displaced one when it was spiderfied— or a cluster. `declutter` rebuilds the whole list on
+ * every `moveend`, because both the screen positions and which points became a cluster depend on
+ * the zoom; the hover and the click only ever read it, which is what keeps them agnostic of the
+ * mode.
+ */
+type TemasMapTarget =
+  | {
+      kind: 'point';
+      /** Position in `current`, which is what `hoverHtml` and `onMarkerClick` are indexed by */
+      index: number;
+      /** Screen position as painted: its own coordinate, or the spiderfied one */
+      screen: number[];
+      /** Map coordinate the tooltip sits on */
+      coord: number[];
+      /** Pointer radius: the marker's radius plus the hit padding */
+      radius: number;
+    }
+  | {
+      kind: 'cluster';
+      screen: number[];
+      coord: number[];
+      radius: number;
+      /** How many topics the cluster stands for, and what its marker is numbered with */
+      count: number;
+    };
+
+/**
  * One live map plus the overlay that was bound to it. Both have to be let go of when the card goes
  * away: the map because it keeps its canvas, listeners and tile source alive, and the overlay because
  * `Map.dispose()` does not take the overlays that were added to it with it.
@@ -538,7 +643,9 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
    */
   updatePoints(points: P[]): void;
   /**
-   * Repintar los markers para que el predicado `isSelected` se vuelva a evaluar.
+   * Repintar los markers para que el predicado `isSelected` se vuelva a evaluar, y re-agrupar lo
+   * que la selección cambió (el punto abierto queda fuera de los clústeres y de los grupos del
+   * spiderfy).
    *
    * El estilo de cada marker es una **función**, así que no alcanza con cambiar el estado: sin este
    * `changed()` los círculos seguirían siendo los del momento en que se creó el feature. Solo lo
@@ -574,6 +681,12 @@ interface TemasMapMountOptions<P> {
   markerLabel: ((point: P) => string) | null;
   /** Markup del globo de hover sobre un marcador */
   hoverHtml: (point: P) => string;
+  /**
+   * Markup del globo de hover sobre un clúster, o `undefined` para el default `"N temas"`. Ninguna
+   * de las dos vistas lo pasa hoy: el conteo se lee igual en los dos, pero la opción existe para un
+   * consumidor que quiera sumarle el aviso de que el click acerca.
+   */
+  clusterHoverHtml?: (count: number) => string;
   /** Clase del globo de hover */
   tooltipClass: string;
   /** Clase del mensaje que se escribe en el canvas cuando no se pudo cargar `ol` */
@@ -3249,6 +3362,40 @@ export default class Timeline {
       });
     };
 
+    // One circle per cluster color and one text per count, shared by every cluster that needs them.
+    // The style function runs on every repaint of every feature, so without the cache a pan would
+    // build a fresh `Circle` per cluster per frame —same reason as the `circleOf` caches above.
+    const clusterCircles = new Map<string, CircleStyle>();
+    const clusterCircleOf = (color: string): CircleStyle => {
+      let circle = clusterCircles.get(color);
+      if (!circle) {
+        circle = new ol.Circle({
+          radius: TEMAS_MAP_CLUSTER_RADIUS,
+          fill: new ol.Fill({ color }),
+          stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_CLUSTER_STROKE })
+        });
+        clusterCircles.set(color, circle);
+      }
+      return circle;
+    };
+    const clusterTexts = new Map<number, TextStyle>();
+    const clusterTextOf = (count: number): TextStyle => {
+      let text = clusterTexts.get(count);
+      if (!text) {
+        text = new ol.Text({
+          text: String(count),
+          font: `700 ${TEMAS_MAP_CLUSTER_FONT}px system-ui, sans-serif`,
+          textAlign: 'center',
+          textBaseline: 'middle',
+          // Mismo nudge que el número del marker: la constante es la misma y por la misma razón.
+          offsetY: TEMAS_MAP_MARKER_TEXT_OFFSET_Y,
+          fill: new ol.Fill({ color: TEMAS_MAP_CLUSTER_TEXT_COLOR })
+        });
+        clusterTexts.set(count, text);
+      }
+      return text;
+    };
+
     const featureOf = (p: P) => {
       const feature = new ol.OlFeature({
         geometry: new ol.OlPoint(ol.fromLonLat([p.lon, p.lat]))
@@ -3266,6 +3413,11 @@ export default class Timeline {
       // when there is one, paints the line and the marker at the displaced point instead of at the
       // topic's own coordinate. The geometries live in the `spider` property, not in the feature's
       // own, because one feature paints two geometries that are not the same point.
+      //
+      // El `declutter` también decide si el feature **no se pinta**, y por el mismo motivo: en el
+      // modo clúster el líder pinta el círculo con el conteo (geometría propia, en el centroide del
+      // grupo) y los demás miembros devuelven `[]`, que el renderer lee como un array de estilos
+      // vacío y no dibuja nada.
       //
       // El punto va en la propiedad `point` del feature y no cerrado en la función por lo mismo: la
       // selección se resuelve en cada repintado, así que la función tiene que poder leer el estado de
@@ -3292,6 +3444,21 @@ export default class Timeline {
       };
       feature.setStyle((f) => {
         const point = (f.get('point') as P | undefined) || p;
+        // El clúster manda sobre lo demás: su círculo se pinta en el centroide del grupo (la
+        // geometría vive en la propiedad, igual que la del spider) y nunca trae línea ni número de
+        // marker. Un feature no puede ser líder y miembro a la vez: `declutter` pone las dos
+        // propiedades en el mismo paso y el líder no recibe `hidden`.
+        const cluster = f.get('cluster') as TemasMapCluster | undefined;
+        if (cluster) {
+          return new ol.Style({
+            geometry: cluster.marker,
+            image: clusterCircleOf(cluster.color),
+            text: clusterTextOf(cluster.count)
+          });
+        }
+        // Miembro absorbido por un clúster: estilo vacío, o sea nada pintado (el renderer itera el
+        // array y no tiene estilos que dibujar).
+        if (f.get('hidden')) return [];
         const base = plainStyle(point);
         const spider = f.get('spider') as TemasMapSpider | undefined;
         if (!spider) return base;
@@ -3388,9 +3555,8 @@ export default class Timeline {
     // `renderSync()` is the one public method that paints before returning.
     map.renderSync();
 
-    // Hover that names the topic under the pointer. The hit test is a distance against the circle's
-    // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
-    // being plain circles the manual test is exact and needs no feature-to-point mapping.
+    // The tooltip element the hover floats over. Its markup comes from the caller on every
+    // `pointermove`; the node itself is created once and reused for markers and clusters alike.
     const tooltip = document.createElement('div');
     // La clase viene de la opción y no es fija: el SCSS del globo de la tarjeta está scopeado bajo
     // `.card-temas-map-canvas`, así que en el mapa general no aplicaría y el texto quedaría blanco
@@ -3410,12 +3576,13 @@ export default class Timeline {
       canvas.classList.remove('is-hover-marker');
     };
 
-    // Screen position of every marker as it is currently painted — its own coordinate, or the
-    // displaced one when it was spiderfied — and the map coordinate the tooltip has to sit on. Both
-    // are kept in sync by `declutter`, and are what the hover reads: the hit test has to point at
-    // what the user sees, not at the coordinate the topic would have without the displacement.
-    let markerScreens: number[][] = current.map(() => [0, 0]);
-    let markerCoords: number[][] = current.map((p) => ol.fromLonLat([p.lon, p.lat]));
+    // Every target the pointer can land on —a marker at the position it is painted, or a cluster at
+    // its centroid— as `declutter` left it. It is what the hover and the click read: the hit test has
+    // to point at what the user sees, not at the coordinate the topic would have without the
+    // displacement, and in cluster mode most points are not painted at all. Rebuilt from scratch on
+    // every `moveend` because both the positions and which points became a cluster depend on the
+    // zoom; nothing else writes it.
+    let targets: TemasMapTarget[] = [];
     // Own coordinate of each topic, as a geometry ready to be reused. It is what the line of a
     // displaced marker starts at, and what the marker sits on while it is not displaced —`declutter`
     // resets every marker before grouping, so the geometry is only ever read, never accumulated: the
@@ -3423,32 +3590,61 @@ export default class Timeline {
     let ownPoints: OlPoint[] = current.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
 
     /**
-     * Spread the markers that overlap at the current zoom. Every marker starts at its own
-     * coordinate; the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another are grouped
-     * and re-laid out on a circle around the group's centroid.
+     * Decide, for the current zoom, how every overlapping group is drawn, and rebuild `targets`.
+     *
+     * Two modes, picked by `TEMAS_MAP_CLUSTER_MAX_ZOOM`:
+     *
+     * - **Spiderfy** (near view): every marker starts at its own coordinate, and the ones that sit
+     *   closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another are re-laid out on a circle around the
+     *   group's centroid, each with the line back to its real coordinate. Unchanged from the
+     *   original behavior, except that a group bigger than `TEMAS_MAP_SPIDER_MAX_GROUP` is no longer
+     *   spread —that ring grows with the count and is what broke the far view— and is clustered
+     *   instead.
+     * - **Cluster** (far view): every group within `TEMAS_MAP_CLUSTER_DISTANCE` becomes **one**
+     *   marker —a circle with the count— at the group's centroid. The leader feature paints it, the
+     *   rest paint nothing, and the only lines on screen are the ones the spiderfy still owns at a
+     *   near view.
+     *
+     * In both modes the **selected** point of the general map is left out of every group: its row
+     * says "it is here", and at a far view —where a click on a row does not change the zoom— it
+     * would otherwise be buried inside a count. It paints alone, with its selected circle, on top.
      *
      * A displaced marker is painted from the `spider` property and not from the feature's own
      * geometry: one feature then paints two geometries that are not the same point —the line back to
      * the real coordinate and the circle at the displaced one—, which is the whole reason the style
-     * is a function. The line is the only thing drawn back: no arrowhead, no anchor dot.
+     * is a function. The line is the only thing drawn back: no arrowhead, no anchor dot. Same for a
+     * cluster: the count lives in the `cluster` property because the centroid is not the feature's
+     * coordinate either.
      *
      * Runs on every `moveend` —and once right after the fit— because what overlaps changes with the
-     * zoom: a far view clusters markers that a near view separates back into place.
+     * zoom: a far view groups markers that a near view separates back into place.
      */
     const declutter = () => {
       const n = current.length;
       const screens = current.map((p) => map.getPixelFromCoordinate(ol.fromLonLat([p.lon, p.lat])));
       const used = new Array<boolean>(n).fill(false);
+      // `getZoom()` is undefined only if the resolution maps to no zoom level, which the default
+      // view never does; the fallback keeps the old behavior rather than the new one.
+      const zoom = map.getView().getZoom();
+      const clusterMode = (zoom ?? TEMAS_MAP_CLUSTER_MAX_ZOOM) < TEMAS_MAP_CLUSTER_MAX_ZOOM;
+      const threshold = clusterMode ? TEMAS_MAP_CLUSTER_DISTANCE : TEMAS_MAP_SPIDER_THRESHOLD;
 
-      // Back to the own coordinate first: whatever was displaced before this zoom may not overlap
-      // anymore, and a feature keeps the last `spider` it was given.
+      // Back to the own coordinate first: whatever was displaced or absorbed before this zoom may
+      // not overlap anymore, and a feature keeps the last `spider`/`cluster`/`hidden` it was given.
+      // Reset for **every** feature, even the ones with no pixel this pass: a point that left the
+      // viewport would otherwise come back carrying the group it had when it left.
       clearHover();
+      targets = [];
       for (let i = 0; i < n; i++) {
-        const screen = screens[i];
-        if (!screen) continue;
-        markerScreens[i] = screen;
-        markerCoords[i] = ownPoints[i].getCoordinates();
         features[i].set('spider', undefined);
+        features[i].set('cluster', undefined);
+        features[i].set('hidden', undefined);
+      }
+      // The open point never joins a group: marking it used keeps it out of the BFS below, so it is
+      // painted at its own coordinate —with its selected circle, which the z index puts over any
+      // cluster next to it— and it gets its own point target at the end of this pass.
+      for (let i = 0; i < n; i++) {
+        if (screens[i] && options.isSelected?.(current[i])) used[i] = true;
       }
 
       for (let i = 0; i < n; i++) {
@@ -3465,7 +3661,7 @@ export default class Timeline {
             const b = screens[j]!;
             const dx = a[0] - b[0];
             const dy = a[1] - b[1];
-            if (dx * dx + dy * dy <= TEMAS_MAP_SPIDER_THRESHOLD * TEMAS_MAP_SPIDER_THRESHOLD) {
+            if (dx * dx + dy * dy <= threshold * threshold) {
               used[j] = true;
               group.push(j);
             }
@@ -3482,6 +3678,32 @@ export default class Timeline {
         }
         cx /= group.length;
         cy /= group.length;
+
+        if (clusterMode || group.length > TEMAS_MAP_SPIDER_MAX_GROUP) {
+          // One circle with the count, at the centroid. The color is the tone the members share, or
+          // the dark neutral when they are a mix —painting a mixed group green because its first
+          // member is green would say something the data does not.
+          const coord = map.getCoordinateFromPixel([cx, cy]);
+          const tone = current[group[0]].color;
+          const color = group.every((k) => current[k].color === tone) ? tone : TEMAS_MAP_CLUSTER_FILL_DARK;
+          features[group[0]].set('cluster', {
+            count: group.length,
+            color,
+            marker: new ol.OlPoint(coord)
+          } as TemasMapCluster);
+          for (const k of group) {
+            if (k !== group[0]) features[k].set('hidden', true);
+          }
+          targets.push({
+            kind: 'cluster',
+            screen: [cx, cy],
+            coord,
+            radius: TEMAS_MAP_CLUSTER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING,
+            count: group.length
+          });
+          continue;
+        }
+
         // Radius that keeps consecutive markers `2 * (radius + gap)` apart whatever their count;
         // the ring grows with the count instead of letting the numbers overlap again on it. Starts
         // at the top and goes clockwise, so the layout is stable between renders.
@@ -3497,31 +3719,50 @@ export default class Timeline {
             line: new ol.OlLineString([ownPoints[k].getCoordinates(), coord]),
             marker: new ol.OlPoint(coord)
           } as TemasMapSpider);
-          markerScreens[k] = displaced;
-          markerCoords[k] = coord;
+          targets.push({
+            kind: 'point',
+            index: k,
+            screen: displaced,
+            coord,
+            radius: TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING
+          });
+        });
+      }
+
+      // Every point that ended up painted on its own: a lone marker, or the selected one the loops
+      // above skipped. A leader is not one —it already pushed its cluster target— and neither is a
+      // hidden member or a spiderfied marker, which pushed its displaced target already.
+      for (let i = 0; i < n; i++) {
+        if (!screens[i] || features[i].get('cluster') || features[i].get('hidden') || features[i].get('spider'))
+          continue;
+        targets.push({
+          kind: 'point',
+          index: i,
+          screen: screens[i]!,
+          coord: ownPoints[i].getCoordinates(),
+          radius: TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING
         });
       }
     };
     map.on('moveend', declutter);
     declutter();
 
-    // Hover that names the topic under the pointer. The hit test is a distance against the circle's
-    // radius —plus a few px of slack— and not `map.forEachFeatureAtPixel`, because with the markers
-    // being plain circles the manual test is exact and needs no feature-to-point mapping.
-    // It keeps the **closest** marker within the radius instead of the first one: spread markers sit
+    // Hover that names the topic under the pointer —or the size of the cluster it is over. The hit
+    // test is a distance against each target's radius —plus a few px of slack— and not
+    // `map.forEachFeatureAtPixel`, because with the markers being plain circles the manual test is
+    // exact and needs no feature-to-point mapping.
+    // It keeps the **closest** target within the radius instead of the first one: spread markers sit
     // `2 * (radius + gap)` apart, which is less than twice the hit radius, so their targets do
     // overlap and the pointer in the middle of two of them has to name the one the reader is over.
-    const hitTest = (pixel: number[]): number => {
-      const radius = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING;
-      let closest = -1;
-      let closestDistance = radius * radius;
-      for (let i = 0; i < current.length; i++) {
-        const screen = markerScreens[i];
-        const dx = pixel[0] - screen[0];
-        const dy = pixel[1] - screen[1];
+    const hitTest = (pixel: number[]): TemasMapTarget | null => {
+      let closest: TemasMapTarget | null = null;
+      let closestDistance = Infinity;
+      for (const target of targets) {
+        const dx = pixel[0] - target.screen[0];
+        const dy = pixel[1] - target.screen[1];
         const distance = dx * dx + dy * dy;
-        if (distance <= closestDistance) {
-          closest = i;
+        if (distance <= target.radius * target.radius && distance < closestDistance) {
+          closest = target;
           closestDistance = distance;
         }
       }
@@ -3529,15 +3770,24 @@ export default class Timeline {
     };
 
     map.on('pointermove', (e) => {
-      const index = hitTest(e.pixel);
-      if (index < 0) {
+      const target = hitTest(e.pixel);
+      if (!target) {
         clearHover();
         return;
       }
       // `innerHTML` and not `textContent` because the general map writes two lines —the topic and the
-      // headline of its article—. The markup is built by the caller and its texts come escaped.
-      tooltip.innerHTML = options.hoverHtml(current[index]);
-      overlay.setPosition(markerCoords[index]);
+      // headline of its article—. The markup is built by the caller and its texts come escaped; the
+      // cluster's count is a number, so it needs no escaping of its own.
+      tooltip.innerHTML =
+        target.kind === 'cluster'
+          ? (options.clusterHoverHtml?.(target.count) ?? `${target.count} temas`)
+          : options.hoverHtml(current[target.index]);
+      overlay.setPosition(target.coord);
+      // The gap under the tooltip follows the circle it floats over, not a fixed radius: a cluster
+      // is a 30px circle and the marker an 18px one, and with the marker's radius the tooltip would
+      // sit inside the cluster. `HIT_PADDING` is what the target's radius adds over the painted
+      // circle, so taking it back gives the visual radius of each.
+      overlay.setOffset([0, -(target.radius - TEMAS_MAP_MARKER_HIT_PADDING)]);
       canvas.classList.add('is-hover-marker');
     });
     // The map stops firing `pointermove` the moment the pointer leaves it, so without this the
@@ -3545,20 +3795,34 @@ export default class Timeline {
     // away with the card, so this listener needs no teardown.
     canvas.addEventListener('pointerleave', clearHover);
 
-    // Click sobre un marcador. Reusa el mismo hit test del hover, así que el punto que se abre es
-    // exactamente el que el puntero nombraba —y no el primero que pasó por el radio—. El click en el
-    // vacío es un caso aparte: no hay punto, así que va por su propio callback y no con un punto
-    // `undefined` que cada consumidor tendría que adivinar.
-    if (options.onMarkerClick || options.onMarkerMiss) {
-      map.on('singleclick', (e) => {
-        const index = hitTest(e.pixel);
-        if (index < 0) {
-          options.onMarkerMiss?.();
-          return;
-        }
-        options.onMarkerClick?.(current[index]);
-      });
-    }
+    // Click sobre el mapa. Reusa el mismo hit test del hover, así que lo que se abre es exactamente
+    // lo que el puntero nombraba —y no el primero que pasó por el radio—. El listener va
+    // **siempre** bindeado, aunque el mapa no traiga callbacks: el click sobre un clúster es
+    // navegación (acercar) y le corresponde a los dos mapas. El click en el vacío es un caso aparte:
+    // no hay target, así que va por su propio callback y no con un punto `undefined` que cada
+    // consumidor tendría que adivinar.
+    map.on('singleclick', (e) => {
+      const target = hitTest(e.pixel);
+      if (!target) {
+        options.onMarkerMiss?.();
+        return;
+      }
+      if (target.kind === 'cluster') {
+        const view = map.getView();
+        const zoom = view.getZoom();
+        if (zoom === undefined) return;
+        // Dos niveles por click disuelven el clúster desde cualquier zoom de partida sin el salto
+        // que tendría un `fit` al extent de los miembros cuando ese extent ya llena el viewport.
+        // El `moveend` del animate re-corre `declutter`, que va agrupando de nuevo en el camino.
+        view.animate({
+          center: target.coord,
+          zoom: Math.min(zoom + TEMAS_MAP_CLUSTER_ZOOM_STEP, TEMAS_MAP_FIT_MAX_ZOOM),
+          duration: TEMAS_MAP_CLUSTER_ZOOM_DURATION
+        });
+        return;
+      }
+      options.onMarkerClick?.(current[target.index]);
+    });
 
     /**
      * Reemplazar los puntos sin tocar la vista.
@@ -3568,9 +3832,10 @@ export default class Timeline {
      * se lleve el zoom y el paneo que el usuario dejó puestos —que es lo que se perdía reconstruyendo
      * el mapa entero en cada cambio de filtro.
      *
-     * Lo único que se rehace son los tres arrays que el `declutter` y el hit test leen, y en el mismo
-     * orden que al montar: primero `clearHover`, porque el índice que el hover tiene guardado
-     * pertenece al set viejo; después los features, y recién entonces el `declutter`.
+     * Lo único que se rehace son los features y el array de coordenadas propias que el `declutter`
+     * lee, y en el mismo orden que al montar: primero `clearHover`, porque el target que el hover
+     * tiene guardado pertenece al set viejo; después los features, y recién entonces el `declutter`,
+     * que es el que vuelve a armar `targets` con los puntos nuevos.
      *
      * Un set vacío no hace nada: un mapa sin puntos no es un mapa, y el que decide qué mostrar sin
      * puntos es `_refreshFullMap` (que escribe el mensaje), no esto.
@@ -3580,8 +3845,6 @@ export default class Timeline {
       clearHover();
       current = next;
       features = current.map(featureOf);
-      markerScreens = current.map(() => [0, 0]);
-      markerCoords = current.map((p) => ol.fromLonLat([p.lon, p.lat]));
       ownPoints = current.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
       // `clear()` y no reemplazar la `source`: el `VectorLayer` —y con él la capa de tiles y el
       // `View`— queda siendo el mismo objeto, que es justo lo que hay que preservar.
@@ -3594,15 +3857,18 @@ export default class Timeline {
     };
 
     /**
-     * Repintar los markers para que `isSelected` se vuelva a leer. `changed()` por feature es lo que
-     * hace que el renderer vuelva a llamar a la función de estilo; sin él, abrir o cerrar la ficha no
-     * se vería en el mapa.
+     * Repintar los markers para que `isSelected` se vuelva a leer, y re-agrupar. `changed()` por
+     * feature es lo que hace que el renderer vuelva a llamar a la función de estilo; sin él, abrir o
+     * cerrar la ficha no se vería en el mapa.
      *
-     * No toca el `declutter`: la selección no mueve ningún marker (el círculo crece, no se desplaza),
-     * así que las distancias del agrupamiento siguen siendo las mismas.
+     * El `declutter` va con eso porque la selección también cambia el **agrupamiento**: el punto
+     * abierto queda fuera de los clústeres y de los grupos del spiderfy (es el que la fila de la
+     * ficha dice "acá está"), así que sin re-agruparlo seguiría escondido adentro del clúster del
+     * que acababa de salir —o, al cerrarlo, afuera de uno que ahora le correspondería.
      */
     const refreshStyles = (): void => {
       features.forEach((feature) => feature.changed());
+      declutter();
     };
 
     return { map, overlay, updatePoints, refreshStyles };
