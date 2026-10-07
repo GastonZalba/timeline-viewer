@@ -45,9 +45,9 @@ const TEMAS_MAP_FIT_PADDING = 28;
  * with no width— where the extent has no size to divide by and `fit` would zoom in until it hits
  * its own limit), the fit that brings a clicked topic into view, the zoom a cluster click animates
  * to, and the `maxZoom` of the `View` itself, so the zoom controls and the pinch stop there too.
- * 17 is a street-level zoom, which is what "these topics happen in one place" should look like.
+ * 15 is a street-level zoom, which is what "these topics happen in one place" should look like.
  */
-const TEMAS_MAP_FIT_MAX_ZOOM = 17;
+const TEMAS_MAP_FIT_MAX_ZOOM = 15;
 /**
  * Raster base of the topics map when the consumer does not pass one: the public OpenStreetMap
  * standard layer, whose XYZ template only needs `{z}/{x}/{y}` —the four placeholders `ol/uri.js`
@@ -192,8 +192,11 @@ const TEMAS_MAP_SPIDER_MAX_GROUP = 12;
  * at a close zoom is information, a count you cannot open is not).
  *
  * Below it nothing changes: the far view still clusters, and the spiderfy still caps its groups.
+ *
+ * It sits **exactly at** `TEMAS_MAP_FIT_MAX_ZOOM`, which is also the `maxZoom` of the `View`: a
+ * threshold above the ceiling can never be reached and the rule becomes dead code.
  */
-const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 16;
+const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 15;
 /**
  * Radius of a cluster marker, in screen pixels: the 18px marker plus the room a count of up to
  * three digits needs at `TEMAS_MAP_CLUSTER_FONT`.
@@ -367,6 +370,12 @@ const FILTER_EMPTY_LABEL = 'Sin valor';
 const ALL_TAXONOMIES_LABEL = 'Ver todo';
 /** `_contentIndex` value that means "every taxonomy" instead of a single group */
 const ALL_TAXONOMIES_INDEX = -1;
+/**
+ * Result sets bigger than this get the count row **twice**: the one `_renderStatus` writes at the
+ * end of the list, and a mirror of it at the top of it (right below the taxonomy row, when there
+ * is one). Below that threshold the single row at the end is enough, which is how it always was.
+ */
+const STATUS_TOP_MIN_ITEMS = 3;
 const RESIZE_MIN_HEIGHT = 180;
 const RESIZE_MAX_HEIGHT = 1200;
 const RESIZE_STEP = 24;
@@ -415,6 +424,16 @@ const FULLMAP_TONE_FIELD = 'tonos_sociales';
  * markers en el camino.
  */
 const FULLMAP_FOCUS_DURATION = 400;
+/**
+ * Ancho mínimo de viewport (px) a partir del cual la ficha del mapa general se saltea el clamp contra
+ * la barra de herramientas y su alto puede llegar hasta arriba.
+ *
+ * Por debajo del umbral el panel se ancla al bottom real de `.featured-row` (`_syncFullMapDetailTop()`)
+ * porque en pantallas angostas la barra ocupa el ancho completo y taparía el inicio de la ficha —y su
+ * botón de cerrar—. Desde el umbral se escribe `0`, que es el mismo camino que ya usaba la ausencia de
+ * barra, así que no hace falta ninguna regla nueva en el SCSS.
+ */
+const FULLMAP_DETAIL_TOP_MIN_WIDTH = 1700;
 /**
  * Normalize a text so it can be searched as a plain substring: without accents and without case,
  * so "politica" finds "Política" and the other way around. Done **once per value**, when the list
@@ -619,6 +638,7 @@ export default class Timeline {
             typeof config.container === 'string'
                 ? document.querySelector(config.container)
                 : config.container;
+        this.container.classList.add('publicaciones-container');
         this.items = config.items || [];
         this.content = this._normalizeContent(config.content);
         this._contentIndex = 0;
@@ -1115,23 +1135,24 @@ export default class Timeline {
         if (!this.showFullMap)
             return '';
         return `<div class="fullmap-wrap">
-            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="fullmap-view" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}</button>
+            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="publicaciones-fullmap-section" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}</button>
           </div>`;
     }
     /**
-     * La vista del mapa general, hermana de `.timeline-container` y no dentro de ella: el contenedor
-     * del timeline lleva `max-height: 0` mientras está colapsado, así que un mapa adentro no tendría
-     * alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa hasta el primer
-     * click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada que mostrar.
+     * La vista del mapa general, hermana de `section.publicaciones-timeline-section` y no adentro del
+     * timeline: `.timeline-container` lleva `max-height: 0` mientras está colapsado, así que un mapa
+     * ahí no tendría alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa
+     * hasta el primer click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada
+     * que mostrar.
      */
     _buildFullMapViewHtml() {
         if (!this.showFullMap)
             return '';
-        return `<div class="fullmap-view" id="fullmap-view" hidden>
+        return `<section class="publicaciones-fullmap-section" id="publicaciones-fullmap-section" hidden>
           <div class="fullmap-status" id="fullmap-status" hidden></div>
           <div class="fullmap-canvas" id="fullmap-canvas"></div>
           <div class="fullmap-detail" id="fullmap-detail" hidden></div>
-        </div>`;
+        </section>`;
     }
     /** Build the main DOM layout and cache element references */
     _buildLayout() {
@@ -1141,9 +1162,9 @@ export default class Timeline {
         const fullMapHtml = this._buildFullMapToggleHtml();
         const fullMapViewHtml = this._buildFullMapViewHtml();
         this.container.innerHTML = `
-      <section class="publicaciones-section" id="publicaciones-section">
+      <section class="publicaciones-timeline-section" id="publicaciones-timeline-section">
         <div class="featured-row">
-          <div class="noticias-top">
+          <div class="toolbar-menu-top">
             <button class="expand-toggle" id="expand-toggle" aria-expanded="false" aria-controls="timeline-container">
               <span class="expand-text"><span id="remaining-count"></span> <span id="remaining-text">${this._relatedLabel(0)}</span></span>
               <span class="expand-icon" id="expand-icon"></span>
@@ -1184,10 +1205,10 @@ export default class Timeline {
             <span>El contenido fue procesado con IA y puede contener imprecisiones</span>
           </div>
         </div>
-        ${fullMapViewHtml}
       </section>
+      ${fullMapViewHtml}
     `;
-        this.section = this.container.querySelector('#publicaciones-section');
+        this.section = this.container.querySelector('#publicaciones-timeline-section');
         this.featuredContainer = this.container.querySelector('#featured-cards');
         this.featuredRow = this.container.querySelector('.featured-row');
         this.timelineContainer = this.container.querySelector('#timeline-container');
@@ -1211,7 +1232,7 @@ export default class Timeline {
         this.taxonomySelectCount = this.container.querySelector('#taxonomy-select-count');
         this.taxonomySelect = this.container.querySelector('#taxonomy-select');
         this.fullMapToggle = this.container.querySelector('#fullmap-toggle');
-        this.fullMapView = this.container.querySelector('#fullmap-view');
+        this.fullMapView = this.container.querySelector('#publicaciones-fullmap-section');
         this.fullMapCanvas = this.container.querySelector('#fullmap-canvas');
         this.fullMapStatus = this.container.querySelector('#fullmap-status');
         this.fullMapDetail = this.container.querySelector('#fullmap-detail');
@@ -2045,7 +2066,8 @@ export default class Timeline {
                 Text: text.default,
                 Zoom: zoomCtl.default,
                 Attribution: attrCtl.default,
-                fromLonLat: proj.fromLonLat
+                fromLonLat: proj.fromLonLat,
+                getProjection: proj.get
             }));
         }
         return this._olModules;
@@ -2277,7 +2299,7 @@ export default class Timeline {
         // usuario había dejado puesta. Ahora solo se reemplazan los features de la capa vectorial.
         let current = points;
         let features = current.map(featureOf);
-        const source = new ol.VectorSource({ features });
+        const source = new ol.VectorSource({ features, wrapX: false });
         const layers = [];
         // The credit belongs to the base layer, so it only exists when there is one: with no tiles there
         // is nothing to attribute. That is why the flag checks the tiles and not just the credit —and it
@@ -2291,6 +2313,7 @@ export default class Timeline {
                 // reads, and an empty value would leave it rendering an empty box over the map.
                 source: new ol.XYZ({
                     url: this.temasMapTiles,
+                    wrapX: false,
                     ...(showAttribution ? { attributions: this.temasMapAttribution } : {})
                 })
             }));
@@ -2305,7 +2328,10 @@ export default class Timeline {
             // wheel climb to OpenLayers' own default (28) and "the max zoom of this map" stops meaning
             // anything — while every programmatic move (the opening fit, the focus of a clicked topic,
             // the zoom a cluster click animates to) is already clamped to `TEMAS_MAP_FIT_MAX_ZOOM`.
-            maxZoom: TEMAS_MAP_FIT_MAX_ZOOM
+            maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
+            // Limit the view to the world extent so we don't pan outside the planet and avoid
+            // the black edges that appear when wrapX is disabled.
+            extent: ol.getProjection('EPSG:3857')?.getExtent() || undefined
         });
         const map = new ol.OlMap({
             target: canvas,
@@ -2710,18 +2736,25 @@ export default class Timeline {
     /**
      * Keep the topic panel of the general map below the toolbar.
      *
-     * The map view is `fixed inset: 0` and floats **under** `.featured-row` (the toolbar, `z-index: 2`),
-     * so a `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
+     * The map view is absolutely pinned inside its section (`top/right/bottom/left: 0` plus an explicit
+     * `height: 100vh`) and floats **under** `.featured-row` (the toolbar, `z-index: 2`), so a
+     * `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
      * viewport —under the bar, which covers its top and its close button and makes the card unusable.
      * The toolbar's height is not a constant (fullpage pill, collapsed panel, wrap on small screens), so
      * its live bottom is written into a CSS variable that the SCSS reads in the panel's `calc()`. Same
      * measurement as `_scrollToTimelineTop()`, which reads the same row for the scroll target.
+     *
+     * On a wide viewport (`FULLMAP_DETAIL_TOP_MIN_WIDTH`) the bar does not compete with the panel, so
+     * the offset goes to zero and the panel's height is allowed to reach the top of the viewport.
      */
     _syncFullMapDetailTop() {
         const panel = this.fullMapDetail;
         if (!panel)
             return;
-        const toolbarBottom = this.featuredRow ? this.featuredRow.getBoundingClientRect().bottom : 0;
+        // A zero bottom is the "no clamp" case, and it also covers the missing `featuredRow`.
+        const toolbarBottom = window.innerWidth >= FULLMAP_DETAIL_TOP_MIN_WIDTH || !this.featuredRow
+            ? 8
+            : this.featuredRow.getBoundingClientRect().bottom;
         // Clamped so a toolbar scrolled out of view (or a `rect` above the viewport) never lifts the top
         // of the panel into negative space.
         panel.style.setProperty('--tv-fullmap-top', `${Math.max(toolbarBottom, 0)}px`);
@@ -2988,6 +3021,10 @@ export default class Timeline {
      * El id del click es el de la **tarjeta**, no el del tema: el panel muestra el artículo, y un
      * artículo con diez temas tiene un solo panel. En API los puntos solo traen el id, así que el
      * artículo entero se pide con `_fetchDetail` (que ya cachea en `_apiDetails`).
+     *
+     * Es además la única superficie de tarjetas alcanzable con el timeline **colapsado** (el botón del
+     * mapa general no se esconde con el timeline cerrado), así que no puede depender de que
+     * `_toggleExpand` o `_init` ya hayan corrido `_preloadEmbedLibraries()`: por eso lo llama ella misma.
      */
     async _openFullMapCard(point) {
         const panel = this.fullMapDetail;
@@ -3067,6 +3104,14 @@ export default class Timeline {
             // La respuesta tardía es de otro punto: ya no se pinta nada.
             if (this._fullMapSelectedKey !== key)
                 return;
+            // El preload no puede depender de que el timeline se haya expandido antes: esta ficha es la
+            // única superficie de tarjetas alcanzable con el timeline colapsado (el botón del mapa general
+            // no se esconde y `_bindFullMapToggle` no toca `isExpanded`), y los otros dos caminos que lo
+            // llaman no llegan acá — en local `_ensureCardDetail` corta en `!this.api`, y en api con el
+            // artículo fuera de la página cargada el detalle se inyectó al crear la tarjeta, así que corta
+            // por `detailLoaded`. Va antes de `_processCardEmbeds` porque el blockquote de Instagram nace
+            // a los 150ms y su polling de `instgrm` dura 15s: el script tiene que estar en camino ya.
+            this._preloadEmbedLibraries();
             this._processCardEmbeds(cardEl);
             // La lista de temas recién llegó, así que recién ahora se puede saber cuáles tienen punto y
             // volverlos clickeables: el bind va después del detalle, no antes. El objeto que se bindea es
@@ -3112,11 +3157,10 @@ export default class Timeline {
      * Son dos gestos en un mismo click, y el orden importa: primero se selecciona —para que el círculo
      * crezca y quede arriba, que es lo que conecta la fila con el punto— y después se mueve la vista.
      *
-     * El **zoom no cambia** en el primer click: el mapa puede estar mostrando medio país, y llevar el
-     * centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que hace útil la fila.
-     * El segundo click sobre el tema que ya está seleccionado es el que hace `fit`, que sí acerca: es
-     * el gesto de "ya sé cuál es, llévame hasta ahí", y como no tiene nada nuevo que seleccionar no
-     * necesita volver a marcar nada.
+     * **Toda fila clickeada acerca**: el gesto es "llévame hasta ahí", y repetirlo sobre otro tema de
+     * la misma tarjeta hace exactamente lo mismo, centrando el nuevo punto. Antes solo el segundo click
+     * —sobre el tema ya seleccionado— hacía `fit`, con lo cual clickear una fila nueva se quedaba en el
+     * zoom viejo y no llegaba al punto elegido.
      */
     _focusFullMapTema(cardEl, card, temaIndex) {
         const tema = (card.temas || [])[temaIndex];
@@ -3125,10 +3169,10 @@ export default class Timeline {
         if (!tema || !geom || !view)
             return;
         const key = `${String(card.id)}#${tema.id_subtema ?? ''}`;
-        // El criterio del segundo gesto es la **selección**, no "la última fila clickeada": un tema que ya
-        // está seleccionado —venga del click en su punto o de su propia fila— es el que pide el `fit`.
-        // Así el gesto es el mismo llegue como llegue, y no hace falta un segundo campo para acordarse de
-        // la última fila.
+        // El criterio es la **selección**, no "la última fila clickeada": un tema distinto al que ya
+        // estaba marcado —venga del click en su punto o de su propia fila— es el que cambia el punto
+        // seleccionado. El `fit` lo pide siempre, así que no hace falta un segundo campo para acordarse
+        // de la última fila.
         const alreadySelected = this._fullMapSelectedKey === key;
         if (!alreadySelected) {
             this._fullMapCardId = String(card.id);
@@ -3145,18 +3189,11 @@ export default class Timeline {
         // proyectar `lon`/`lat` a las coordenadas de la vista, que son EPSG:3857.
         void this._loadOpenLayers().then((ol) => {
             const center = ol.fromLonLat([geom.lon, geom.lat]);
-            if (alreadySelected) {
-                // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
-                // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
-                // queda centrado. Es el "llévame hasta ahí" del segundo click.
-                view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: FULLMAP_FOCUS_DURATION });
-                return;
-            }
-            // El primer click mueve el centro **sin** cambiar el zoom: el mapa puede estar mostrando medio
-            // país, y llevar el centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que
-            // hace útil la fila. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
+            // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
+            // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
+            // queda centrado. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
             // que re-declutterean los markers por el camino.
-            view.animate({ center, duration: FULLMAP_FOCUS_DURATION });
+            view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: FULLMAP_FOCUS_DURATION });
         });
     }
     /**
@@ -5668,6 +5705,15 @@ export default class Timeline {
         this.featuredContainer.querySelectorAll('.featured-skeleton').forEach((el) => el.remove());
     }
     /**
+     * The **total** behind the count row (the "de Y" of "Mostrando A-B de Y"): what the whole
+     * filtered result is, never what is on screen. API mode reads the `total` the server sent with
+     * the page, local mode the filtered pool. Shared by the row at the end and by its mirror at the
+     * top so the two can never disagree on it.
+     */
+    _statusTotal() {
+        return this.api ? this._apiTotal : this.allCards.length;
+    }
+    /**
      * The count line of the status row: "Mostrando 11-20 de 55 publicaciones", or `''` when there is
      * nothing to count. A **range** of positions rather than a bare amount, because what is on screen
      * is always a slice of the result set and never the whole thing.
@@ -5691,13 +5737,56 @@ export default class Timeline {
      * show. The caller skips the row when this returns `''`.
      */
     _statusCountText() {
-        const total = this.api ? this._apiTotal : this.allCards.length;
+        const total = this._statusTotal();
         const count = this.api ? this.allCards.length : this._localDisplayCards().length;
         if (total <= 0 || count === 0)
             return '';
         const start = this.pagination ? (this._currentPage() - 1) * this._pageSize() + 1 : 1;
         const end = Math.min(start + count - 1, total);
         return `Mostrando ${start}-${end} de ${total} publicaciones`;
+    }
+    /**
+     * Write (or take down) the count row at the **top** of the list: the mirror of the one
+     * `_renderStatus` puts at its end, with the very same text, and only when the result set is
+     * bigger than `STATUS_TOP_MIN_ITEMS`.
+     *
+     * It is inserted as the first child of `#timeline-cards`, which is exactly "below the taxonomy
+     * row": that row lives right above `#timeline-cards` in the layout, so the two are neighbours
+     * whether taxonomies exist or not.
+     *
+     * It deliberately carries neither `.timeline-item` nor `.timeline-status-item`:
+     *
+     * - Not `.timeline-item`, because every article selector —the ones in this repo's suites, and
+     *   the documented pattern for consumers' ones— is `.timeline-item:not(<control rows>)`: a
+     *   control row that is a `.timeline-item` without one of those extra classes reads as an
+     *   article.
+     * - Not `.timeline-status-item`, because the two helpers that own the bottom row look it up
+     *   with `querySelector`, which returns the first match in document order — and this row is
+     *   always the first child, so it would be the one `_renderStatus` removes on the next pass,
+     *   and the anchor `_insertBeforeTrailing` would insert appended cards above it.
+     *
+     * It owns no state: it is rebuilt from `_statusCountText()` on every `_renderStatus`, so it can
+     * never disagree with the row at the end, and it takes itself down when there is no count to
+     * show (empty result, error, first API page still loading). While the skeletons are up
+     * `_renderStatus` returns before getting here, and the list they replaced already took the row
+     * with it.
+     */
+    _renderTopStatus() {
+        this.timelineCards.querySelectorAll('.timeline-status-top').forEach((el) => el.remove());
+        if (this._statusTotal() <= STATUS_TOP_MIN_ITEMS)
+            return;
+        const text = this._statusCountText();
+        if (!text)
+            return;
+        const el = document.createElement('div');
+        el.className = 'timeline-status-top';
+        el.innerHTML = `
+      <div class="timeline-date-col">
+        <div class="timeline-dot timeline-footer-dot"></div>
+      </div>
+      <div class="timeline-status-text">${text}</div>
+    `;
+        this.timelineCards.insertBefore(el, this.timelineCards.firstChild);
     }
     /**
      * Render the status row (error / loading / count) at the end of the timeline.
@@ -5718,6 +5807,7 @@ export default class Timeline {
         // second, wrong line ("Cargando más publicaciones...") under the placeholders.
         if (this.timelineCards.querySelector('.timeline-skeleton-item'))
             return;
+        this._renderTopStatus();
         const prev = this.timelineCards.querySelector('.timeline-status-item');
         if (prev)
             prev.remove();
@@ -6122,8 +6212,8 @@ export default class Timeline {
             </button>
           </div>`
             : '';
-        this.container.innerHTML = `<section class="publicaciones-section single-mode" id="publicaciones-section">${workNotesHtml}</section>`;
-        this.section = this.container.querySelector('#publicaciones-section');
+        this.container.innerHTML = `<section class="publicaciones-timeline-section single-mode" id="publicaciones-timeline-section">${workNotesHtml}</section>`;
+        this.section = this.container.querySelector('#publicaciones-timeline-section');
         this.workNotesToggle = this.container.querySelector('#work-notes-toggle');
         if (this.workNotesToggle) {
             this._applyWorkNotesState();

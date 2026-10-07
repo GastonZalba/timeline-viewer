@@ -1,7 +1,7 @@
-@use "sass:list";
+@use 'sass:list';
 
 @property --tv-row-angle {
-  syntax: "<angle>";
+  syntax: '<angle>';
   inherits: false;
   initial-value: 0deg;
 }
@@ -43,12 +43,18 @@
 }
 
 .publicaciones-container {
-  // Vista de mapa general (`showFullMap`): el mapa entra donde estaba el timeline, así que es
-  // hermano de `.timeline-container` y no hijo suyo —el contenedor lleva `max-height: 0` mientras
-  // está colapsado, y un mapa adentro no tendría alto en el modo normal—.
+  // Vista de mapa general (`showFullMap`): el mapa entra donde estaba el timeline, así que va en
+  // una `section` **hermana** de `.publicaciones-timeline-section` —no dentro de
+  // `.timeline-container`, que lleva `max-height: 0` mientras está colapsado: un mapa ahí no
+  // tendría alto en el modo normal—. Por eso vive a este nivel de `.publicaciones-container` y no
+  // adentro de la sección del timeline.
   //
   // El alto tiene que ser un número y no un `auto`: OpenLayers mide su target al crearse y sin una
-  // caja con resolución el `View.fit` de los puntos no tiene viewport contra el que ajustarse.
+  // caja con resolución el `View.fit` de los puntos no tiene viewport contra el que ajustarse. Los
+  // insets solos no alcanzan: `top/bottom: 0` se resuelven contra el alto del contenedor posicionado
+  // que tenga alrededor —el del consumidor es de contenido, y con el timeline oculto al abrir el
+  // mapa mediría apenas la barra—, así que el `height: 100vh` es el que garantiza una caja del
+  // tamaño del viewport. `.fullmap-canvas` repite el `100vh` porque es el target real de OL.
   .publicaciones-fullmap-section {
     display: flex;
     gap: 8px;
@@ -59,6 +65,7 @@
     position: absolute;
     z-index: 1;
     background: var(--tv-bg-primary);
+    height: 100vh;
 
     // Necesita su propio `display: none`: el `display: flex` de arriba le gana a la regla `[hidden]`
     // de la UA, así que sin esto la vista se montaría encima del timeline apenas se renderiza el
@@ -93,15 +100,15 @@
 
       // El error se distingue por el color y no por un ícono: es el único de los tres que es un fallo
       // en vez de un estado, y el tono negativo ya está en las variables del componente.
-      &[data-state="error"] {
+      &[data-state='error'] {
         color: var(--tv-tone-negative);
       }
     }
 
-    // Ficha del punto clickeado. Va **absoluta** sobre el canvas y no como un tercer hijo del `flex
-    // column`: si fuera un hermano más, `.fullmap-canvas` conserva su `100vh` y la vista pasaría a
-    // medir más que el viewport (con scroll, o con la ficha cortada abajo). Absoluta, se superpone al
-    // mapa sin empujarlo.
+    // Ficha del punto clickeado. Va **absoluta** sobre el canvas y no como un hijo más en flujo del
+    // `flex` de la sección: si fuera un hermano en flujo, `.fullmap-canvas` conserva su `100vh` y la
+    // vista pasaría a medir más que el viewport (con scroll, o con la ficha cortada abajo). Absoluta,
+    // se superpone al mapa sin empujarlo.
     //
     // Abajo a la izquierda y no centrada: el centro es donde el usuario está mirando y clickeando para
     // elegir puntos, así que taparlo con la ficha obliga a cerrarla antes de seguir explorando.
@@ -233,7 +240,7 @@
       left: auto;
       right: 0.5em;
       bottom: 2.5em;
-      top: inherit;   
+      top: inherit;
       display: flex;
       flex-direction: column;
       gap: 4px;
@@ -300,6 +307,11 @@
     }
   }
 
+  // Base de `.timeline-item` a nivel de **container** y no de `.publicaciones-timeline-section`:
+  // el mismo markup se renderiza también dentro de `.fullmap-detail-body`, que vive en
+  // `.publicaciones-fullmap-section` —hermana de la sección del timeline—, así que la regla base
+  // cuelga de `.publicaciones-container`, el ancestro común de las dos. Moverla a la sección deja
+  // la tarjeta del mapa general con solo los overrides de `.fullmap-detail-body`, sin la base.
   .timeline-item {
     display: flex;
     align-items: center;
@@ -580,7 +592,7 @@
         margin-bottom: 6px;
 
         &::before {
-          content: "";
+          content: '';
           width: 7px;
           height: 7px;
           background: var(--tv-accent-light);
@@ -852,7 +864,7 @@
           color: var(--tv-accent);
         }
 
-        &[aria-expanded="true"] {
+        &[aria-expanded='true'] {
           background: var(--tv-bg-hover);
           border: 1px solid var(--tv-accent-light);
           color: var(--tv-accent-light);
@@ -933,7 +945,7 @@
         left: auto;
         right: 0.5em;
         bottom: 1.5em;
-        top: inherit;      
+        top: inherit;
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -1118,7 +1130,7 @@
           }
 
           &::before {
-            content: "";
+            content: '';
             position: absolute;
             inset: 0;
             background: linear-gradient(
@@ -1240,7 +1252,7 @@
       pointer-events: none;
 
       &::before {
-        content: "";
+        content: '';
         position: absolute;
         width: 12px;
         height: 2px;
@@ -1443,7 +1455,7 @@
       border-radius: 8px 8px 0 0;
 
       &::before {
-        content: "";
+        content: '';
         position: absolute;
         inset: 0;
         background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
@@ -1452,7 +1464,7 @@
       }
 
       &::after {
-        content: "";
+        content: '';
         position: absolute;
         inset: 0;
         background: linear-gradient(to top, rgba(0, 0, 0, 0.78) 0%, rgba(0, 0, 0, 0.38) 45%, transparent 70%);
@@ -1889,6 +1901,19 @@
   .publicaciones-timeline-section {
     container-type: inline-size;
     container-name: publicaciones;
+    // Piso de ancho en escritorio. Con el piso vigente el container `publicaciones` nunca baja de
+    // 680px, así que los `@container publicaciones (max-width: 600px)` / `(max-width: 610px)` del
+    // final del archivo no se alcanzan desde un viewport normal: solo corren por debajo de 660px,
+    // que es donde el bloque siguiente suelta el piso (`min-width: inherit` toma el del padre) y la
+    // sección pasa a fluir al 100% con su propio padding —los `@media` de viewport de abajo siguen
+    // mandando igual, porque son de la ventana y no del container—.
+    min-width: 680px;
+
+    @media (max-width: 660px) {
+      min-width: inherit;
+      width: 100%;
+      padding: 0 10px;
+    }
 
     .featured-row {
       position: relative;
@@ -1926,7 +1951,7 @@
       }
 
       &::before {
-        content: "";
+        content: '';
         position: absolute;
         inset: -1px;
         border-radius: inherit;
@@ -2313,7 +2338,7 @@
       }
 
       &.active::after {
-        content: "";
+        content: '';
         position: absolute;
         top: -2px;
         right: -2px;
@@ -2355,7 +2380,7 @@
       }
 
       &.active::after {
-        content: "";
+        content: '';
         position: absolute;
         top: -2px;
         right: 0;
@@ -2398,7 +2423,7 @@
 
       // El estado sale del `aria-expanded` que escribe el handler, como el del botón del mapa de la
       // tarjeta: no hay clase que sincronizar, y el fondo lleno dice "estás en el mapa".
-      &[aria-expanded="true"] {
+      &[aria-expanded='true'] {
         background: var(--tv-accent);
 
         &:hover {
@@ -2426,7 +2451,7 @@
       // Puntito de "filtro en uso". Solo con el campo colapsado: desplegado, el término escrito ya
       // lo dice, y el badge en la esquina de la píldora de 180px era ruido.
       &.active:not(.open)::after {
-        content: "";
+        content: '';
         position: absolute;
         top: -2px;
         right: 0;
@@ -2486,7 +2511,7 @@
       // entero y se baja la opacidad para que sea legible sin competir con el término escrito (mismo
       // criterio que el resto de los íconos claros de la barra). El hover la sube a opaco.
       &::-webkit-search-cancel-button {
-        filter: #{"invert(1)"};
+        filter: #{'invert(1)'};
         opacity: 0.75;
         cursor: pointer;
         transition: opacity 0.2s ease;
@@ -2629,7 +2654,7 @@
           background: rgba(255, 255, 255, 0.05);
         }
 
-        input[type="radio"] {
+        input[type='radio'] {
           accent-color: var(--tv-accent);
           width: 12px;
           height: 12px;
@@ -2694,7 +2719,7 @@
         background: rgba(255, 255, 255, 0.05);
       }
 
-      input[type="checkbox"] {
+      input[type='checkbox'] {
         accent-color: var(--tv-accent);
         width: 12px;
         height: 12px;
@@ -3141,7 +3166,7 @@
     .featured-cards {
       position: relative;
       height: 130px;
-      width: 360px;
+      width: 340px;
       cursor: pointer;
       perspective: 1000px;
       transition:
@@ -3168,7 +3193,7 @@
       border: 1px solid var(--tv-border-card);
 
       &::after {
-        content: "";
+        content: '';
         position: absolute;
         inset: 0;
         background: #161c21;
@@ -3230,7 +3255,7 @@
         text-transform: uppercase;
 
         &::before {
-          content: "";
+          content: '';
           width: 7px;
           height: 7px;
           background: var(--tv-accent-light);
@@ -3525,7 +3550,7 @@
       outline: none;
 
       &::before {
-        content: "";
+        content: '';
         width: 4px;
         height: 4px;
         border-radius: 50%;
@@ -3638,7 +3663,7 @@
       transition: all 0.3s ease;
 
       &::before {
-        content: "";
+        content: '';
         position: absolute;
         inset: -2px;
         border-radius: inherit;
@@ -3721,7 +3746,7 @@
       white-space: nowrap;
 
       &::before {
-        content: "";
+        content: '';
         position: absolute;
         inset: -2px;
         border-radius: inherit;

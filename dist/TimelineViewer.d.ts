@@ -16,7 +16,7 @@ import type TextStyle from 'ol/style/Text.js';
 import type ZoomControl from 'ol/control/Zoom.js';
 import type AttributionControl from 'ol/control/Attribution.js';
 import type OlOverlay from 'ol/Overlay.js';
-import type { fromLonLat as FromLonLat } from 'ol/proj.js';
+import type { fromLonLat as FromLonLat, get as GetProjection } from 'ol/proj.js';
 export type TonoSocial = 'Positivo' | 'Negativo' | 'Neutro';
 /**
  * Punto geográfico de un tema, en **EPSG:4326** (WGS84): latitud y longitud en
@@ -55,6 +55,7 @@ interface TemasMapModules {
     Text: typeof TextStyle;
     Zoom: typeof ZoomControl;
     Attribution: typeof AttributionControl;
+    getProjection: typeof GetProjection;
     fromLonLat: typeof FromLonLat;
 }
 /**
@@ -1154,10 +1155,11 @@ export default class Timeline {
      */
     protected _buildFullMapToggleHtml(): string;
     /**
-     * La vista del mapa general, hermana de `.timeline-container` y no dentro de ella: el contenedor
-     * del timeline lleva `max-height: 0` mientras está colapsado, así que un mapa adentro no tendría
-     * alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa hasta el primer
-     * click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada que mostrar.
+     * La vista del mapa general, hermana de `section.publicaciones-timeline-section` y no adentro del
+     * timeline: `.timeline-container` lleva `max-height: 0` mientras está colapsado, así que un mapa
+     * ahí no tendría alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa
+     * hasta el primer click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada
+     * que mostrar.
      */
     protected _buildFullMapViewHtml(): string;
     /** Build the main DOM layout and cache element references */
@@ -1412,12 +1414,16 @@ export default class Timeline {
     /**
      * Keep the topic panel of the general map below the toolbar.
      *
-     * The map view is `fixed inset: 0` and floats **under** `.featured-row` (the toolbar, `z-index: 2`),
-     * so a `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
+     * The map view is absolutely pinned inside its section (`top/right/bottom/left: 0` plus an explicit
+     * `height: 100vh`) and floats **under** `.featured-row` (the toolbar, `z-index: 2`), so a
+     * `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
      * viewport —under the bar, which covers its top and its close button and makes the card unusable.
      * The toolbar's height is not a constant (fullpage pill, collapsed panel, wrap on small screens), so
      * its live bottom is written into a CSS variable that the SCSS reads in the panel's `calc()`. Same
      * measurement as `_scrollToTimelineTop()`, which reads the same row for the scroll target.
+     *
+     * On a wide viewport (`FULLMAP_DETAIL_TOP_MIN_WIDTH`) the bar does not compete with the panel, so
+     * the offset goes to zero and the panel's height is allowed to reach the top of the viewport.
      */
     protected _syncFullMapDetailTop(): void;
     /**
@@ -1518,6 +1524,10 @@ export default class Timeline {
      * El id del click es el de la **tarjeta**, no el del tema: el panel muestra el artículo, y un
      * artículo con diez temas tiene un solo panel. En API los puntos solo traen el id, así que el
      * artículo entero se pide con `_fetchDetail` (que ya cachea en `_apiDetails`).
+     *
+     * Es además la única superficie de tarjetas alcanzable con el timeline **colapsado** (el botón del
+     * mapa general no se esconde con el timeline cerrado), así que no puede depender de que
+     * `_toggleExpand` o `_init` ya hayan corrido `_preloadEmbedLibraries()`: por eso lo llama ella misma.
      */
     protected _openFullMapCard(point: FullMapPoint): Promise<void>;
     /**
@@ -1539,11 +1549,10 @@ export default class Timeline {
      * Son dos gestos en un mismo click, y el orden importa: primero se selecciona —para que el círculo
      * crezca y quede arriba, que es lo que conecta la fila con el punto— y después se mueve la vista.
      *
-     * El **zoom no cambia** en el primer click: el mapa puede estar mostrando medio país, y llevar el
-     * centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que hace útil la fila.
-     * El segundo click sobre el tema que ya está seleccionado es el que hace `fit`, que sí acerca: es
-     * el gesto de "ya sé cuál es, llévame hasta ahí", y como no tiene nada nuevo que seleccionar no
-     * necesita volver a marcar nada.
+     * **Toda fila clickeada acerca**: el gesto es "llévame hasta ahí", y repetirlo sobre otro tema de
+     * la misma tarjeta hace exactamente lo mismo, centrando el nuevo punto. Antes solo el segundo click
+     * —sobre el tema ya seleccionado— hacía `fit`, con lo cual clickear una fila nueva se quedaba en el
+     * zoom viejo y no llegaba al punto elegido.
      */
     protected _focusFullMapTema(cardEl: HTMLElement, card: TimelineItem, temaIndex: number): void;
     /**
@@ -2267,6 +2276,13 @@ export default class Timeline {
      */
     protected _clearApiLoading(): void;
     /**
+     * The **total** behind the count row (the "de Y" of "Mostrando A-B de Y"): what the whole
+     * filtered result is, never what is on screen. API mode reads the `total` the server sent with
+     * the page, local mode the filtered pool. Shared by the row at the end and by its mirror at the
+     * top so the two can never disagree on it.
+     */
+    protected _statusTotal(): number;
+    /**
      * The count line of the status row: "Mostrando 11-20 de 55 publicaciones", or `''` when there is
      * nothing to count. A **range** of positions rather than a bare amount, because what is on screen
      * is always a slice of the result set and never the whole thing.
@@ -2290,6 +2306,33 @@ export default class Timeline {
      * show. The caller skips the row when this returns `''`.
      */
     protected _statusCountText(): string;
+    /**
+     * Write (or take down) the count row at the **top** of the list: the mirror of the one
+     * `_renderStatus` puts at its end, with the very same text, and only when the result set is
+     * bigger than `STATUS_TOP_MIN_ITEMS`.
+     *
+     * It is inserted as the first child of `#timeline-cards`, which is exactly "below the taxonomy
+     * row": that row lives right above `#timeline-cards` in the layout, so the two are neighbours
+     * whether taxonomies exist or not.
+     *
+     * It deliberately carries neither `.timeline-item` nor `.timeline-status-item`:
+     *
+     * - Not `.timeline-item`, because every article selector —the ones in this repo's suites, and
+     *   the documented pattern for consumers' ones— is `.timeline-item:not(<control rows>)`: a
+     *   control row that is a `.timeline-item` without one of those extra classes reads as an
+     *   article.
+     * - Not `.timeline-status-item`, because the two helpers that own the bottom row look it up
+     *   with `querySelector`, which returns the first match in document order — and this row is
+     *   always the first child, so it would be the one `_renderStatus` removes on the next pass,
+     *   and the anchor `_insertBeforeTrailing` would insert appended cards above it.
+     *
+     * It owns no state: it is rebuilt from `_statusCountText()` on every `_renderStatus`, so it can
+     * never disagree with the row at the end, and it takes itself down when there is no count to
+     * show (empty result, error, first API page still loading). While the skeletons are up
+     * `_renderStatus` returns before getting here, and the list they replaced already took the row
+     * with it.
+     */
+    protected _renderTopStatus(): void;
     /**
      * Render the status row (error / loading / count) at the end of the timeline.
      *

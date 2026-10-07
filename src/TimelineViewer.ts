@@ -89,7 +89,7 @@ const TEMAS_MAP_FIT_PADDING = 28;
  * with no width— where the extent has no size to divide by and `fit` would zoom in until it hits
  * its own limit), the fit that brings a clicked topic into view, the zoom a cluster click animates
  * to, and the `maxZoom` of the `View` itself, so the zoom controls and the pinch stop there too.
- * 17 is a street-level zoom, which is what "these topics happen in one place" should look like.
+ * 15 is a street-level zoom, which is what "these topics happen in one place" should look like.
  */
 const TEMAS_MAP_FIT_MAX_ZOOM = 15;
 
@@ -252,8 +252,11 @@ const TEMAS_MAP_SPIDER_MAX_GROUP = 12;
  * at a close zoom is information, a count you cannot open is not).
  *
  * Below it nothing changes: the far view still clusters, and the spiderfy still caps its groups.
+ *
+ * It sits **exactly at** `TEMAS_MAP_FIT_MAX_ZOOM`, which is also the `maxZoom` of the `View`: a
+ * threshold above the ceiling can never be reached and the rule becomes dead code.
  */
-const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 16;
+const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 15;
 
 /**
  * Radius of a cluster marker, in screen pixels: the 18px marker plus the room a count of up to
@@ -2327,10 +2330,11 @@ export default class Timeline {
   }
 
   /**
-   * La vista del mapa general, hermana de `.timeline-container` y no dentro de ella: el contenedor
-   * del timeline lleva `max-height: 0` mientras está colapsado, así que un mapa adentro no tendría
-   * alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa hasta el primer
-   * click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada que mostrar.
+   * La vista del mapa general, hermana de `section.publicaciones-timeline-section` y no adentro del
+   * timeline: `.timeline-container` lleva `max-height: 0` mientras está colapsado, así que un mapa
+   * ahí no tendría alto en el modo normal. El canvas arranca vacío y sin mapa —`ol` no se importa
+   * hasta el primer click— y `#fullmap-status` es donde se avisa que está cargando o que no hay nada
+   * que mostrar.
    */
   protected _buildFullMapViewHtml(): string {
     if (!this.showFullMap) return '';
@@ -3983,8 +3987,9 @@ export default class Timeline {
   /**
    * Keep the topic panel of the general map below the toolbar.
    *
-   * The map view is `fixed inset: 0` and floats **under** `.featured-row` (the toolbar, `z-index: 2`),
-   * so a `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
+   * The map view is absolutely pinned inside its section (`top/right/bottom/left: 0` plus an explicit
+   * `height: 100vh`) and floats **under** `.featured-row` (the toolbar, `z-index: 2`), so a
+   * `max-height` anchored to `100vh` clamps a tall panel right up against the top of the
    * viewport —under the bar, which covers its top and its close button and makes the card unusable.
    * The toolbar's height is not a constant (fullpage pill, collapsed panel, wrap on small screens), so
    * its live bottom is written into a CSS variable that the SCSS reads in the panel's `calc()`. Same

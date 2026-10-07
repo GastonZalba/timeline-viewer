@@ -208,7 +208,7 @@ test.describe('filtros configurables en el navegador', () => {
     await expect(page).toHaveURL(/tv_tipo_fuente=Sitio\+web\+o\+portal/);
 
     await page.reload();
-    await page.waitForSelector('.publicaciones-section .timeline-card', { state: 'attached' });
+    await page.waitForSelector('.publicaciones-timeline-section .timeline-card', { state: 'attached' });
 
     // El estado interno vuelve tildado (persistió) y el del panel vuelve tildado (viajó en la URL),
     // por dos caminos distintos que acá se ven juntos.

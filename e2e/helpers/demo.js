@@ -15,11 +15,11 @@ const DEMO = '/index.html';
 export async function openDemo(page, flags = '') {
   await useOfflineNetwork(page);
   await page.goto(`${DEMO}?${flags}`);
-  await page.waitForSelector('.publicaciones-section .timeline-card', { state: 'attached' });
+  await page.waitForSelector('.publicaciones-timeline-section .timeline-card', { state: 'attached' });
 }
 
 export const sel = {
-  section: '.publicaciones-section',
+  section: '.publicaciones-timeline-section',
   cards: '#timeline-cards',
   toolbar: '.featured-row',
   paginator: '.timeline-paginator-item',

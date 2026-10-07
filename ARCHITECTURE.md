@@ -114,7 +114,7 @@ new Timeline({ container, items, ... })
 | `_bindTemasMapToggle(slot, located)` | 3160 | Bindea el toggle (alterna `expanded`/`hidden`/`aria-expanded`/labels, con `stopPropagation`) y, en el primer open, monta el mapa en un `requestAnimationFrame` |
 | `_loadOpenLayers()` | 3194 | `import()` dinámico de los módulos de `ol` (Map, View, geometrías, capas, fuentes, estilos, overlay, controles, proj) y del plugin de zoom. Cachea la promesa |
 | `_mountTemasMap(canvas, located)` | 3270 | Montaje del mapa de la tarjeta: llama a `_mountTemasMapOn` y registra el handle en `_temasMaps` (el teardown es `_destroyTemasMaps`) |
-| `_mountTemasMapOn(canvas, points, options)` | 3300 | El mapa compartido (tarjeta y general): features (círculos + texto, estilo por función), overlay de tooltip, `renderSync()` + `declutter()` y los listeners de `pointermove`/`singleclick`. `declutter()` elige modo por zoom: **clúster** por debajo de `TEMAS_MAP_CLUSTER_MAX_ZOOM` (un círculo con el conteo en el centroide, `feature.cluster` en el líder y `hidden` en el resto, cuyo estilo es `[]` = no pintar nada) o **spiderfy** (separa los markers solapados y guarda en `feature.spider` la línea de vuelta al origen y la geometría desplazada); un grupo de más de `TEMAS_MAP_SPIDER_MAX_GROUP` (12) se agrupa como clúster por debajo de `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` (16), y a partir de ese zoom el tope se apaga y **todo** grupo se estira en anillo, sin clústeres (a la vista cercana un clúster es un callejón sin salida: su click no puede disolverlo), el punto seleccionado queda fuera de todo grupo, y `targets` es lo que leen el hit test del hover y del click (el click en un clúster hace `view.animate` +2 de zoom, con tope `TEMAS_MAP_FIT_MAX_ZOOM` = 17, que además es el `maxZoom` de la `View`) |
+| `_mountTemasMapOn(canvas, points, options)` | 3300 | El mapa compartido (tarjeta y general): features (círculos + texto, estilo por función), overlay de tooltip, `renderSync()` + `declutter()` y los listeners de `pointermove`/`singleclick`. `declutter()` elige modo por zoom: **clúster** por debajo de `TEMAS_MAP_CLUSTER_MAX_ZOOM` (un círculo con el conteo en el centroide, `feature.cluster` en el líder y `hidden` en el resto, cuyo estilo es `[]` = no pintar nada) o **spiderfy** (separa los markers solapados y guarda en `feature.spider` la línea de vuelta al origen y la geometría desplazada); un grupo de más de `TEMAS_MAP_SPIDER_MAX_GROUP` (12) se agrupa como clúster por debajo de `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` (15), y a partir de ese zoom el tope se apaga y **todo** grupo se estira en anillo, sin clústeres (a la vista cercana un clúster es un callejón sin salida: su click no puede disolverlo), el punto seleccionado queda fuera de todo grupo, y `targets` es lo que leen el hit test del hover y del click (el click en un clúster hace `view.animate` +2 de zoom, con tope `TEMAS_MAP_FIT_MAX_ZOOM` = 15, que además es el `maxZoom` de la `View`) |
 | `_mountFullMap(canvas, points)` | 4137 | Wrapper del mapa general (`showFullMap`): le pasa a `_mountTemasMapOn` el tooltip de dos líneas, `onMarkerClick: _openFullMapCard` y `isSelected` por `_fullMapSelectedKey` |
 | `_destroyTemasMaps()` | 3886 | Suelta cada mapa guardado en `_temasMaps` (`overlay.setMap(null)` + `map.setTarget(undefined)` + `dispose()`). Se llama antes de vaciar la lista (`_renderTimeline`, `_renderApiLoading`) |
 
@@ -139,12 +139,12 @@ new Timeline({ container, items, ... })
 
 ## Estructura DOM
 
-El componente inyecta la siguiente jerarquía en el `container` del consumidor:
+El componente agrega la clase `publicaciones-container` al `container` del consumidor (es la que ancla todo el CSS) y, dentro, inyecta la siguiente jerarquía:
 
 ```html
-<section class="publicaciones-section" id="publicaciones-section">
+<section class="publicaciones-timeline-section" id="publicaciones-timeline-section">
   ├── .featured-row
-  │   ├── .noticias-top
+  │   ├── .toolbar-menu-top
   │   │   ├── button.expand-toggle (#expand-toggle)
   │   │   │   ├── span.expand-text (contiene #remaining-count + #remaining-text; con taxonomías, #remaining-count se oculta al expandir)
   │   │   │   └── span.expand-icon (#expand-icon)
@@ -164,6 +164,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
   │   │           ├── button.filtros-internos-toggle (#filtros-internos-toggle)
   │   │           └── div.filtros-internos-menu (#filtros-internos-menu)
   │   │               └── .filter-section × N (validado / capturado / descartado) > .filter-header (si el grupo declara `label`) + .filter-options[data-filter-field]
+  │   │   └── .fullmap-wrap (solo con `showFullMap`) > button.fullmap-toggle (#fullmap-toggle)
   │   └── .featured-cards (#featured-cards)
   │       └── .featured-card × N (generados por _renderFeatured)
   │           ├── .card-image-wrap > img.card-image
@@ -223,10 +224,25 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 │   │           ├── .card-fuente
 │   │           ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook/video, publicación original)
 │   │           └── .card-videos > .card-videos-list > .card-iframe-wrap × N (links_videos)
+              │   ├── .timeline-item.timeline-load-more-item (si hay más páginas; sin `pagination`)
+              │   ├── .timeline-item.timeline-paginator-item (solo con `pagination: true`)
+              │   ├── .timeline-item.timeline-status-item (conteo "Mostrando A-B de Y"; en API, también cargando / error)
               │   ├── .timeline-item.timeline-footer-item (si lastUpdated)
-              │   ├── .timeline-item.timeline-load-more-item (si hay más páginas)
               │   └── .timeline-item.timeline-empty-item (si no hay resultados)
 
+```
+
+Ambas `section` son **hermanas** dentro del `container`. La segunda existe solo con `showFullMap`:
+
+```html
+<div class="publicaciones-container">   ← el `container` del consumidor, con la clase agregada
+├── section.publicaciones-timeline-section (la de arriba)
+└── section.publicaciones-fullmap-section#publicaciones-fullmap-section [hidden]
+    ├── .fullmap-status#fullmap-status [hidden] (cargando / sin puntos / error)
+    ├── .fullmap-canvas#fullmap-canvas (target de OpenLayers; `height: 100vh`)
+    └── .fullmap-detail#fullmap-detail [hidden] (ficha del punto clickeado, absoluta abajo a la izquierda)
+        ├── .fullmap-detail-close (botón ×, pegado a la esquina de la tarjeta que está adentro)
+        └── .fullmap-detail-loading | .fullmap-detail-body > .timeline-item (la misma tarjeta del timeline)
 ```
 
 ### Modo single (`singleId`)
@@ -234,7 +250,7 @@ El componente inyecta la siguiente jerarquía en el `container` del consumidor:
 Cuando `singleId` está seteado, `_init()` corta antes de `_buildLayout()` y delega en `_renderSingleCard()`, que monta un árbol mínimo: sin featured, sin filtros, sin búsqueda, sin sort, sin paginación ni footer. La `.timeline-date-col` y el `button.card-collapse` se eliminan y la tarjeta queda siempre expandida.
 
 ```
-section.publicaciones-section.single-mode
+section.publicaciones-timeline-section.single-mode
 ├── .single-mode-toolbar (si internalButtons)
 │   └── button.work-notes-toggle
 ├── .timeline-item.visible (sin .timeline-date-col)
@@ -255,13 +271,16 @@ El bloque de taxonomías se renderiza con `_buildTaxonomias(card.taxonomias)` de
 
 ## Sistema de theming CSS
 
-Todas las variables CSS custom están definidas al inicio de `styles.scss` bajo `.publicaciones-section`:
+Todo `styles.scss` está anidado bajo `.publicaciones-container` (la clase que el constructor agrega al `container` del consumidor). Dentro de ese wrapper viven dos ramas hermanas: `.publicaciones-timeline-section` (barra, lista, filtros, paginación) y `.publicaciones-fullmap-section` (la vista del mapa general, solo con `showFullMap`), más la base de `.timeline-item`, que cuelga directo del wrapper porque también la usa la tarjeta del mapa general (`.fullmap-detail-body`), que vive en la otra rama.
+
+Las variables CSS custom están declaradas en `:root` al inicio del archivo (también el `@property --tv-row-angle` del borde animado de la barra):
 
 ```scss
-.publicaciones-section {
+:root {
   --tv-bg-primary: #1a2025;
   --tv-bg-secondary: #1a1a1a;
   --tv-bg-card: #1d2633;
+  --tv-bg-card-glass: rgba(29, 38, 51, 0.7);
   --tv-bg-card-discarded: #3a1f26;
   --tv-bg-card-unvalidated: #3d2a14;
   --tv-bg-overlay: rgba(96, 165, 250, 0.07);
@@ -269,23 +288,27 @@ Todas las variables CSS custom están definidas al inicio de `styles.scss` bajo 
   --tv-border-card: #0e1116;
   --tv-border-section: #2a2a2a;
   --tv-text-primary: #e0e0e0;
-  --tv-text-secondary: #999;
+  --tv-text-secondary: #a3a3a3;
   --tv-text-muted: #a4a4a4;
   --tv-text-dark: #444;
   --tv-text-on-primary: #fff;
-  --tv-accent: #3b82f6;
-  --tv-accent-light: #60a5fa;
+  --tv-accent: #3792c4;
+  --tv-accent-light: #38b2f4;
+  --tv-accent-dark: #1f4457;
+  --tv-scrollbar-track: rgba(0, 0, 0, 0.45);
   --tv-tone-positive: #22c55e;
   --tv-tone-negative: #ef4444;
   --tv-tone-neutral: #94a3b8;
   --tv-shadow-card: rgba(0, 0, 0, 0.541);
+  --tv-date-col-width: 110px;
+  --tv-sticky-top: 6px;
 }
 ```
 
-El consumidor puede personalizar estos valores sobreescribiéndolos en CSS:
+Viven en `:root` y no dentro de la sección para que las herede cualquier nodo —incluida la tarjeta del `.fullmap-detail-body` y la del modo single—. El consumidor las sobreescribe **scopeado a su container**, que es lo que evita teñir el resto de la página:
 
 ```css
-#mi-container .publicaciones-section {
+#mi-container .publicaciones-container {
   --tv-accent: #ff6b6b;
   --tv-bg-card: #2d2d2d;
 }
@@ -471,7 +494,7 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 | `_urlFilters` | `Record<string, string[]> \| null` | Tokens del link por `field`, leídos una vez; `null` con la opción apagada. Vive fuera de los `FilterDef` a propósito: es lo que sobrevive a los rebuilds de los checkboxes |
 | `_urlPage` | `number` | Página que pidió el link (1 si no pidió ninguna) |
 | `_urlReady` | `boolean` | Si el componente ya montó. Lo gatea para que el arranque no reescriba la URL que acaba de leer |
-| `section` | `HTMLElement` | `.publicaciones-section` |
+| `section` | `HTMLElement` | `.publicaciones-timeline-section` |
 | `featuredContainer` | `HTMLElement` | `#featured-cards` |
 | `timelineContainer` | `HTMLElement` | `#timeline-container` |
 | `timelineCards` | `HTMLElement` | `#timeline-cards` |
@@ -494,9 +517,9 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 
 | Clase | Elemento | Descripción |
 |-------|----------|-------------|
-| `.expanded` | `.publicaciones-section` | Timeline visible, featured oculto |
-| `.has-taxonomy` | `.publicaciones-section` | El selector de taxonomías está activo (`content` con grupos): con el timeline expandido oculta `#remaining-count` porque el contador pasa a verse en la píldora del selector |
-| `.fullpage` | `.publicaciones-section` | Modo fullpage (`fullpage: true`): timeline siempre abierto y sin colapsar, sin handle de resize, sin scroll interno en `#timeline-cards` y con `.featured-row` pegada al top. Lo agrega `_buildLayout()` |
+| `.expanded` | `.publicaciones-timeline-section` | Timeline visible, featured oculto |
+| `.has-taxonomy` | `.publicaciones-timeline-section` | El selector de taxonomías está activo (`content` con grupos): con el timeline expandido oculta `#remaining-count` porque el contador pasa a verse en la píldora del selector |
+| `.fullpage` | `.publicaciones-timeline-section` | Modo fullpage (`fullpage: true`): timeline siempre abierto y sin colapsar, sin handle de resize, sin scroll interno en `#timeline-cards` y con `.featured-row` pegada al top. Lo agrega `_buildLayout()` |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
 | `.descartada` | `.timeline-card` | Ítem `descartado: true`: fondo de la carta en `--tv-bg-card-discarded` (rojo), con un velo del mismo tono sobre la miniatura (que es opaca y taparía el fondo). La pone `_createTimelineItem()` |
 | `.sin-validar` | `.timeline-card` | Ítem `validado !== true` (mismo criterio que el badge "Sin validar", o sea incluye el `null`): lo mismo que `.descartada` pero en `--tv-bg-card-unvalidated` (naranja). El selector es `:not(.descartada)`, así que un ítem que llega con los dos estados se pinta de rojo |
