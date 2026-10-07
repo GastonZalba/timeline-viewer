@@ -40,6 +40,10 @@
   // Offset de la barra de herramientas pegada del modo fullpage. Sube este valor si la página
   // del consumidor ya tiene un header propio fijo, para que la barra no quede debajo.
   --tv-sticky-top: 6px;
+  --tv-color-map: #e6761a;
+  --tv-color-map-light: #fb6f00;
+
+  --tv-work-note: #ef44a2;
 }
 
 .publicaciones-container {
@@ -548,12 +552,9 @@
       }
 
       .card-notas-trabajo {
-        background: rgb(203 53 54 / 50%);
-        border: 1px solid var(--tv-tone-negative);
-        color: #fff;
-        font-size: 0.65rem;
-        padding: 4px 8px;
-        border-radius: 4px;
+        color: var(--tv-work-note);
+        font-style: italic;
+        font-size: 0.8rem;
         letter-spacing: 0.3px;
         margin-bottom: 6px;
         line-height: 1.2;
@@ -859,9 +860,9 @@
         display: flex;
         gap: 5px;
         height: 25px;
-        border: 1px solid var(--tv-accent);
+        border: 1px solid var(--tv-color-map);
         background: transparent;
-        color: var(--tv-accent);
+        color: var(--tv-color-map);
         cursor: pointer;
         transition:
           background 0.2s,
@@ -887,23 +888,27 @@
         }
 
         &:hover {
-          background: var(--tv-bg-hover);
-          border: 1px solid var(--tv-accent);
-          color: var(--tv-accent);
+          background: rgba(230, 118, 26, 0.123);
+          border: 1px solid var(--tv-color-map-light);
+          color: var(--tv-color-map-light);
         }
 
         &[aria-expanded='true'] {
-          background: var(--tv-bg-hover);
-          border: 1px solid var(--tv-accent-light);
-          color: var(--tv-accent-light);
+          background: rgba(230, 118, 26, 0.2);
+          border: 1px solid var(--tv-color-map-light);
+          color: var(--tv-color-map-light);
 
           .card-temas-map-chevron {
             transform: rotate(180deg);
           }
+
+          svg {
+            fill: var(--tv-color-map-light);
+          }
         }
 
         &:focus-visible {
-          outline: 2px solid var(--tv-accent);
+          outline: 2px solid var(--tv-color-map);
           outline-offset: 2px;
         }
       }
@@ -1705,15 +1710,16 @@
       }
 
       // El id del subtema, al final del título: dato de trabajo, no de lectura, así que en rojo
-      // (mismo `--tv-tone-negative` que los badges de `notas_de_trabajo`). Dos cortes: el span
+      // (mismo `--tv-work-note` que los badges de `notas_de_trabajo`). Dos cortes: el span
       // **no se emite** sin `internalButtons` (gate en `_buildTemasHtml`) y con ellas la
       // visibilidad vive en el bloque `&.work-notes-hidden` de más abajo (mismo destino que las
       // notas), porque `_toggleWorkNotes` solo togglea la clase de la sección, sin re-render.
       .tema-id {
-        color: var(--tv-tone-negative);
+        color: var(--tv-work-note);
         font-size: 0.7rem;
         font-weight: 600;
         white-space: nowrap;
+        font-style: italic;
       }
 
       .tema-tone {
@@ -1736,12 +1742,9 @@
       }
 
       .tema-notas-trabajo {
-        background: rgb(203 53 54 / 50%);
-        border: 1px solid var(--tv-tone-negative);
-        color: #fff;
-        font-size: 0.65rem;
-        padding: 4px 8px;
-        border-radius: 4px;
+        color: var(--tv-work-note);
+        font-style: italic;
+        font-size: 0.8rem;
         letter-spacing: 0.3px;
         margin-top: 6px;
         line-height: 1.2;
@@ -1770,6 +1773,10 @@
         box-shadow: inset 2px 0 0 var(--tema-tone-color, var(--tv-accent));
         border-radius: 4px;
         padding: 10px;
+
+        .tema-desc {
+          color: var(--tv-text-primary);
+        }
       }
 
       // El tema que tiene punto en el mapa general: clickeable, así que se lo dice —con el puntero y con
@@ -2235,19 +2242,6 @@
       z-index: 2;
     }
 
-    // Notas de trabajo ocultas: además de los badges va el id del subtema al final del título del
-    // tema (`.tema-id`), que es el mismo "dato de trabajo" en otra forma. Ojo con el `internalButtons`
-    // apagado: acá la clase nunca se aplica, pero eso ya no deja el id a la vista —sin
-    // `internalButtons` el span no se emite, gateado en `_buildTemasHtml`—; las notas, en cambio,
-    // siguen viéndose siempre, como siempre.
-    &.work-notes-hidden {
-      .card-notas-trabajo,
-      .tema-notas-trabajo,
-      .tema-id {
-        display: none !important;
-      }
-    }
-
     .expand-toggle {
       background: none;
       border: 1px solid var(--tv-accent);
@@ -2348,7 +2342,7 @@
 
     .work-notes-toggle,
     .filtros-internos-toggle {
-      border: 1px solid var(--tv-tone-negative);
+      border: 1px solid var(--tv-work-note);
       border-radius: 34px;
       height: 34px;
       width: 34px;
@@ -2359,10 +2353,10 @@
       align-items: center;
       justify-content: center;
       color: var(--tv-text-on-primary);
-      background: var(--tv-tone-negative);
+      background: var(--tv-work-note);
 
       &:hover {
-        background: var(--tv-tone-negative);
+        background: var(--tv-work-note);
       }
 
       &.active {
@@ -2391,7 +2385,7 @@
         width: 8px;
         height: 8px;
         border-radius: 50%;
-        background: var(--tv-tone-negative);
+        background: var(--tv-work-note);
         border: 1px solid #1e2a3a;
       }
     }
@@ -2449,7 +2443,7 @@
     // general no es una parte del timeline, así que no tiene sentido ofrecerlo con la lista colapsada.
     .fullmap-toggle {
       background: none;
-      border: 1px solid #008024;
+      border: 1px solid var(--tv-color-map);
       color: var(--tv-text-on-primary);
       padding: 8px;
       border-radius: 42px;
@@ -2461,19 +2455,20 @@
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 128, 34, 0.5);
+      background: rgba(230, 118, 26, 0.1);
 
       &:hover {
-        background: rgba(0, 128, 34, 0.7);
+        background: rgba(230, 118, 26, 0.2);
       }
 
       // El estado sale del `aria-expanded` que escribe el handler, como el del botón del mapa de la
       // tarjeta: no hay clase que sincronizar, y el fondo lleno dice "estás en el mapa".
       &[aria-expanded='true'] {
-        background: rgba(0, 128, 34, 0.7);
+        background: var(--tv-accent);
+        border: 0;
 
         &:hover {
-          background: rgba(0, 128, 34, 0.85);
+          background: var(--tv-accent-light);
         }
       }
 
@@ -2481,10 +2476,11 @@
         display: block;
         width: 15px;
         height: 15px;
+        fill: var(--tv-color-map);
       }
 
       &:focus-visible {
-        outline: 2px solid #008024;
+        outline: 2px solid var(--tv-color-map-light);
         outline-offset: 2px;
       }
     }
@@ -2630,6 +2626,56 @@
         margin-top: 6px;
         padding-top: 6px;
         border-top: 1px solid var(--tv-border-card);
+      }
+
+      // Fila propia al final del panel: es la acción del panel, no un grupo, así que sale de la
+      // repartición en columnas con el mismo truco que `.filter-selects` (`flex: 1 0 100%`) y no
+      // lleva `.filter-section` —no hereda el separador entre grupos, ni se oculta con los que
+      // quedan sin valores—. La derecha la deja leyéndose como la salida del panel y no como una
+      // fila más de opciones.
+      .filter-menu-footer {
+        flex: 1 0 100%;
+        display: flex;
+        justify-content: flex-end;
+        padding: 4px 0;
+        border-top: 1px solid var(--tv-border-card);
+      }
+
+      // Sin columnas (un panel de solo `select`) el `.filter-selects` ya trae su propio separador:
+      // dos líneas con el hueco del `gap` en el medio se leerían como dos bloques distintos.
+      .filter-selects + .filter-menu-footer {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      // Mismo dibujo que el "Limpiar" del pie de un `select`: texto subrayado, no un botón con
+      // caja, para leerse como la acción que es y no como un valor más del panel.
+      .filter-clear {
+        padding: 0;
+        border: 0;
+        background: none;
+        font-family: inherit;
+        font-size: 0.65rem;
+        font-style: italic;
+        color: var(--tv-text-muted);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+
+        &:hover:not(:disabled) {
+          color: var(--tv-accent);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--tv-accent);
+          outline-offset: 2px;
+          border-radius: 2px;
+        }
+
+        &:disabled {
+          opacity: 0.4;
+          cursor: default;
+        }
       }
 
       @media (max-width: 600px) {
@@ -3174,7 +3220,7 @@
       top: calc(100% + 8px);
       right: 0;
       background: rgb(45 27 27);
-      border: 1px solid var(--tv-tone-negative);
+      border: 1px solid var(--tv-work-note);
       border-radius: 8px;
       padding: 6px;
       min-width: 200px;
@@ -3517,10 +3563,10 @@
       font-size: 0.7rem;
       font-weight: 700;
       border-radius: 20px;
-      border: 1px solid #fff;
       color: #fff;
       pointer-events: none;
       background: var(--tv-accent);
+      border: 1px solid var(--tv-accent-dark);
       pointer-events: none;
     }
 
@@ -4278,6 +4324,19 @@
       .timeline-card .card-image {
         height: 104px;
       }
+    }
+  }
+
+  // Notas de trabajo ocultas: además de los badges va el id del subtema al final del título del
+  // tema (`.tema-id`), que es el mismo "dato de trabajo" en otra forma. Ojo con el `internalButtons`
+  // apagado: acá la clase nunca se aplica, pero eso ya no deja el id a la vista —sin
+  // `internalButtons` el span no se emite, gateado en `_buildTemasHtml`—; las notas, en cambio,
+  // siguen viéndose siempre, como siempre.
+  &.work-notes-hidden {
+    .card-notas-trabajo,
+    .tema-notas-trabajo,
+    .tema-id {
+      display: none !important;
     }
   }
 }

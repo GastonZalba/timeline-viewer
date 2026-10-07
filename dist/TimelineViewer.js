@@ -79,11 +79,13 @@ const TEMAS_MAP_TILES_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
  */
 const TEMAS_MAP_MARKER_RADIUS = 9;
 /**
- * Width of the white ring around a marker, in screen pixels. It is what separates a mid-tone marker
- * from whatever the raster map has under it, so it stays at 1px: thicker, it eats the tone color of
- * the 18px circle and starts to collide with the number painted in the middle.
+ * Width of the ring around a marker, in screen pixels. It is what separates a mid-tone marker
+ * from whatever the raster map has under it, and a dark ring needs more than a hairline to read,
+ * so it sits at 1.5px: the stroke is centered on the radius, which still leaves 16.5px of tone
+ * inside the 18px circle for the number painted in the middle, and two neighbors spread by the
+ * spiderfy —fixed at 20px, see `TEMAS_MAP_SPIDER_GAP`— keep half a pixel of air between rings.
  */
-const TEMAS_MAP_MARKER_STROKE = 1;
+const TEMAS_MAP_MARKER_STROKE = 3;
 /**
  * Font size, in px, of the number painted in the center of a marker
  */
@@ -123,11 +125,13 @@ const TEMAS_MAP_TONE_FALLBACK = '#3792c4';
  */
 const TEMAS_MAP_MARKER_TEXT_COLOR = '#0e1116';
 /**
- * White ring around a marker. Hardcoded for the same reason as the tones, and white on purpose: the
- * markers sit on top of a raster map instead of the dark card, and the ring is what separates a
- * mid-tone marker from whatever the tiles happen to have under it.
+ * Ring around a marker —and around a cluster too, same constant. Dark on purpose: the ring is what
+ * separates the tone fill from whatever the tiles happen to have under it, and `#0e1116` is the
+ * same ink as the number in the middle, the count on a cluster and the selected marker's ring, so
+ * every circle reads as one family (tone fill, dark outline, dark number). Hardcoded for the same
+ * reason as the tones: it is painted into a canvas, where a CSS variable does not reach.
  */
-const TEMAS_MAP_MARKER_RING_COLOR = '#ffffff';
+const TEMAS_MAP_MARKER_RING_COLOR = '#0e1116';
 /**
  * Screen distance, in pixels, below which two markers are considered overlapped and get spread
  * apart. It is the marker diameter —18px, so the two numbers already touch at this distance— plus a
@@ -143,8 +147,9 @@ const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
  * Extra gap, in pixels, left between the rings of two neighboring markers when they are spread on a
  * circle. The distance between consecutive markers stays fixed at
  * `2 * (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP)` whatever their count: the radius of the
- * circle grows with the count, so the count never squeezes the neighbors, and the gap only has to
- * cover the ring itself —1px is where the white rings of two markers meet and nothing more.
+ * circle grows with the count, so the count never squeezes the neighbors, and the gap is what
+ * keeps a ring from bleeding into the next one: at that fixed pitch two 1.5px rings
+ * (`TEMAS_MAP_MARKER_STROKE`) come within half a pixel and never touch.
  */
 const TEMAS_MAP_SPIDER_GAP = 1;
 /**
@@ -154,14 +159,14 @@ const TEMAS_MAP_SPIDER_GAP = 1;
  * the last `TEMAS_MAP_MARKER_RADIUS` px stay hidden under the marker's own fill — which is why it
  * does not need a gap at its tip the way an arrow would.
  */
-const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
+const TEMAS_MAP_SPIDER_LINE_WIDTH = 2;
 /**
- * Color of that line, white for the same reason as `TEMAS_MAP_MARKER_RING_COLOR`: it is drawn over
- * a raster map, and white is the one color that reads on any tile. The line does not need to carry
- * the topic's tone anymore — the marker it points to keeps the color and the number that identify
- * it — so it stays neutral and the tone colors are left to the circles.
+ * Color of that line, the same ink as the rings (`TEMAS_MAP_MARKER_RING_COLOR`): thread and
+ * circles read as one drawing over the tiles. The line does not need to carry the topic's tone
+ * anymore — the marker it points to keeps the color and the number that identify it — so it stays
+ * neutral and the tone colors are left to the circles.
  */
-const TEMAS_MAP_SPIDER_LINE_COLOR = '#ffffff';
+const TEMAS_MAP_SPIDER_LINE_COLOR = '#0e1116';
 /**
  * Zoom below which overlapping markers are drawn as a single cluster marker —one circle carrying
  * the count of the topics it stands for— instead of being spread apart by the spiderfy. **This is
@@ -227,7 +232,12 @@ const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 15;
  * three digits needs at `TEMAS_MAP_CLUSTER_FONT`.
  */
 const TEMAS_MAP_CLUSTER_RADIUS = 14;
-/** Width of the white ring around a cluster marker, in screen pixels */
+/**
+ * Width of the ring around a cluster marker, in screen pixels. The cluster's fill is already
+ * `TEMAS_MAP_CLUSTER_FILL_DARK` and the ring is that same ink, so here it does not outline the
+ * disc — it grows it by half the stroke, and what separates the cluster from the tiles is the dark
+ * disc itself.
+ */
 const TEMAS_MAP_CLUSTER_STROKE = 2;
 /** Font size, in px, of the count painted in the center of a cluster marker */
 const TEMAS_MAP_CLUSTER_FONT = 12;
@@ -258,19 +268,62 @@ const TEMAS_MAP_CLUSTER_ZOOM_DURATION = 400;
  * it grows around itself is.
  *
  * The selection is the point the article panel is showing, and it has to read at a glance over a
- * raster base layer where the marker might sit on a tone-colored tile. Growing the circle is what
- * separates it from its neighbors —the spiderfy already guarantees they are at least
- * `2 * (radius + gap)` apart, so this does not make two markers touch— and the ring is what holds the
- * shape together while it grows.
+ * raster base layer where the marker might sit on a tone-colored tile. It reads by two things at
+ * once now: the circle grows (`TEMAS_MAP_SELECTED_RADIUS_DELTA` over `TEMAS_MAP_MARKER_RADIUS`) and
+ * a shadow falls behind it —two stepped translucent discs, see `TEMAS_MAP_SELECTED_SHADE_*`— that
+ * darkens whatever the tiles have under the marker. Growing alone was the whole treatment, and on a
+ * busy map it was not enough: the only cue was a slightly fatter circle. The growth is smaller now
+ * because the shadow carries half of the emphasis.
  *
- * The ring is **almost black**, not the tone color like the plain marker's white one: the fill already
- * is the tone color, so a ring of the same hue would only widen a solid blob of it instead of drawing
- * a marker. A dark outline is what separates the fill from whatever the tiles have under it, and it is
- * the same `#0e1116` as the number painted on top, so the selected circle reads as one object.
+ * The ring is the same ink as every other circle's (`#0e1116`): what marks the selection is size,
+ * weight and shadow —radius plus `TEMAS_MAP_SELECTED_RADIUS_DELTA`, a 2px ring against the plain
+ * marker's 1.5px, and the shade discs behind it—, not a different color. The fill already is the tone
+ * color, so a ring of the same hue would only widen a solid blob of it instead of drawing a marker:
+ * a dark outline is what separates the fill from whatever the tiles have under it, and it is the
+ * same `#0e1116` as the number painted on top, so the selected circle reads as one object.
  */
-const TEMAS_MAP_SELECTED_RADIUS_DELTA = 4;
+const TEMAS_MAP_SELECTED_RADIUS_DELTA = 3;
 const TEMAS_MAP_SELECTED_RING_WIDTH = 2;
 const TEMAS_MAP_SELECTED_RING_COLOR = '#0e1116';
+/**
+ * The projected shadow itself: two translucent discs stacked behind the selected circle, painted
+ * **below every marker** (`TEMAS_MAP_SELECTED_SHADE_Z_INDEX` is under the `undefined` = 0 of the
+ * plain ones), so what shows of them is only the part over the tiles —the circles cover the middle,
+ * and a neighbor sitting on the shadow covers it too, which is the right depth order anyway: a
+ * shadow falls on the ground, not on the markers.
+ *
+ * The radii are deltas over the selected circle's own radius
+ * (`TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA`), so the inner disc starts where the
+ * 2px ring ends and the outer one reaches 3px further out. OpenLayers paints no blur, so the falloff
+ * of a shadow has to come from steps: half of the ink just under the ring, a fifth a few pixels
+ * further out, tiles after that — three pixels each, because a two-pixel band of 45% disappeared
+ * over a dark satellite tile. The two discs are the same for every tone —they do not depend on the
+ * color—, so they are built once per map instead of per color, unlike every circle above.
+ */
+const TEMAS_MAP_SELECTED_SHADE_INNER_DELTA = 4;
+const TEMAS_MAP_SELECTED_SHADE_OUTER_DELTA = 7;
+const TEMAS_MAP_SELECTED_SHADE_INNER_COLOR = 'rgba(14, 17, 22, 0.5)';
+const TEMAS_MAP_SELECTED_SHADE_OUTER_COLOR = 'rgba(14, 17, 22, 0.2)';
+const TEMAS_MAP_SELECTED_SHADE_Z_INDEX = -1;
+/**
+ * Extra growth, in screen pixels, of the selected marker **while it sits displaced in a spider
+ * ring** — on top of `TEMAS_MAP_SELECTED_RADIUS_DELTA`.
+ *
+ * Inside a ring every circle is the plain size and they almost touch (consecutive markers sit
+ * `2 * (radius + gap)` apart), so the plain selection delta —which is what makes the selection read
+ * over the open map— is a small step between neighbors that are already touching, and the chosen
+ * one hardly stands out of the ring. This is the extra it gets **only there**: outside a ring
+ * nothing changes, because that is where the plain delta was tuned (a lone marker, or one over a
+ * cluster's count).
+ *
+ * The ring spacing does **not** grow with it: the neighbors keep the plain radius, so the selected
+ * circle overlaps them — on purpose, with its z index above theirs and its shadow underneath, which
+ * is what separates it from the ring instead of pushing the ring apart. The same delta also grows
+ * the marker's hit radius in `declutter` (a click on the enlarged rim has to select this marker and
+ * not the neighbor whose circle it covers) and the shadow discs in the style function (they are
+ * deltas over the selected circle's own radius, so they follow it out).
+ */
+const TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS = 4;
 /**
  * Z index of the selected marker's style.
  *
@@ -713,6 +766,7 @@ export default class Timeline {
         this._fullMapHandle = null;
         this._fullMapPoints = [];
         this._fullMapSeq = 0;
+        this._fullMapStale = false;
         this._fullMapCardId = null;
         this._fullMapSelectedKey = null;
         // The URL state is read here, before `_init()`, and not inside it: what it says has to be part of
@@ -757,6 +811,7 @@ export default class Timeline {
         this.workNotesToggle = null;
         this.filterToggle = null;
         this.filterMenu = null;
+        this.filterClear = null;
         this.filtrosInternosWrap = null;
         this.filtrosInternosToggle = null;
         this.filtrosInternosMenu = null;
@@ -1086,6 +1141,12 @@ export default class Timeline {
      * second. A `'select'` group is not in a column: it goes in a full-width block above them, in
      * the order it was declared, because it is the control for a field with many values and it has
      * to read as the first thing in the panel rather than as one more group among the others.
+     *
+     * The footer carries the panel's one action — clear every `'menu'` group at once — and is emitted
+     * outside the `.filter-section`s on purpose: it is not a group, so it must not inherit the
+     * separator between groups nor hide with the ones that end up with no values. It is a static row
+     * (bound once, like the rest of this markup), which is why its `disabled` state is written by
+     * `_syncFilterToggleState()` rather than baked in.
      */
     _buildFilterMenuHtml() {
         const menuGroups = this.filters.filter((f) => f.group === 'menu');
@@ -1104,6 +1165,9 @@ export default class Timeline {
               <div class="filter-menu" id="filter-menu">
                 ${selectsHtml ? `<div class="filter-selects">${selectsHtml}</div>` : ''}
                 ${groups.map((sections) => `<div class="filter-column">${sections.join('')}</div>`).join('')}
+                <div class="filter-menu-footer">
+                  <button class="filter-clear" id="filter-clear" type="button">Limpiar filtros</button>
+                </div>
               </div>
             </div>`;
     }
@@ -1266,6 +1330,7 @@ export default class Timeline {
         this.workNotesToggle = this.container.querySelector('#work-notes-toggle');
         this.filterToggle = this.container.querySelector('#filter-toggle');
         this.filterMenu = this.container.querySelector('#filter-menu');
+        this.filterClear = this.container.querySelector('#filter-clear');
         this.filtrosInternosWrap = this.container.querySelector('#filtros-internos-wrap');
         this.filtrosInternosToggle = this.container.querySelector('#filtros-internos-toggle');
         this.filtrosInternosMenu = this.container.querySelector('#filtros-internos-menu');
@@ -2254,22 +2319,55 @@ export default class Timeline {
             }
             return circle;
         };
-        // El círculo del punto abierto: más grande y con un anillo casi negro, que es lo que dice "este es
+        // El círculo del punto abierto: más grande y con un anillo negro, que es lo que dice "este es
         // el que elegiste" sin tener que inventar un ícono. Va en su propia caché y no agranda el de
-        // `circleOf`: los markers no elegidos no pueden verse afectados.
+        // `circleOf`: los markers no elegidos no pueden verse afectados. El segundo parámetro es el
+        // crecimiento extra del spider (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`): el seleccionado que
+        // está desplazado en un anillo pinta este, y fuera de un anillo el de siempre. La caché lleva
+        // los dos en la misma key por color, porque es un Style distinto y el repintado alterna entre
+        // ellos según el `declutter` meta o saque al punto del anillo.
         const selectedCircles = new Map();
-        const selectedCircleOf = (color) => {
-            let circle = selectedCircles.get(color);
+        const selectedCircleOf = (color, grown) => {
+            const key = `${color}|${grown ? 1 : 0}`;
+            let circle = selectedCircles.get(key);
             if (!circle) {
                 circle = new ol.Circle({
-                    radius: TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA,
+                    radius: TEMAS_MAP_MARKER_RADIUS +
+                        TEMAS_MAP_SELECTED_RADIUS_DELTA +
+                        (grown ? TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS : 0),
                     fill: new ol.Fill({ color }),
                     stroke: new ol.Stroke({ color: TEMAS_MAP_SELECTED_RING_COLOR, width: TEMAS_MAP_SELECTED_RING_WIDTH })
                 });
-                selectedCircles.set(color, circle);
+                selectedCircles.set(key, circle);
             }
             return circle;
         };
+        // La sombra proyectada del seleccionado: los dos discos escalonados de las constantes, afuera
+        // del círculo (radio propio + delta) y uno detrás del otro, el exterior primero para que el
+        // interior —más opaco— le pinte encima. Son iguales para todos los tonos, así que se construyen
+        // una sola vez por mapa; `plainStyle` los concatena **antes** del círculo cuando el punto está
+        // seleccionado, y el `zIndex` negativo es lo que los deja por debajo de cualquier otro marker.
+        // Se arman de una función y no como un literal porque el par del seleccionado-en-el-anillo es
+        // el mismo desplazado por `TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`: los deltas son sobre el
+        // radio del propio círculo, así que la sombra lo sigue cuando crece adentro del spider.
+        const shadeStylesFor = (radius) => [
+            new ol.Style({
+                image: new ol.Circle({
+                    radius: radius + TEMAS_MAP_SELECTED_SHADE_OUTER_DELTA,
+                    fill: new ol.Fill({ color: TEMAS_MAP_SELECTED_SHADE_OUTER_COLOR })
+                }),
+                zIndex: TEMAS_MAP_SELECTED_SHADE_Z_INDEX
+            }),
+            new ol.Style({
+                image: new ol.Circle({
+                    radius: radius + TEMAS_MAP_SELECTED_SHADE_INNER_DELTA,
+                    fill: new ol.Fill({ color: TEMAS_MAP_SELECTED_SHADE_INNER_COLOR })
+                }),
+                zIndex: TEMAS_MAP_SELECTED_SHADE_Z_INDEX
+            })
+        ];
+        const selectedShadeStyles = shadeStylesFor(TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA);
+        const grownSelectedShadeStyles = shadeStylesFor(TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA + TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS);
         // El número va solo si la vista lo necesita (ver `markerLabel`): en el mapa general no hay
         // lista a la que apunte, así que el círculo se pinta pelado y el hover queda de etiqueta.
         const markerText = (p) => {
@@ -2346,24 +2444,33 @@ export default class Timeline {
             // **ahora** y no el del momento en que se creó el feature.
             const connector = new ol.Stroke({ color: TEMAS_MAP_SPIDER_LINE_COLOR, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
             feature.set('point', p);
-            // El estilo "pelado" se cachea por `color + seleccionado` porque se resuelve en cada repintado de
-            // cada marker: sin el cache, mover el mapa crearía un `Style` por feature por frame.
+            // El estilo "pelado" se cachea por `color + seleccionado + crecido` porque se resuelve en cada
+            // repintado de cada marker: sin el cache, mover el mapa crearía un `Style` por feature por
+            // frame. Devuelve **siempre un array**: el seleccionado son dos estilos más —los discos de la
+            // sombra, primero— y el resto es uno solo; la rama del `spider` de abajo los recorre uno a uno.
+            // `grown` es "está pintado desplazado en un anillo": solo le suma el extra al seleccionado
+            // (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`), así que un punto no seleccionado cachea la misma
+            // key con o sin él.
             const plainStyles = new Map();
-            const plainStyle = (point) => {
+            const plainStyle = (point, grown) => {
                 const selected = Boolean(options.isSelected?.(point));
-                const key = `${point.color}|${selected ? 1 : 0}`;
+                const grow = grown && selected;
+                const key = `${point.color}|${selected ? 1 : 0}${grow ? 'g' : ''}`;
                 const hit = plainStyles.get(key);
                 if (hit)
                     return hit;
-                const style = new ol.Style({
-                    image: selected ? selectedCircleOf(point.color) : circleOf(point.color),
+                const marker = new ol.Style({
+                    image: selected ? selectedCircleOf(point.color, grow) : circleOf(point.color),
                     text: markerText(point) || undefined,
                     // El z index solo en el seleccionado. Los demás se quedan en `undefined`, que OpenLayers
                     // ordena como 0, así que el orden entre ellos sigue siendo el que dejaría el `declutter`.
                     zIndex: selected ? TEMAS_MAP_SELECTED_Z_INDEX : undefined
                 });
-                plainStyles.set(key, style);
-                return style;
+                const styles = selected
+                    ? [...(grow ? grownSelectedShadeStyles : selectedShadeStyles), marker]
+                    : [marker];
+                plainStyles.set(key, styles);
+                return styles;
             };
             feature.setStyle((f) => {
                 const point = f.get('point') || p;
@@ -2383,23 +2490,27 @@ export default class Timeline {
                 // array y no tiene estilos que dibujar).
                 if (f.get('hidden'))
                     return [];
-                const base = plainStyle(point);
+                // El `spider` se lee **antes** del `base`: es lo que decide el crecimiento extra del
+                // seleccionado, y tiene que estar en la caché como una key distinta para que alternar entre
+                // el punto en el anillo y el punto en su propia coordenada no reabra el estilo.
                 const spider = f.get('spider');
+                const base = plainStyle(point, Boolean(spider));
                 if (!spider)
                     return base;
                 // The line first, so the marker is painted over its own end of it.
                 return [
                     // La línea **no** sube de z index: si subiera, cruzaría por encima de los círculos
                     // vecinos en vez de meterse debajo de ellos, que es lo que se lee bien con el punto
-                    // desplazado. El z index del círculo sí es el del `base`, porque es un segundo estilo del
-                    // mismo feature y sin él el punto desplazado se quedaría atrás igual que el resto.
+                    // desplazado. Los estilos del `base` conservan el suyo —la sombra sigue en -1 y el
+                    // círculo en el del `TEMAS_MAP_SELECTED_Z_INDEX`—, porque son estilos del mismo feature
+                    // y sin eso el punto desplazado se quedaría atrás igual que el resto.
                     new ol.Style({ geometry: spider.line, stroke: connector }),
-                    new ol.Style({
+                    ...base.map((style) => new ol.Style({
                         geometry: spider.marker,
-                        image: base.getImage() || undefined,
-                        text: base.getText() || undefined,
-                        zIndex: base.getZIndex()
-                    })
+                        image: style.getImage() || undefined,
+                        text: style.getText() || undefined,
+                        zIndex: style.getZIndex()
+                    }))
                 ];
             });
             return feature;
@@ -2443,7 +2554,14 @@ export default class Timeline {
             maxZoom: TEMAS_MAP_MAX_ZOOM,
             // Limit the view to the world extent so we don't pan outside the planet and avoid
             // the black edges that appear when wrapX is disabled.
-            extent: ol.getProjection('EPSG:3857')?.getExtent() || undefined
+            extent: ol.getProjection('EPSG:3857')?.getExtent() || undefined,
+            // Whole zoom levels only, and that is what keeps the raster tiles sharp: at a fractional zoom
+            // OpenLayers paints the tiles of the nearest XYZ level scaled up, which is exactly the blur.
+            // The `fit`s below don't pass `nearest`, so OL constrains them with direction 1 = floor: every
+            // fit lands on the **farthest** integer zoom that still frames the extent —the requested one,
+            // not the closest—. OL 10 has no `zoomSnap`, so this same flag is what keeps the wheel, the
+            // pinch and the double click on whole levels too.
+            constrainResolution: true
         });
         const map = new ol.OlMap({
             target: canvas,
@@ -2468,6 +2586,8 @@ export default class Timeline {
             map.dispose();
             return null;
         }
+        // The fit itself lands on a whole zoom —floored to the farthest level that still frames the
+        // extent— by virtue of `constrainResolution: true` on the view above (see the comment there).
         view.fit(extent, {
             padding: [TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING],
             maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
@@ -2537,9 +2657,13 @@ export default class Timeline {
          *   and same-coordinate points never separate anyway), so all the topics have to be on screen
          *   to be clickable. The ring growing past the canvas with a huge group is the accepted cost.
          *
-         * In every mode the **selected** point of the general map is left out of every group: its row
+         * The **selected** point of the general map rides its group like any other, so clicking a marker
+         * inside a spider ring leaves it in the ring —same slot, only the circle grows
+         * (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`)— instead of pulling it to the middle of the ring,
+         * which is what it used to do. The one place it is still pulled out is a **cluster**: its row
          * says "it is here", and at a far view —where a click on a row does not change the zoom— it
-         * would otherwise be buried inside a count. It paints alone, with its selected circle, on top.
+         * would otherwise be buried inside a count, so the cluster branch paints the count over the
+         * members that remain and the selection paints alone, with its selected circle, on top.
          *
          * A displaced marker is painted from the `spider` property and not from the feature's own
          * geometry: one feature then paints two geometries that are not the same point —the line back to
@@ -2575,14 +2699,16 @@ export default class Timeline {
                 features[i].set('cluster', undefined);
                 features[i].set('hidden', undefined);
             }
-            // The open point never joins a group: marking it used keeps it out of the grouping loop below,
-            // so it is
-            // painted at its own coordinate —with its selected circle, which the z index puts over any
-            // cluster next to it— and it gets its own point target at the end of this pass.
-            for (let i = 0; i < n; i++) {
-                if (screens[i] && options.isSelected?.(current[i]))
-                    used[i] = true;
-            }
+            // The open point is **not** pulled out of the grouping anymore: it joins every group exactly as
+            // it would with nothing selected, which is what keeps the map still under the click. A marker
+            // taken out of its spider read as "it left the ring and sat in the middle" —the complaint this
+            // replaced—, and taking it out of the grouping repartitioned the neighbors around it on every
+            // open and close. What is still forbidden is **riding a cluster**: a count circle would swallow
+            // the very marker the panel is pointing at (`hidden` members are not painted at all), so the
+            // cluster branch below kicks it out of the group and the final pass paints it on its own
+            // coordinate, with its selected circle over the count — the same outcome the pre-mark produced,
+            // minus the repartition.
+            const selectedFlags = current.map((p) => Boolean(options.isSelected?.(p)));
             for (let i = 0; i < n; i++) {
                 if (used[i] || !screens[i])
                     continue;
@@ -2618,6 +2744,45 @@ export default class Timeline {
                 // A lone marker is painted on its own coordinate and is left alone.
                 if (group.length < 2)
                     continue;
+                if (clusterMode || (group.length > TEMAS_MAP_SPIDER_MAX_GROUP && !noCluster)) {
+                    // The selection is kicked out of the cluster and painted on its own coordinate by the
+                    // final pass: it never rides a count circle (see the `selectedFlags` note above), and the
+                    // count is of the members that remain —the same number the cluster had with nothing
+                    // selected, minus the point the panel is now showing separately. With fewer than two
+                    // members left there is nothing to aggregate: both points paint on their own, and falling
+                    // through to the spider branch is not an option because this is a cluster's zoom.
+                    const members = group.filter((k) => !selectedFlags[k]);
+                    if (members.length >= 2) {
+                        let mx = 0;
+                        let my = 0;
+                        for (const k of members) {
+                            mx += screens[k][0];
+                            my += screens[k][1];
+                        }
+                        mx /= members.length;
+                        my /= members.length;
+                        // One circle with the count, at the centroid. The color is dark neutral
+                        const coord = map.getCoordinateFromPixel([mx, my]);
+                        const color = TEMAS_MAP_CLUSTER_FILL_DARK;
+                        features[members[0]].set('cluster', {
+                            count: members.length,
+                            color,
+                            marker: new ol.OlPoint(coord)
+                        });
+                        for (const k of members) {
+                            if (k !== members[0])
+                                features[k].set('hidden', true);
+                        }
+                        targets.push({
+                            kind: 'cluster',
+                            screen: [mx, my],
+                            coord,
+                            radius: TEMAS_MAP_CLUSTER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING,
+                            count: members.length
+                        });
+                    }
+                    continue;
+                }
                 let cx = 0;
                 let cy = 0;
                 for (const k of group) {
@@ -2626,32 +2791,11 @@ export default class Timeline {
                 }
                 cx /= group.length;
                 cy /= group.length;
-                if (clusterMode || (group.length > TEMAS_MAP_SPIDER_MAX_GROUP && !noCluster)) {
-                    // One circle with the count, at the centroid. The color is dark neutral
-                    const coord = map.getCoordinateFromPixel([cx, cy]);
-                    const tone = current[group[0]].color;
-                    const color = TEMAS_MAP_CLUSTER_FILL_DARK;
-                    features[group[0]].set('cluster', {
-                        count: group.length,
-                        color,
-                        marker: new ol.OlPoint(coord)
-                    });
-                    for (const k of group) {
-                        if (k !== group[0])
-                            features[k].set('hidden', true);
-                    }
-                    targets.push({
-                        kind: 'cluster',
-                        screen: [cx, cy],
-                        coord,
-                        radius: TEMAS_MAP_CLUSTER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING,
-                        count: group.length
-                    });
-                    continue;
-                }
                 // Radius that keeps consecutive markers `2 * (radius + gap)` apart whatever their count;
                 // the ring grows with the count instead of letting the numbers overlap again on it. Starts
-                // at the top and goes clockwise, so the layout is stable between renders.
+                // at the top and goes clockwise, so the layout is stable between renders. A selected member
+                // sits in this ring like any other —same slot it had before the click, because the grouping
+                // no longer depends on the selection— and only its circle grows (see the style function).
                 const spread = (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP) / Math.sin(Math.PI / group.length);
                 group.forEach((k, position) => {
                     const angle = -Math.PI / 2 + (2 * Math.PI * position) / group.length;
@@ -2669,13 +2813,18 @@ export default class Timeline {
                         index: k,
                         screen: displaced,
                         coord,
-                        radius: TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING
+                        // The selected circle grows inside the ring (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`),
+                        // so its target grows with it: a click on the enlarged rim has to land on this marker
+                        // and not on the neighbor whose plain circle it overlaps.
+                        radius: TEMAS_MAP_MARKER_RADIUS +
+                            TEMAS_MAP_MARKER_HIT_PADDING +
+                            (selectedFlags[k] ? TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS : 0)
                     });
                 });
             }
-            // Every point that ended up painted on its own: a lone marker, or the selected one the loops
-            // above skipped. A leader is not one —it already pushed its cluster target— and neither is a
-            // hidden member or a spiderfied marker, which pushed its displaced target already.
+            // Every point that ended up painted on its own: a lone marker, or the selected one a cluster
+            // kicked out of its group. A leader is not one —it already pushed its cluster target— and
+            // neither is a hidden member or a spiderfied marker, which pushed its displaced target already.
             for (let i = 0; i < n; i++) {
                 if (!screens[i] || features[i].get('cluster') || features[i].get('hidden') || features[i].get('spider'))
                     continue;
@@ -2804,15 +2953,68 @@ export default class Timeline {
          * cerrar la ficha no se vería en el mapa.
          *
          * El `declutter` va con eso porque la selección también cambia el **agrupamiento**: el punto
-         * abierto queda fuera de los clústeres y de los grupos del spiderfy (es el que la fila de la
-         * ficha dice "acá está"), así que sin re-agruparlo seguiría escondido adentro del clúster del
-         * que acababa de salir —o, al cerrarlo, afuera de uno que ahora le correspondería.
+         * abierto queda fuera de los clústeres (es el que la fila de la ficha dice "acá está", y un
+         * conteo lo enterraría) y **adentro** de los grupos del spiderfy, en su slot del anillo con el
+         * círculo agrandado —sin re-agruparlo seguiría en el centro, afuera del anillo en el que el
+         * usuario lo clickeó—.
          */
         const refreshStyles = () => {
             features.forEach((feature) => feature.changed());
             declutter();
         };
-        return { map, overlay, updatePoints, refreshStyles };
+        /**
+         * La coordenada de vista del seleccionado si el último `declutter` lo dejó **desplazado en un
+         * anillo del spider**, o `null` si no (ver `TemasMapHandle.selectedSpiderCenter`). Lee la
+         * propiedad `spider` que el `declutter` acaba de escribir en el feature, así que el llamador
+         * tiene que invocarla **después** de un `refreshStyles()` —o con la selección ya pintada—, que
+         * es el orden que trae `_focusFullMapTema`.
+         */
+        const selectedSpiderCenter = () => {
+            if (!options.isSelected)
+                return null;
+            const index = current.findIndex((p) => options.isSelected?.(p));
+            if (index === -1 || !features[index])
+                return null;
+            const spider = features[index].get('spider');
+            return spider ? spider.marker.getCoordinates() : null;
+        };
+        /**
+         * Encuadrar los puntos actuales en el viewport.
+         *
+         * Repite el `fit` del montaje —mismo `padding`, mismo `TEMAS_MAP_FIT_MAX_ZOOM`, `duration: 0`,
+         * y el mismo zoom entero que resuelve el `constrainResolution: true` del `View` (floor: el nivel
+         * más lejano que igual encuadra)— sobre el extent que la **source** tiene ahora, que es el
+         * último set aceptado (`updatePoints` la reemplaza), así que no hace falta pasárselo desde
+         * afuera.
+         *
+         * El `updateSize()` va antes del fit por la misma razón que en el montaje: la sección estuvo
+         * `display: none` hasta que el toggle la abrió, y la resolución con la que `fit` calcula el zoom
+         * se deriva del tamaño de la caja —encajar los puntos en un viewport de 0x0 (o del tamaño que
+         * tenía antes de esconderse) es lo que producía la vista rota—.
+         *
+         * El `renderSync()` + `declutter()` es el mismo par del montaje y de `updatePoints`: el `fit`
+         * cambió el zoom, y sin un render pintado el `declutter` agruparía contra píxeles viejos. Corre
+         * además del `moveend` que el propio `fit` dispara (declutterear es idempotente: resetea todo y
+         * vuelve a agrupar) porque no se puede depender de en qué frame llega ese evento.
+         *
+         * Un extent vacío o no finito no se fittea: con el mapa montado no debería darse (un set vacío
+         * destruye la vista y `_refreshFullMap` no llega acá), pero un `fit` contra `[Infinity…]` dejaría
+         * la resolución en `NaN` y la vista insalvable, así que se corta igual que en el montaje.
+         */
+        const fit = () => {
+            map.updateSize();
+            const extent = source.getExtent();
+            if (!extent || extent.some((v) => !Number.isFinite(v)))
+                return;
+            view.fit(extent, {
+                padding: [TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING, TEMAS_MAP_FIT_PADDING],
+                maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
+                duration: 0
+            });
+            map.renderSync();
+            declutter();
+        };
+        return { map, overlay, updatePoints, refreshStyles, fit, selectedSpiderCenter };
     }
     /**
      * Dispose every live topics map. Called from the two places that empty `#timeline-cards`,
@@ -2836,8 +3038,24 @@ export default class Timeline {
      * the timeline goes `hidden` while the map is up and comes back exactly as it was, so nothing
      * about `isExpanded` is touched here —that state belongs to the timeline and only `_toggleExpand`
      * and its two helpers write it.
-     * Its pan and zoom are what the user moved, so they are not touched: the map survives the toggle
-     * hidden and the view stays where it was left.
+     * Its pan and zoom are what the user moved, so they survive the toggle: the map stays alive behind
+     * the `hidden`. But the view that comes **back** is not resumed where it was left — opening the
+     * view fits whatever is on it, every time (see below).
+     *
+     * Lo que **no** sobrevive intacto al toggle es el scope: con el mapa cerrado un cambio de filtro no
+     * pinta nada (no hay mapa que pintar), así que los puntos que quedaron son los del scope anterior.
+     * Por eso una re-apertura con `_fullMapStale` encendido vuelve a llamar a `_refreshFullMap()` —que
+     * con el mapa ya montado solo le cambia los puntos, sin tocar tiles ni vista—, mientras que una
+     * re-apertura sin cambios de scope se queda con el `updateSize()` de siempre y no hace ningún
+     * request (ni el flash de "Cargando elementos del mapa…" de la rama API).
+     *
+     * **Abrir es fit**: el único gesto que re-encuadra la vista, y va en las dos ramas de la apertura.
+     * El mapa puede haber quedado con el zoom y el paneo de la última vez —o con el `fit` al tema
+     * clickeado de la ficha—, y "mostrar la vista" significa mostrar el conjunto completo, no retomar
+     * un recorte que ya nadie eligió. En la rama con scope sucio el `fit` va **después** de que
+     * `_refreshFullMap` acepta los puntos nuevos (fittear los viejos sería encuadrar otro filtro); en
+     * la rama sin cambios, directo contra el set que ya está pintado. El primer open ni siquiera pasa
+     * por acá: ahí el que hace el `fit` es el montaje.
      */
     _bindFullMapToggle() {
         if (!this.fullMapToggle)
@@ -2849,9 +3067,14 @@ export default class Timeline {
             if (!this._fullMapOpen)
                 return;
             if (this._fullMapHandle) {
-                // El mapa sigue vivo detrás del `hidden`, con el pan y el zoom que el usuario dejó. Lo único
-                // que hay que reflotar es el tamaño: la caja cambió de `display: none` a visible.
+                // De tamaño hay que reflotarlo apenas se muestra la caja (`display: none` → visible), antes
+                // de cualquier fit o request: es contra ese tamaño con el que se calcula la resolución.
                 this._fullMapHandle.map.updateSize();
+                if (this._fullMapStale) {
+                    void this._refreshFullMap(true);
+                    return;
+                }
+                this._fullMapHandle.fit();
                 return;
             }
             void this._refreshFullMap();
@@ -2949,10 +3172,12 @@ export default class Timeline {
     /**
      * Resolve the points of the general map and paint them.
      *
-     * It is the only trigger, and it runs in three situations: el primer click del botón, y cada
-     * cambio del scope filtrado con el mapa ya en pantalla. Con el mapa cerrado no hace nada —ni
-     * request, ni `ol`— porque abrirlo vuelve a llamarlo: es el mismo patrón lazy del mapa de la
-     * tarjeta, aplicado a la vista entera.
+     * It is the only trigger, and it runs in three situations: el primer click del botón, cada cambio
+     * del scope filtrado con el mapa ya en pantalla (`_applyFilters`), y la re-apertura de una vista
+     * **ya montada** cuando el scope cambió con ella cerrada (`_fullMapStale`, en `_bindFullMapToggle`):
+     * ahí el mapa existe pero sus puntos son de otro scope, y este método solo se los cambia. Con el
+     * mapa cerrado no hace nada —ni request, ni `ol`— porque abrirlo vuelve a llamarlo: es el mismo
+     * patrón lazy del mapa de la tarjeta, aplicado a la vista entera.
      *
      * Each resolution goes through `_fullMapSeq`, for the same reason `_fetchPage` does it: the answer
      * to an old query arriving after a newer one would paint the map of a view that no longer exists.
@@ -2965,7 +3190,7 @@ export default class Timeline {
      * El estado de carga sí se escribe cuando ya hay un mapa en pantalla, y solo en API: es el mismo
      * criterio que la lista, donde las tarjetas desaparecen de inmediato y los skeletons toman su lugar
      * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el cartelito
-     * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparece son los markers: los del filtro
+     * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparecen son los markers: los del filtro
      * que terminó no significan nada para el que está por venir, y dejarlos mientras el server tarda
      * uno o dos segundos sería una mentira con forma de respuesta vieja. La capa de tiles y la vista
      * quedan —eso es justamente lo que `updatePoints` preserva—, así que se lee como "el mapa se está
@@ -2976,8 +3201,19 @@ export default class Timeline {
      * El error y el vacío sí se muestran en los dos casos —en esos dos no hay mapa que dejar en paz:
      * en el vacío hay que tirar los puntos viejos abajo—, y el vacío sigue siendo el único que
      * destruye el mapa.
+     *
+     * `_fullMapStale` se apaga **acá**, junto con aceptar el set, y no en ningún otro lado: una
+     * respuesta descartada por `seq`/`_fullMapOpen` o un `null` de error dejan la marca encendida, de
+     * modo que el próximo open vuelve a preguntar en vez de dar por bueno un mapa de otro scope.
+     *
+     * `fit` es el gesto de **apertura**: al entrar a la vista el conjunto tiene que verse entero, así
+     * que cuando el mapa ya existe —y `updatePoints` conservó la vista del usuario— se le pide además
+     * el `fit` de `TemasMapHandle`. Solo lo pasa `_bindFullMapToggle`; un cambio de filtro con el mapa
+     * en pantalla **no** fittea, porque ahí lo que no se debe mover es la vista (ver README, "No
+     * flash, no re-framing"). En el camino de montaje el `fit` ya es del propio montaje, así que el
+     * flag no hace falta.
      */
-    async _refreshFullMap() {
+    async _refreshFullMap(fit = false) {
         const canvas = this.fullMapCanvas;
         if (!canvas)
             return;
@@ -2999,6 +3235,7 @@ export default class Timeline {
             return;
         }
         this._fullMapPoints = loaded;
+        this._fullMapStale = false;
         if (!loaded.length) {
             // Sin puntos no hay mapa: los viejos no significan nada para el filtro actual. Se destruye
             // **una vez**, acá, y no en cada cambio como antes.
@@ -3009,6 +3246,8 @@ export default class Timeline {
         this._setFullMapStatus(null, '');
         if (this._fullMapHandle) {
             this._fullMapHandle.updatePoints(loaded);
+            if (fit)
+                this._fullMapHandle.fit();
             return;
         }
         this._fullMapHandle = await this._mountFullMap(canvas, loaded);
@@ -3331,9 +3570,14 @@ export default class Timeline {
         this._revealFullMapTema(cardEl, tema.id_subtema ?? '', false);
         // `_loadOpenLayers` cachea la promesa, así que acá solo es el `await` de algo ya resuelto (el
         // mapa general no puede estar montado sin que `ol` se haya cargado). Sin esto no hay forma
-        // proyectar `lon`/`lat` a las coordenadas de la vista, que son EPSG:3857.
+        // de proyectar `lon`/`lat` a las coordenadas de la vista, que son EPSG:3857.
         void this._loadOpenLayers().then((ol) => {
-            const center = ol.fromLonLat([geom.lon, geom.lat]);
+            // El destino del `fit` es donde el círculo **está pintado**: si el `declutter` dejó al punto
+            // desplazado en el anillo del spider, la coordenada propia es el centro de ese anillo y
+            // centrar ahí dejaría el marcador elegido del lado del visor en lugar de en el medio. Fuera
+            // de un anillo (`null`) no cambia nada: se centra en la coordenada propia, como siempre.
+            const spiderCenter = this._fullMapHandle?.selectedSpiderCenter() ?? null;
+            const center = spiderCenter ?? ol.fromLonLat([geom.lon, geom.lat]);
             // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
             // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
             // queda centrado. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
@@ -4318,7 +4562,7 @@ export default class Timeline {
         catch {
             /* localStorage unavailable */
         }
-        this.section.classList.toggle('work-notes-hidden', hidden);
+        this.container.classList.toggle('work-notes-hidden', hidden);
         this.workNotesToggle.classList.toggle('active', hidden);
         this.workNotesToggle.setAttribute('aria-pressed', hidden ? 'true' : 'false');
         this.workNotesToggle.title = hidden ? 'Mostrar notas de trabajo' : 'Ocultar notas de trabajo';
@@ -4327,8 +4571,8 @@ export default class Timeline {
     _toggleWorkNotes() {
         if (!this.workNotesToggle)
             return;
-        const hidden = !this.section.classList.contains('work-notes-hidden');
-        this.section.classList.toggle('work-notes-hidden', hidden);
+        const hidden = !this.container.classList.contains('work-notes-hidden');
+        this.container.classList.toggle('work-notes-hidden', hidden);
         this.workNotesToggle.classList.toggle('active', hidden);
         this.workNotesToggle.setAttribute('aria-pressed', hidden ? 'true' : 'false');
         this.workNotesToggle.title = hidden ? 'Mostrar notas de trabajo' : 'Ocultar notas de trabajo';
@@ -4988,6 +5232,42 @@ export default class Timeline {
         this._syncSingleSelect(f);
         this._renderSelectTrigger(f);
         if (f.persist)
+            this._savePersistedFilterState();
+        this._applyFilters(true);
+    }
+    /**
+     * Drop every filter the panel holds — all the `'menu'` groups, checkboxes and `select` alike —
+     * in one click, from the footer's "Limpiar filtros" button.
+     *
+     * Scope is the panel and only the panel: the `filtros_internos` groups live behind their own
+     * button and keep their state, and the search term is its own control with its own way out
+     * (<kbd>Escape</kbd>), so neither of them is touched here.
+     *
+     * The recipe is the one `_applyCardFilter` already follows: clear each group's `active` and push
+     * it back into its control with `_syncFilterControl` (the one writer that changes the set without
+     * going through a checkbox), persist the `persist` groups, then a single `_applyFilters(true)`
+     * for the rest — toggle dot, page reset, URL, API refetch and full map all follow it.
+     *
+     * The `_urlFilters` snapshot needs the extra step: `_seedFilterActive` reseeds from it (and from
+     * the declared `checked`) on **every** rebuild — API facets landing, taxonomy re-scope —, so a
+     * group that starts checked would come back to life on the next one. Writing `[]` for each panel
+     * field is exactly the documented meaning of `?tv_campo=` ("cleared on purpose"), which wins over
+     * both sources, and it is created here when `stateInUrl` left it `null`.
+     */
+    _clearFilters() {
+        const groups = this.filters.filter((f) => f.group === 'menu');
+        if (!groups.some((g) => g.active.size > 0))
+            return;
+        groups.forEach((g) => {
+            g.active.clear();
+            this._syncFilterControl(g);
+        });
+        if (!this._urlFilters)
+            this._urlFilters = {};
+        groups.forEach((g) => {
+            this._urlFilters[g.field] = [];
+        });
+        if (groups.some((g) => g.persist))
             this._savePersistedFilterState();
         this._applyFilters(true);
     }
@@ -6045,11 +6325,17 @@ export default class Timeline {
      * Sync the active class on the search/filter/internal-filters toggle buttons.
      * Each button is lit by the groups **it** holds, not by any active filter: the `filtros_internos`
      * groups live in the flyout, so they only light the flyout button and never the one of the panel.
+     *
+     * It also writes the `disabled` of the panel's "Limpiar filtros": same scope as the dot — the
+     * groups the panel owns —, so with nothing applied there is nothing for it to clear.
      */
     _syncFilterToggleState() {
         const isActive = (f) => f.active.size > 0;
+        const panelActive = this.filters.some((f) => f.group !== 'filtros_internos' && isActive(f));
         if (this.filterToggle)
-            this.filterToggle.classList.toggle('active', this.filters.some((f) => f.group !== 'filtros_internos' && isActive(f)));
+            this.filterToggle.classList.toggle('active', panelActive);
+        if (this.filterClear)
+            this.filterClear.disabled = !panelActive;
         const internosActive = this.filters.some((f) => f.group === 'filtros_internos' && isActive(f));
         if (this.filtrosInternosToggle)
             this.filtrosInternosToggle.classList.toggle('active', internosActive);
@@ -6062,44 +6348,53 @@ export default class Timeline {
      */
     _applyFilters(immediate = false) {
         this._syncFilterToggleState();
-        // El mapa general muestra **el mismo scope filtrado** que la lista, así que un cambio acá también
-        // lo cambia a él. Va acá y no en `_renderAll` porque `_renderAll` también corre en un cambio de
-        // página, que no narrowea nada: con el mapa abierto el filtro tiene que re-preguntar los puntos,
-        // y con el mapa cerrado no hay ni request ni trabajo que hacer (abrirlo lo llama igual).
-        if (this._fullMapOpen)
-            void this._refreshFullMap();
+        // El scope cambió, así que los puntos del mapa general (si los hay) ya no lo describen. La marca
+        // se enciende **acá**, al principio y con el mapa abierto o cerrado: con el cerrado no se pinta
+        // nada —no hay mapa que pintar— y lo que quedaron son los puntos del scope anterior, de modo que
+        // `_bindFullMapToggle` es el que tiene que repreguntar al reabrirla.
+        this._fullMapStale = true;
         if (this.api) {
             // The results on screen no longer match the panel, so they go away right now instead of
             // sitting there stale until the response: `_renderApiLoading` puts the skeletons in their
             // place and `_fetchPage(1)` replaces them when the data lands.
             this._renderApiLoading();
             this._schedulePageReload(immediate);
-            return;
         }
-        const matches = (c) => this._matchesSearch(c) &&
-            this.filters.every((f) => {
-                const active = this._filterActiveTokens(f);
-                if (active.length === 0)
-                    return true;
-                return this._filterValuesOf(f, c).some((x) => active.includes(x));
-            });
-        this.allCards = this._sortBy(this._scopeItems().filter(matches));
-        this._featuredCards = this._sortBy(this._allItems().filter(matches));
-        if (this.pagination) {
-            // Search, filters, sort and taxonomy re-scope all narrow or reorder the pool, so the page
-            // the user was on may not even exist in the new one: every one of them starts over at the
-            // first page. The API branch above already gets this from `_fetchPage(1)`.
-            this._page = 1;
+        else {
+            const matches = (c) => this._matchesSearch(c) &&
+                this.filters.every((f) => {
+                    const active = this._filterActiveTokens(f);
+                    if (active.length === 0)
+                        return true;
+                    return this._filterValuesOf(f, c).some((x) => active.includes(x));
+                });
+            this.allCards = this._sortBy(this._scopeItems().filter(matches));
+            this._featuredCards = this._sortBy(this._allItems().filter(matches));
+            if (this.pagination) {
+                // Search, filters, sort and taxonomy re-scope all narrow or reorder the pool, so the page
+                // the user was on may not even exist in the new one: every one of them starts over at the
+                // first page. The API branch above already gets this from `_fetchPage(1)`.
+                this._page = 1;
+            }
+            else if (this.itemsPerPage > 0) {
+                this._displayedCount = this.itemsPerPage;
+            }
+            this._renderAll();
+            // The URL follows the view, and here it is already back on page 1: narrowing the pool starts
+            // over, so the page of the previous link has to leave the address bar with it. The API branch
+            // does not write here because its page cursor belongs to the request that is about to go out,
+            // and that is `_fetchPage` who writes it when it lands.
+            this._syncUrlState();
         }
-        else if (this.itemsPerPage > 0) {
-            this._displayedCount = this.itemsPerPage;
-        }
-        this._renderAll();
-        // The URL follows the view, and here it is already back on page 1: narrowing the pool starts
-        // over, so the page of the previous link has to leave the address bar with it. The API branch
-        // does not write here because its page cursor belongs to the request that is about to go out,
-        // and that is `_fetchPage` who writes it when it lands.
-        this._syncUrlState();
+        // El mapa general muestra **el mismo scope filtrado** que la lista, así que un cambio acá también
+        // lo cambia a él. No vive en `_renderAll` porque `_renderAll` también corre en un cambio de
+        // página, que no narrowea nada. Y va **después** de la rama local, no antes: en local los puntos
+        // salen de `allCards` (`_fullMapPointsFrom(this.allCards)`) y el refresh no tiene ningún `await`
+        // que lo posponga —el ternario `this.api ? await … : …` toma la rama síncrona—, así que corrido
+        // antes de recalcularla habría pintado el scope anterior en el mismo acto. Con el mapa cerrado
+        // no hace ni request ni trabajo: ahí alcanza con la marca de arriba.
+        if (this._fullMapOpen)
+            void this._refreshFullMap();
     }
     /** Label of the expand toggle; uses the custom function when provided, otherwise the Spanish singular/plural default */
     _relatedLabel(n) {
@@ -6649,6 +6944,11 @@ export default class Timeline {
         // que es el único lugar que reconstruye el panel con valores. Corre una sola vez.
         if (!this.api)
             this._bindFilterToggle();
+        // El "Limpiar filtros" es markup estático del panel (se emite una vez en `_buildLayout`, no se
+        // reconstruye con los checkboxes), así que se bindeaba una sola vez y no depende de los facets:
+        // limpiar es vaciar los `active`, que ya existen (URL o `checked`) aunque el conteo no.
+        if (this.filterClear)
+            this.filterClear.addEventListener('click', () => this._clearFilters());
         if (this.filtrosInternosToggle) {
             this.filtrosInternosToggle.addEventListener('click', (e) => {
                 e.stopPropagation();

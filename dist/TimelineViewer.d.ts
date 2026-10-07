@@ -109,9 +109,22 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
      */
     updatePoints(points: P[]): void;
     /**
+     * Encuadrar en el viewport los puntos que el mapa tiene **ahora**.
+     *
+     * Es el mismo `fit` del montaje (mismo padding, mismo tope de zoom, sin animación) y lo necesita
+     * solo la vista general al **abrirse**: `updatePoints` conserva la vista a propósito —el usuario
+     * puede estar adentro de una ciudad—, pero "abrir la vista" vuelve a pedir que se vea el conjunto
+     * completo, aunque no haya cambiado nada desde la última vez (ver `_bindFullMapToggle`).
+     *
+     * Va como método y no como parte de `updatePoints` por el mismo motivo que `refreshStyles`: es un
+     * gesto del que llama, no algo que el cambio de set deba hacer siempre.
+     */
+    fit(): void;
+    /**
      * Repintar los markers para que el predicado `isSelected` se vuelva a evaluar, y re-agrupar lo
-     * que la selección cambió (el punto abierto queda fuera de los clústeres y de los grupos del
-     * spiderfy).
+     * que la selección cambió (el punto abierto queda **fuera de los clústeres** —pinta en su propia
+     * coordenada, sobre el conteo— y **adentro de los grupos del spiderfy**, en su slot del anillo y
+     * con el círculo agrandado por `TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`).
      *
      * El estilo de cada marker es una **función**, así que no alcanza con cambiar el estado: sin este
      * `changed()` los círculos seguirían siendo los del momento en que se creó el feature. Solo lo
@@ -119,6 +132,16 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
      * explícito y no una parte de `updatePoints`: abrir y cerrar la ficha no cambia los puntos.
      */
     refreshStyles(): void;
+    /**
+     * Coordenada de vista del punto seleccionado **si está pintado desplazado en un anillo del
+     * spider**, o `null` si no lo está (no hay selección, o el punto pinta en su propia coordenada).
+     *
+     * Existe para el `fit` de `_focusFullMapTema`: centrar en la coordenada propia del tema dejaría el
+     * círculo elegido del lado del centro del anillo en lugar de en el visor, y lo que el click de la
+     * fila pide es "llévame hasta donde se ve el punto". Es un método y no una parte de `refreshStyles`
+     * porque es una lectura, no un gesto sobre el mapa —mismo motivo que `fit`—.
+     */
+    selectedSpiderCenter(): number[] | null;
 }
 /**
  * Lo mínimo que un punto necesita para existir en un mapa: dónde está y de qué color se lo pinta.
@@ -889,6 +912,20 @@ export default class Timeline {
      */
     _fullMapSeq: number;
     /**
+     * Whether the points painted on the general map describe a scope that has since changed.
+     *
+     * Es la marca que le dice a la re-apertura de la vista que hay algo que repreguntar: con el mapa
+     * **cerrado** un cambio de filtro no pinta nada (no hay nada que pintar), así que los puntos que
+     * quedaron son los del scope anterior y `_bindFullMapToggle` tendría que volver a llamar a
+     * `_refreshFullMap()` en vez de solo `updateSize()`. La marca la enciende `_applyFilters()` —el
+     * único lugar que cambia el scope— y la apaga `_refreshFullMap()` **recién cuando el set se
+     * acepta** (pasado el chequeo de `seq`/`_fullMapOpen`): una respuesta descartada o fallida deja la
+     * marca encendida, y el próximo open reintenta. Por eso no se apaga después del
+     * `await _mountFullMap`: un filtro que llegue mientras se importa `ol` la habría encendido de
+     * nuevo y habría que respetarlo.
+     */
+    _fullMapStale: boolean;
+    /**
      * Id of the article whose card the general map panel is showing, or `null` when it is closed.
      *
      * Un *artículo*, no un punto: un artículo con varios temas ubicados llega por cualquiera de sus
@@ -981,6 +1018,8 @@ export default class Timeline {
     /** Null when the `filters` option declares no group, in which case the panel is not rendered */
     filterToggle: HTMLElement | null;
     filterMenu: HTMLElement | null;
+    /** The "Limpiar filtros" button of the panel footer; same `null` rule as `filterToggle` */
+    filterClear: HTMLButtonElement | null;
     /** Null when `internalButtons` is off or no group is declared for the `filtros_internos` flyout */
     filtrosInternosWrap: HTMLElement;
     filtrosInternosToggle: HTMLElement;
@@ -1141,6 +1180,12 @@ export default class Timeline {
      * second. A `'select'` group is not in a column: it goes in a full-width block above them, in
      * the order it was declared, because it is the control for a field with many values and it has
      * to read as the first thing in the panel rather than as one more group among the others.
+     *
+     * The footer carries the panel's one action — clear every `'menu'` group at once — and is emitted
+     * outside the `.filter-section`s on purpose: it is not a group, so it must not inherit the
+     * separator between groups nor hide with the ones that end up with no values. It is a static row
+     * (bound once, like the rest of this markup), which is why its `disabled` state is written by
+     * `_syncFilterToggleState()` rather than baked in.
      */
     protected _buildFilterMenuHtml(): string;
     /**
@@ -1442,8 +1487,24 @@ export default class Timeline {
      * the timeline goes `hidden` while the map is up and comes back exactly as it was, so nothing
      * about `isExpanded` is touched here —that state belongs to the timeline and only `_toggleExpand`
      * and its two helpers write it.
-     * Its pan and zoom are what the user moved, so they are not touched: the map survives the toggle
-     * hidden and the view stays where it was left.
+     * Its pan and zoom are what the user moved, so they survive the toggle: the map stays alive behind
+     * the `hidden`. But the view that comes **back** is not resumed where it was left — opening the
+     * view fits whatever is on it, every time (see below).
+     *
+     * Lo que **no** sobrevive intacto al toggle es el scope: con el mapa cerrado un cambio de filtro no
+     * pinta nada (no hay mapa que pintar), así que los puntos que quedaron son los del scope anterior.
+     * Por eso una re-apertura con `_fullMapStale` encendido vuelve a llamar a `_refreshFullMap()` —que
+     * con el mapa ya montado solo le cambia los puntos, sin tocar tiles ni vista—, mientras que una
+     * re-apertura sin cambios de scope se queda con el `updateSize()` de siempre y no hace ningún
+     * request (ni el flash de "Cargando elementos del mapa…" de la rama API).
+     *
+     * **Abrir es fit**: el único gesto que re-encuadra la vista, y va en las dos ramas de la apertura.
+     * El mapa puede haber quedado con el zoom y el paneo de la última vez —o con el `fit` al tema
+     * clickeado de la ficha—, y "mostrar la vista" significa mostrar el conjunto completo, no retomar
+     * un recorte que ya nadie eligió. En la rama con scope sucio el `fit` va **después** de que
+     * `_refreshFullMap` acepta los puntos nuevos (fittear los viejos sería encuadrar otro filtro); en
+     * la rama sin cambios, directo contra el set que ya está pintado. El primer open ni siquiera pasa
+     * por acá: ahí el que hace el `fit` es el montaje.
      */
     protected _bindFullMapToggle(): void;
     /**
@@ -1477,10 +1538,12 @@ export default class Timeline {
     /**
      * Resolve the points of the general map and paint them.
      *
-     * It is the only trigger, and it runs in three situations: el primer click del botón, y cada
-     * cambio del scope filtrado con el mapa ya en pantalla. Con el mapa cerrado no hace nada —ni
-     * request, ni `ol`— porque abrirlo vuelve a llamarlo: es el mismo patrón lazy del mapa de la
-     * tarjeta, aplicado a la vista entera.
+     * It is the only trigger, and it runs in three situations: el primer click del botón, cada cambio
+     * del scope filtrado con el mapa ya en pantalla (`_applyFilters`), y la re-apertura de una vista
+     * **ya montada** cuando el scope cambió con ella cerrada (`_fullMapStale`, en `_bindFullMapToggle`):
+     * ahí el mapa existe pero sus puntos son de otro scope, y este método solo se los cambia. Con el
+     * mapa cerrado no hace nada —ni request, ni `ol`— porque abrirlo vuelve a llamarlo: es el mismo
+     * patrón lazy del mapa de la tarjeta, aplicado a la vista entera.
      *
      * Each resolution goes through `_fullMapSeq`, for the same reason `_fetchPage` does it: the answer
      * to an old query arriving after a newer one would paint the map of a view that no longer exists.
@@ -1493,7 +1556,7 @@ export default class Timeline {
      * El estado de carga sí se escribe cuando ya hay un mapa en pantalla, y solo en API: es el mismo
      * criterio que la lista, donde las tarjetas desaparecen de inmediato y los skeletons toman su lugar
      * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el cartelito
-     * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparece son los markers: los del filtro
+     * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparecen son los markers: los del filtro
      * que terminó no significan nada para el que está por venir, y dejarlos mientras el server tarda
      * uno o dos segundos sería una mentira con forma de respuesta vieja. La capa de tiles y la vista
      * quedan —eso es justamente lo que `updatePoints` preserva—, así que se lee como "el mapa se está
@@ -1504,8 +1567,19 @@ export default class Timeline {
      * El error y el vacío sí se muestran en los dos casos —en esos dos no hay mapa que dejar en paz:
      * en el vacío hay que tirar los puntos viejos abajo—, y el vacío sigue siendo el único que
      * destruye el mapa.
+     *
+     * `_fullMapStale` se apaga **acá**, junto con aceptar el set, y no en ningún otro lado: una
+     * respuesta descartada por `seq`/`_fullMapOpen` o un `null` de error dejan la marca encendida, de
+     * modo que el próximo open vuelve a preguntar en vez de dar por bueno un mapa de otro scope.
+     *
+     * `fit` es el gesto de **apertura**: al entrar a la vista el conjunto tiene que verse entero, así
+     * que cuando el mapa ya existe —y `updatePoints` conservó la vista del usuario— se le pide además
+     * el `fit` de `TemasMapHandle`. Solo lo pasa `_bindFullMapToggle`; un cambio de filtro con el mapa
+     * en pantalla **no** fittea, porque ahí lo que no se debe mover es la vista (ver README, "No
+     * flash, no re-framing"). En el camino de montaje el `fit` ya es del propio montaje, así que el
+     * flag no hace falta.
      */
-    protected _refreshFullMap(): Promise<void>;
+    protected _refreshFullMap(fit?: boolean): Promise<void>;
     /**
      * The points of the general map out of the cards on screen, one per located topic.
      *
@@ -2068,6 +2142,26 @@ export default class Timeline {
     /** Drop every active value of a `'select'` group and apply */
     protected _clearSelectValues(f: FilterDef): void;
     /**
+     * Drop every filter the panel holds — all the `'menu'` groups, checkboxes and `select` alike —
+     * in one click, from the footer's "Limpiar filtros" button.
+     *
+     * Scope is the panel and only the panel: the `filtros_internos` groups live behind their own
+     * button and keep their state, and the search term is its own control with its own way out
+     * (<kbd>Escape</kbd>), so neither of them is touched here.
+     *
+     * The recipe is the one `_applyCardFilter` already follows: clear each group's `active` and push
+     * it back into its control with `_syncFilterControl` (the one writer that changes the set without
+     * going through a checkbox), persist the `persist` groups, then a single `_applyFilters(true)`
+     * for the rest — toggle dot, page reset, URL, API refetch and full map all follow it.
+     *
+     * The `_urlFilters` snapshot needs the extra step: `_seedFilterActive` reseeds from it (and from
+     * the declared `checked`) on **every** rebuild — API facets landing, taxonomy re-scope —, so a
+     * group that starts checked would come back to life on the next one. Writing `[]` for each panel
+     * field is exactly the documented meaning of `?tv_campo=` ("cleared on purpose"), which wins over
+     * both sources, and it is created here when `stateInUrl` left it `null`.
+     */
+    protected _clearFilters(): void;
+    /**
      * The group a chip inside a card filters through, or `null` when there is none to filter by:
      * single mode has no panel at all (`_buildLayout` never runs there, so applying would throw),
      * and a field the consumer did not declare — or declared without `cardClickable` — keeps the
@@ -2424,6 +2518,9 @@ export default class Timeline {
      * Sync the active class on the search/filter/internal-filters toggle buttons.
      * Each button is lit by the groups **it** holds, not by any active filter: the `filtros_internos`
      * groups live in the flyout, so they only light the flyout button and never the one of the panel.
+     *
+     * It also writes the `disabled` of the panel's "Limpiar filtros": same scope as the dot — the
+     * groups the panel owns —, so with nothing applied there is nothing for it to clear.
      */
     protected _syncFilterToggleState(): void;
     /**
