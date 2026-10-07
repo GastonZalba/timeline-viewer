@@ -1635,7 +1635,7 @@
         height: 18px;
         border-radius: 50%;
         background: var(--tema-tone-color, var(--tv-accent));
-        color: var(--tv-text-dark);
+        color: #000;
         font-size: 0.62rem;
         font-weight: 700;
         line-height: 1;
@@ -2560,6 +2560,8 @@
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
+        max-height: 700px;
+        overflow-y: auto;
       }
 
       .filter-column {

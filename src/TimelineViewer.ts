@@ -1,4 +1,4 @@
-import lightGallery from 'lightgallery';
+﻿import lightGallery from 'lightgallery';
 import lgThumbnail from 'lightgallery/plugins/thumbnail';
 import lgZoom from 'lightgallery/plugins/zoom';
 
@@ -92,6 +92,15 @@ const TEMAS_MAP_FIT_PADDING = 28;
  * 15 is a street-level zoom, which is what "these topics happen in one place" should look like.
  */
 const TEMAS_MAP_FIT_MAX_ZOOM = 15;
+
+/**
+ * `maxZoom` of the topics map `View`, i.e. the ceiling of the *interactive* zoom (the controls,
+ * the pinch, the wheel). It is deliberately above `TEMAS_MAP_FIT_MAX_ZOOM`: programmatic moves
+ * only ever need 15 (street level), but once there the user is still free to zoom further in by
+ * hand, up to 20 — without this the View would climb to OpenLayers' own default (28) and "the max
+ * zoom of this map" would stop meaning anything.
+ */
+const TEMAS_MAP_MAX_ZOOM = 20;
 
 /**
  * Raster base of the topics map when the consumer does not pass one: the public OpenStreetMap
@@ -3568,7 +3577,7 @@ export default class Timeline {
       // wheel climb to OpenLayers' own default (28) and "the max zoom of this map" stops meaning
       // anything — while every programmatic move (the opening fit, the focus of a clicked topic,
       // the zoom a cluster click animates to) is already clamped to `TEMAS_MAP_FIT_MAX_ZOOM`.
-      maxZoom: TEMAS_MAP_FIT_MAX_ZOOM,
+      maxZoom: TEMAS_MAP_MAX_ZOOM,
       // Limit the view to the world extent so we don't pan outside the planet and avoid
       // the black edges that appear when wrapX is disabled.
       extent: ol.getProjection('EPSG:3857')?.getExtent() || undefined
