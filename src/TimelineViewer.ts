@@ -510,6 +510,17 @@ const FULLMAP_TONE_FIELD = 'tonos_sociales';
 const FULLMAP_FOCUS_DURATION = 400;
 
 /**
+ * Ancho mínimo de viewport (px) a partir del cual la ficha del mapa general se saltea el clamp contra
+ * la barra de herramientas y su alto puede llegar hasta arriba.
+ *
+ * Por debajo del umbral el panel se ancla al bottom real de `.featured-row` (`_syncFullMapDetailTop()`)
+ * porque en pantallas angostas la barra ocupa el ancho completo y taparía el inicio de la ficha —y su
+ * botón de cerrar—. Desde el umbral se escribe `0`, que es el mismo camino que ya usaba la ausencia de
+ * barra, así que no hace falta ninguna regla nueva en el SCSS.
+ */
+const FULLMAP_DETAIL_TOP_MIN_WIDTH = 1700;
+
+/**
  * Normalize a text so it can be searched as a plain substring: without accents and without case,
  * so "politica" finds "Política" and the other way around. Done **once per value**, when the list
  * of a `'select'` group is built, which is what keeps typing in the search box cheap on a field
@@ -1801,6 +1812,8 @@ export default class Timeline {
       typeof config.container === 'string'
         ? (document.querySelector(config.container) as HTMLElement)
         : config.container;
+
+    this.container.classList.add('publicaciones-container');
     this.items = config.items || [];
     this.content = this._normalizeContent(config.content);
     this._contentIndex = 0;
@@ -2309,7 +2322,7 @@ export default class Timeline {
   protected _buildFullMapToggleHtml(): string {
     if (!this.showFullMap) return '';
     return `<div class="fullmap-wrap">
-            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="fullmap-view" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}</button>
+            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="publicaciones-fullmap-section" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}</button>
           </div>`;
   }
 
@@ -2321,11 +2334,11 @@ export default class Timeline {
    */
   protected _buildFullMapViewHtml(): string {
     if (!this.showFullMap) return '';
-    return `<div class="fullmap-view" id="fullmap-view" hidden>
+    return `<section class="publicaciones-fullmap-section" id="publicaciones-fullmap-section" hidden>
           <div class="fullmap-status" id="fullmap-status" hidden></div>
           <div class="fullmap-canvas" id="fullmap-canvas"></div>
           <div class="fullmap-detail" id="fullmap-detail" hidden></div>
-        </div>`;
+        </section>`;
   }
 
   /** Build the main DOM layout and cache element references */
@@ -2336,9 +2349,9 @@ export default class Timeline {
     const fullMapHtml = this._buildFullMapToggleHtml();
     const fullMapViewHtml = this._buildFullMapViewHtml();
     this.container.innerHTML = `
-      <section class="publicaciones-section" id="publicaciones-section">
+      <section class="publicaciones-timeline-section" id="publicaciones-timeline-section">
         <div class="featured-row">
-          <div class="noticias-top">
+          <div class="toolbar-menu-top">
             <button class="expand-toggle" id="expand-toggle" aria-expanded="false" aria-controls="timeline-container">
               <span class="expand-text"><span id="remaining-count"></span> <span id="remaining-text">${this._relatedLabel(0)}</span></span>
               <span class="expand-icon" id="expand-icon"></span>
@@ -2379,10 +2392,10 @@ export default class Timeline {
             <span>El contenido fue procesado con IA y puede contener imprecisiones</span>
           </div>
         </div>
-        ${fullMapViewHtml}
       </section>
+      ${fullMapViewHtml}
     `;
-    this.section = this.container.querySelector('#publicaciones-section') as HTMLElement;
+    this.section = this.container.querySelector('#publicaciones-timeline-section') as HTMLElement;
     this.featuredContainer = this.container.querySelector('#featured-cards') as HTMLElement;
     this.featuredRow = this.container.querySelector('.featured-row') as HTMLElement;
     this.timelineContainer = this.container.querySelector('#timeline-container') as HTMLElement;
@@ -2406,7 +2419,7 @@ export default class Timeline {
     this.taxonomySelectCount = this.container.querySelector('#taxonomy-select-count') as HTMLElement | null;
     this.taxonomySelect = this.container.querySelector('#taxonomy-select') as HTMLSelectElement | null;
     this.fullMapToggle = this.container.querySelector('#fullmap-toggle') as HTMLElement | null;
-    this.fullMapView = this.container.querySelector('#fullmap-view') as HTMLElement | null;
+    this.fullMapView = this.container.querySelector('#publicaciones-fullmap-section') as HTMLElement | null;
     this.fullMapCanvas = this.container.querySelector('#fullmap-canvas') as HTMLElement | null;
     this.fullMapStatus = this.container.querySelector('#fullmap-status') as HTMLElement | null;
     this.fullMapDetail = this.container.querySelector('#fullmap-detail') as HTMLElement | null;
@@ -3976,11 +3989,18 @@ export default class Timeline {
    * The toolbar's height is not a constant (fullpage pill, collapsed panel, wrap on small screens), so
    * its live bottom is written into a CSS variable that the SCSS reads in the panel's `calc()`. Same
    * measurement as `_scrollToTimelineTop()`, which reads the same row for the scroll target.
+   *
+   * On a wide viewport (`FULLMAP_DETAIL_TOP_MIN_WIDTH`) the bar does not compete with the panel, so
+   * the offset goes to zero and the panel's height is allowed to reach the top of the viewport.
    */
   protected _syncFullMapDetailTop(): void {
     const panel = this.fullMapDetail;
     if (!panel) return;
-    const toolbarBottom = this.featuredRow ? this.featuredRow.getBoundingClientRect().bottom : 0;
+    // A zero bottom is the "no clamp" case, and it also covers the missing `featuredRow`.
+    const toolbarBottom =
+      window.innerWidth >= FULLMAP_DETAIL_TOP_MIN_WIDTH || !this.featuredRow
+        ? 8
+        : this.featuredRow.getBoundingClientRect().bottom;
     // Clamped so a toolbar scrolled out of view (or a `rect` above the viewport) never lifts the top
     // of the panel into negative space.
     panel.style.setProperty('--tv-fullmap-top', `${Math.max(toolbarBottom, 0)}px`);
@@ -7422,8 +7442,8 @@ export default class Timeline {
             </button>
           </div>`
       : '';
-    this.container.innerHTML = `<section class="publicaciones-section single-mode" id="publicaciones-section">${workNotesHtml}</section>`;
-    this.section = this.container.querySelector('#publicaciones-section') as HTMLElement;
+    this.container.innerHTML = `<section class="publicaciones-timeline-section single-mode" id="publicaciones-timeline-section">${workNotesHtml}</section>`;
+    this.section = this.container.querySelector('#publicaciones-timeline-section') as HTMLElement;
     this.workNotesToggle = this.container.querySelector('#work-notes-toggle') as HTMLElement;
     if (this.workNotesToggle) {
       this._applyWorkNotesState();
