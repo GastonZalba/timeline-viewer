@@ -210,7 +210,7 @@ El componente agrega la clase `publicaciones-container` al `container` del consu
 │   │           │   └── .card-temas-list
 │   │           │       └── .tema-item × N
 │   │           │           ├── span.tema-map-ref (número, o `.tema-map-ref-none` con el pin tachado; visible solo con el mapa abierto)
-│   │           │           └── .tema-content > .tema-title / .tema-desc / .tema-notas-trabajo
+│   │           │           └── .tema-content > .tema-title (con el id del subtema en rojo, solo con `internalButtons` y work notes) / .tema-desc / .tema-notas-trabajo
 │   │           ├── .card-hint
 │   │           ├── button.card-collapse
               │   │           ├── button.card-info-btn

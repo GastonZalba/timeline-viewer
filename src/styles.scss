@@ -1674,6 +1674,18 @@
         white-space: nowrap;
       }
 
+      // El id del subtema, al final del título: dato de trabajo, no de lectura, así que en rojo
+      // (mismo `--tv-tone-negative` que los badges de `notas_de_trabajo`). Dos cortes: el span
+      // **no se emite** sin `internalButtons` (gate en `_buildTemasHtml`) y con ellas la
+      // visibilidad vive en el bloque `&.work-notes-hidden` de más abajo (mismo destino que las
+      // notas), porque `_toggleWorkNotes` solo togglea la clase de la sección, sin re-render.
+      .tema-id {
+        color: var(--tv-tone-negative);
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
       .tema-tone {
         font-size: 0.65rem;
         font-weight: 600;
@@ -2193,9 +2205,15 @@
       z-index: 2;
     }
 
+    // Notas de trabajo ocultas: además de los badges va el id del subtema al final del título del
+    // tema (`.tema-id`), que es el mismo "dato de trabajo" en otra forma. Ojo con el `internalButtons`
+    // apagado: acá la clase nunca se aplica, pero eso ya no deja el id a la vista —sin
+    // `internalButtons` el span no se emite, gateado en `_buildTemasHtml`—; las notas, en cambio,
+    // siguen viéndose siempre, como siempre.
     &.work-notes-hidden {
       .card-notas-trabajo,
-      .tema-notas-trabajo {
+      .tema-notas-trabajo,
+      .tema-id {
         display: none !important;
       }
     }
@@ -2401,7 +2419,7 @@
     // general no es una parte del timeline, así que no tiene sentido ofrecerlo con la lista colapsada.
     .fullmap-toggle {
       background: none;
-      border: 1px solid var(--tv-accent);
+      border: 1px solid #008024;
       color: var(--tv-text-on-primary);
       padding: 8px;
       border-radius: 42px;
@@ -2413,19 +2431,19 @@
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(59, 130, 246, 0.25);
+      background: rgba(0, 128, 34, 0.5);
 
       &:hover {
-        background: var(--tv-accent);
+        background: rgba(0, 128, 34, 0.7);
       }
 
       // El estado sale del `aria-expanded` que escribe el handler, como el del botón del mapa de la
       // tarjeta: no hay clase que sincronizar, y el fondo lleno dice "estás en el mapa".
       &[aria-expanded='true'] {
-        background: var(--tv-accent);
+        background: rgba(0, 128, 34, 0.7);
 
         &:hover {
-          background: var(--tv-accent-light);
+          background: rgba(0, 128, 34, 0.85);
         }
       }
 
@@ -2436,7 +2454,7 @@
       }
 
       &:focus-visible {
-        outline: 2px solid var(--tv-accent);
+        outline: 2px solid #008024;
         outline-offset: 2px;
       }
     }
@@ -2558,7 +2576,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
-        max-height: 700px;
+        max-height: 550px;
         overflow-y: auto;
       }
 

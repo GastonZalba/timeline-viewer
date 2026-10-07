@@ -181,7 +181,7 @@ const TEMAS_MAP_SPIDER_LINE_COLOR = '#ffffff';
  * cluster still stands for a couple of dozen km on the default view. Above
  * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` the cap is off by design.
  */
-const TEMAS_MAP_CLUSTER_MAX_ZOOM = 8;
+const TEMAS_MAP_CLUSTER_MAX_ZOOM = 12;
 /**
  * Screen distance, in pixels, below which two markers become one cluster at the far view. It is
  * wider than `TEMAS_MAP_SPIDER_THRESHOLD` on purpose: a cluster marker is a 30px circle (radius plus
@@ -1897,11 +1897,20 @@ export default class Timeline {
             // en `card.temas`, la que usa el bind de clicks de la fila para encontrar el tema. Sin una
             // identidad estable el resaltado tendría que ir por texto, y dos temas con el mismo título
             // no son una excepción en estos datos. El id viene del pipeline, así que se escapa.
+            //
+            // El id además sale **como texto**, al final del título: es un dato de trabajo, no de
+            // lectura, así que va en rojo y solo aparece con las herramientas internas encendidas.
+            // Dos cortes en dos capas: sin `internalButtons` el span **no se emite** (mismo gate
+            // que el botón "Editar"), y con ellas la visibilidad la manda el toggle de notas de
+            // trabajo (CSS puro, `.tema-id` dentro del bloque `&.work-notes-hidden`, igual que
+            // `.tema-notas-trabajo`), porque `_toggleWorkNotes` solo cambia una clase y no
+            // re-renderiza. Sin `id_subtema` (backend que no lo manda) tampoco se emite, como el
+            // `data-id-subtema` vacío de más arriba.
             return `
           <div class="tema-item tone-tema-${t.tono_social.toLowerCase()}" data-tema-index="${i}" data-id-subtema="${this._escapeHtml(t.id_subtema ?? '')}">
             ${ref}
             <div class="tema-content">
-              <span class="tema-title"><span class="tema-tone">${TONE_LABEL[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
+              <span class="tema-title"><span class="tema-tone">${TONE_LABEL[t.tono_social]}</span><span class="tema-title">${t.titulo}</span>${this.internalButtons && t.id_subtema ? `<span class="tema-id">${this._escapeHtml(t.id_subtema)}</span>` : ''}${t.fecha_narrativa ? `<span class="tema-fecha" title="Fecha narrativa">[ ${this._formatDate(t.fecha_narrativa)} ]</span>` : ''}</span>
               <span class="tema-desc">${t.resumen}</span>
               ${t.notas_de_trabajo ? `<div class="tema-notas-trabajo">${t.notas_de_trabajo}</div>` : ''}
             </div>

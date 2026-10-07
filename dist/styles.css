@@ -1317,6 +1317,12 @@
   color: #b9b9b9;
   white-space: nowrap;
 }
+.publicaciones-container .timeline-item .tema-item .tema-id {
+  color: var(--tv-tone-negative);
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .publicaciones-container .timeline-item .tema-item .tema-tone {
   font-size: 0.65rem;
   font-weight: 600;
@@ -1702,7 +1708,8 @@
   z-index: 2;
 }
 .publicaciones-container .publicaciones-timeline-section.work-notes-hidden .card-notas-trabajo,
-.publicaciones-container .publicaciones-timeline-section.work-notes-hidden .tema-notas-trabajo {
+.publicaciones-container .publicaciones-timeline-section.work-notes-hidden .tema-notas-trabajo,
+.publicaciones-container .publicaciones-timeline-section.work-notes-hidden .tema-id {
   display: none !important;
 }
 .publicaciones-container .publicaciones-timeline-section .expand-toggle {
@@ -1876,7 +1883,7 @@
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle {
   background: none;
-  border: 1px solid var(--tv-accent);
+  border: 1px solid #008024;
   color: var(--tv-text-on-primary);
   padding: 8px;
   border-radius: 42px;
@@ -1888,16 +1895,16 @@
   display: none;
   align-items: center;
   justify-content: center;
-  background: rgba(59, 130, 246, 0.25);
+  background: rgba(0, 128, 34, 0.5);
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle:hover {
-  background: var(--tv-accent);
+  background: rgba(0, 128, 34, 0.7);
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle[aria-expanded=true] {
-  background: var(--tv-accent);
+  background: rgba(0, 128, 34, 0.7);
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle[aria-expanded=true]:hover {
-  background: var(--tv-accent-light);
+  background: rgba(0, 128, 34, 0.85);
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle svg {
   display: block;
@@ -1905,7 +1912,7 @@
   height: 15px;
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle:focus-visible {
-  outline: 2px solid var(--tv-accent);
+  outline: 2px solid #008024;
   outline-offset: 2px;
 }
 .publicaciones-container .publicaciones-timeline-section .search-wrap {
@@ -1991,7 +1998,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  max-height: 700px;
+  max-height: 550px;
   overflow-y: auto;
 }
 .publicaciones-container .publicaciones-timeline-section .filter-menu .filter-column {
