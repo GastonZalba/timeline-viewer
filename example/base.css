@@ -11,15 +11,19 @@ body {
   line-height: 1.6;
 }
 
+#example-padding {
+  padding-left: 60px;
+  position: relative;
+}
+
 #noticias-container {
   height: 100%;
-  margin: 50px 0 50px;
   width: 100%;
   display: flex;
   justify-content: center;
-  align-items: center;
+  position: relative;
 }
 
-.publicaciones-section {
-  width: 740px;
+.publicaciones-timeline-section {
+  margin-top: 30px;
 }
