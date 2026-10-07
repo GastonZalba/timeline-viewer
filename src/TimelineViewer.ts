@@ -91,7 +91,7 @@ const TEMAS_MAP_FIT_PADDING = 28;
  * to, and the `maxZoom` of the `View` itself, so the zoom controls and the pinch stop there too.
  * 17 is a street-level zoom, which is what "these topics happen in one place" should look like.
  */
-const TEMAS_MAP_FIT_MAX_ZOOM = 17;
+const TEMAS_MAP_FIT_MAX_ZOOM = 15;
 
 /**
  * Raster base of the topics map when the consumer does not pass one: the public OpenStreetMap
@@ -4390,11 +4390,10 @@ export default class Timeline {
    * Son dos gestos en un mismo click, y el orden importa: primero se selecciona —para que el círculo
    * crezca y quede arriba, que es lo que conecta la fila con el punto— y después se mueve la vista.
    *
-   * El **zoom no cambia** en el primer click: el mapa puede estar mostrando medio país, y llevar el
-   * centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que hace útil la fila.
-   * El segundo click sobre el tema que ya está seleccionado es el que hace `fit`, que sí acerca: es
-   * el gesto de "ya sé cuál es, llévame hasta ahí", y como no tiene nada nuevo que seleccionar no
-   * necesita volver a marcar nada.
+   * **Toda fila clickeada acerca**: el gesto es "llévame hasta ahí", y repetirlo sobre otro tema de
+   * la misma tarjeta hace exactamente lo mismo, centrando el nuevo punto. Antes solo el segundo click
+   * —sobre el tema ya seleccionado— hacía `fit`, con lo cual clickear una fila nueva se quedaba en el
+   * zoom viejo y no llegaba al punto elegido.
    */
   protected _focusFullMapTema(cardEl: HTMLElement, card: TimelineItem, temaIndex: number): void {
     const tema = (card.temas || [])[temaIndex];
@@ -4402,10 +4401,10 @@ export default class Timeline {
     const view = this._fullMapHandle?.map.getView() || null;
     if (!tema || !geom || !view) return;
     const key = `${String(card.id)}#${tema.id_subtema ?? ''}`;
-    // El criterio del segundo gesto es la **selección**, no "la última fila clickeada": un tema que ya
-    // está seleccionado —venga del click en su punto o de su propia fila— es el que pide el `fit`.
-    // Así el gesto es el mismo llegue como llegue, y no hace falta un segundo campo para acordarse de
-    // la última fila.
+    // El criterio es la **selección**, no "la última fila clickeada": un tema distinto al que ya
+    // estaba marcado —venga del click en su punto o de su propia fila— es el que cambia el punto
+    // seleccionado. El `fit` lo pide siempre, así que no hace falta un segundo campo para acordarse
+    // de la última fila.
     const alreadySelected = this._fullMapSelectedKey === key;
     if (!alreadySelected) {
       this._fullMapCardId = String(card.id);
@@ -4422,18 +4421,11 @@ export default class Timeline {
     // proyectar `lon`/`lat` a las coordenadas de la vista, que son EPSG:3857.
     void this._loadOpenLayers().then((ol) => {
       const center = ol.fromLonLat([geom.lon, geom.lat]);
-      if (alreadySelected) {
-        // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
-        // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
-        // queda centrado. Es el "llévame hasta ahí" del segundo click.
-        view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: FULLMAP_FOCUS_DURATION });
-        return;
-      }
-      // El primer click mueve el centro **sin** cambiar el zoom: el mapa puede estar mostrando medio
-      // país, y llevar el centro a un tema sin acercar deja ver dónde cae en el conjunto, que es lo que
-      // hace útil la fila. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
+      // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
+      // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
+      // queda centrado. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
       // que re-declutterean los markers por el camino.
-      view.animate({ center, duration: FULLMAP_FOCUS_DURATION });
+      view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: FULLMAP_FOCUS_DURATION });
     });
   }
 
