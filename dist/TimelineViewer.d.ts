@@ -718,6 +718,18 @@ export interface TimelineFilter {
      * truncated (instead of leading with the values that filter the most).
      */
     sortValues?: (a: string, b: string) => number;
+    /**
+     * Render the values the card shows for `field` as clickable chips (default: false), so the user
+     * can filter from the card itself. Clicking one drops **every** other active group **and the
+     * search term**, and leaves only that value — it is not a toggle: clicking it again just applies
+     * the same state, so a "filter by this actor" gesture always reads the same.
+     *
+     * The group itself still decides how the value reads (`items` labels, `allowEmpty`, the facets of
+     * API mode...); the card only needs `field` to be the one its own chips come from (today,
+     * `actores_principales`). A group without it keeps the card as plain text, and in single mode
+     * there are no chips at all: there is no panel to sync with.
+     */
+    cardClickable?: boolean;
 }
 /** A `TimelineFilterItem` resolved: the token of the checkbox and the tokens it matches */
 interface FilterDefItem {
@@ -729,7 +741,7 @@ interface FilterDefItem {
     checked: boolean;
 }
 /** A `TimelineFilter` normalized for rendering: defaults resolved and the DOM slot attached */
-interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label' | 'multiple' | 'searchable'> {
+interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 'items' | 'allowEmpty' | 'label' | 'multiple' | 'searchable' | 'cardClickable'> {
     type: FilterType;
     group: FilterGroup;
     persist: boolean;
@@ -741,6 +753,8 @@ interface FilterDef extends Omit<TimelineFilter, 'type' | 'group' | 'persist' | 
     multiple: boolean;
     /** Search box of a `'select'` list. `undefined` = auto (only above `FILTER_SELECT_SEARCH_MIN`) */
     searchable: boolean | undefined;
+    /** The card renders the values of this field as clickable chips (see `TimelineFilter.cardClickable`) */
+    cardClickable: boolean;
     /** Column of the panel the group is rendered in. `0` for the `'filtros_internos'` flyout, ignored there */
     column: number;
     /** The `.filter-options` box of a `'checkboxes'` group, its container to draw the values in */
@@ -1269,6 +1283,27 @@ export default class Timeline {
     protected _hasDetail(card: TimelineItem | TimelineItemSummary): boolean;
     /** Build the "Actores principales" HTML block */
     protected _buildProtagonistaHtml(card: TimelineItem): string;
+    /**
+     * The actor list of the block, for the collapsed and the expanded state of `has-more`.
+     *
+     * With a `cardClickable` group on the field the names are `<button>`s that filter on click (see
+     * `_applyCardFilter`), and the token is the value of the group — the very same one the panel
+     * filters by, so both stay in sync without the card knowing anything about filters. Without it
+     * this is plain text, exactly what the block has always been (only escaped now: the actors come
+     * from the scraping pipeline, and they were being interpolated raw).
+     */
+    protected _buildActorsHtml(actors: string[], showAll: boolean): string;
+    /**
+     * Bind the filtering chips of an actor list (the block itself, or a list a `has-more` toggle
+     * just rebuilt: the nodes it throws away were bound too, and the new ones are not).
+     */
+    protected _bindActorChips(root: HTMLElement): void;
+    /**
+     * Bind what the "Actores principales" block has beyond its markup: the chips that filter, and
+     * the `has-more` toggle, which swaps the first actors for all of them (re-rendering the list,
+     * chips included, instead of writing the raw text like it used to).
+     */
+    protected _bindProtagonista(root: HTMLElement, card: TimelineItem): void;
     /** Build the "Fuente" HTML block */
     protected _buildFuenteHtml(card: TimelineItem): string;
     /**
@@ -2032,6 +2067,30 @@ export default class Timeline {
     protected _syncSingleSelect(f: FilterDef): void;
     /** Drop every active value of a `'select'` group and apply */
     protected _clearSelectValues(f: FilterDef): void;
+    /**
+     * The group a chip inside a card filters through, or `null` when there is none to filter by:
+     * single mode has no panel at all (`_buildLayout` never runs there, so applying would throw),
+     * and a field the consumer did not declare — or declared without `cardClickable` — keeps the
+     * card exactly as it has always been, plain text.
+     */
+    protected _cardFilterGroup(field: string): FilterDef | null;
+    /**
+     * Push `f.active` back into the DOM of its group. It exists for the one writer that changes the
+     * set without going through a control — the chips inside a card —: the checkboxes of a group are
+     * a view of that set, and a value that stays active inside the hidden tail of "Ver más" would be
+     * an applied filter nobody can see, so that group opens too. A `'select'` group redraws its rows
+     * and its trigger, which is what `_toggleSelectValue` does as well.
+     */
+    protected _syncFilterControl(f: FilterDef): void;
+    /**
+     * Filter from a value the user clicked inside a card: every other group **and** the search term
+     * are dropped, and the clicked value becomes the only active one. Deliberately not a toggle —
+     * clicking it again just applies the same state (see `TimelineFilter.cardClickable`).
+     *
+     * It goes through `_applyFilters(true)` like any other control, so the toggles, the URL, the
+     * full map and the page reload of API mode all follow it without this method knowing about them.
+     */
+    protected _applyCardFilter(field: string, value: string): void;
     /** Open the list of a `'select'` group, building it the first time */
     protected _openSelect(f: FilterDef): void;
     /** Close the list of a `'select'` group and send the focus back to its trigger */

@@ -59,6 +59,11 @@
  *   porque un orden deliberado es justo lo contrario de "primero los que más filtran".
  * - `group: 'filtros_internos'` manda el grupo al flyout rojo de "Filtros internos" (necesita
  *   `internalButtons: true`) en vez de a una columna del panel.
+ * - `cardClickable` (default `false`) hace que la tarjeta muestre los valores de ese campo como
+ *   chips clickeables (hoy solo `actores_principales`, que es lo que el bloque "Actores
+ *   principales" sabe renderizar). El click filtra desde la tarjeta: limpia todos los demás grupos
+ *   y la búsqueda, y deja solo ese valor. No es un toggle, y no hay chips en modo single (ahí no
+ *   hay panel con el que sincronizar).
  *
  * El orden de la declaración es el orden de lectura: los grupos `'select'` van en su bloque de
  * ancho completo, arriba del todo, y los primeros grupos `'menu'` de checkboxes van en la primera
@@ -84,6 +89,25 @@ const filters = [
     type: 'select',
     multiple: true,
     allowEmpty: true
+  },
+  {
+    // El segundo `select` del demo, y el primero con `cardClickable`: la opción que convierte en
+    // chips clickeables los valores que la tarjeta muestra en "Actores principales". El click en
+    // un actor limpia **todos** los demás grupos de filtros y la búsqueda, y deja solo ese actor
+    // (no es un toggle: volver a clickearlo aplica el mismo estado).
+    //
+    // El `field` tiene que ser el del bloque de la tarjeta (`actores_principales`), porque es lo
+    // único que la tarjeta sabe renderizar como chips; todo lo demás —labels, facets,
+    // `allowEmpty`, el query param— se resuelve igual que en cualquier otro grupo, y en modo API
+    // el facet sale solo porque `FACET_FIELDS` de `server.js` se arma con los `field` declarados.
+    //
+    // El `allowEmpty` acá sí tiene efecto con este mock: cuatro ítems vienen sin actores (uno con
+    // `null` y tres con el array vacío), así que el grupo ofrece "Sin valor" al final de la lista.
+    field: 'actores_principales',
+    label: 'Actores principales',
+    type: 'select',
+    allowEmpty: true,
+    cardClickable: true
   },
 
   // ---- Columna 1 --------------------------------------------------------

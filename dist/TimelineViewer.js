@@ -399,6 +399,17 @@ const FILTER_EMPTY_VALUE = 'null';
  * is the same everywhere (a missing type, a missing date), so it does not get a label per group.
  */
 const FILTER_EMPTY_LABEL = 'Sin valor';
+/**
+ * The card field the `cardClickable` chips filter by today. The option itself is generic (any
+ * group can declare it), but the card only knows how to render *this* field as chips, so this is
+ * the one place that ties a `filters` declaration to a card slot.
+ */
+const CARD_CLICKABLE_FIELD = 'actores_principales';
+/**
+ * Actors rendered as chips before the "..." of the collapsed block. With `cardClickable` these are
+ * the ones that fit in one line before the card gets taller, same cut the plain text has always had.
+ */
+const CARD_CLICKABLE_MAX = 3;
 /** Label of the "Ver todo" option added to the taxonomy selector when there is more than one group */
 const ALL_TAXONOMIES_LABEL = 'Ver todo';
 /** `_contentIndex` value that means "every taxonomy" instead of a single group */
@@ -848,6 +859,7 @@ export default class Timeline {
                 allowEmpty: f.allowEmpty === true,
                 multiple: f.multiple !== false,
                 searchable: typeof f.searchable === 'boolean' ? f.searchable : undefined,
+                cardClickable: f.cardClickable === true,
                 column: 0,
                 extract: f.extract,
                 formatLabel: f.formatLabel,
@@ -1841,14 +1853,72 @@ export default class Timeline {
     /** Build the "Actores principales" HTML block */
     _buildProtagonistaHtml(card) {
         const actors = card.actores_principales || [];
-        const max = 3;
-        const hasMore = actors.length > max;
+        const hasMore = actors.length > CARD_CLICKABLE_MAX;
         return actors.length
-            ? `<div class="card-protagonista${hasMore ? ' has-more' : ''}" data-full="${actors.join(', ')}">
+            ? `<div class="card-protagonista${hasMore ? ' has-more' : ''}" data-full="${this._escapeHtml(actors.join(', '))}">
           <span class="protagonista-label">Actores principales:</span>
-          <span class="protagonista-list">${actors.slice(0, max).join(', ')}${hasMore ? '...' : ''}</span>
+          <span class="protagonista-list">${this._buildActorsHtml(actors, false)}</span>
          </div>`
             : `<div class="card-protagonista"><span class="protagonista-label">Actores principales:</span> -</div>`;
+    }
+    /**
+     * The actor list of the block, for the collapsed and the expanded state of `has-more`.
+     *
+     * With a `cardClickable` group on the field the names are `<button>`s that filter on click (see
+     * `_applyCardFilter`), and the token is the value of the group — the very same one the panel
+     * filters by, so both stay in sync without the card knowing anything about filters. Without it
+     * this is plain text, exactly what the block has always been (only escaped now: the actors come
+     * from the scraping pipeline, and they were being interpolated raw).
+     */
+    _buildActorsHtml(actors, showAll) {
+        const group = this._cardFilterGroup(CARD_CLICKABLE_FIELD);
+        const list = showAll ? actors : actors.slice(0, CARD_CLICKABLE_MAX);
+        const sep = '<span class="protagonista-sep">, </span>';
+        const parts = list.map((actor) => {
+            const text = this._escapeHtml(actor);
+            if (!group)
+                return text;
+            const token = this._filterToken(actor);
+            const label = this._filterOptionLabel(group, token);
+            const active = group.active.size === 1 && group.active.has(token);
+            return (`<button type="button" class="protagonista-actor${active ? ' active' : ''}"` +
+                ` data-value="${this._escapeHtml(token)}" title="Filtrar por ${this._escapeHtml(label)}">${text}</button>`);
+        });
+        const more = actors.length > CARD_CLICKABLE_MAX && !showAll ? '...' : '';
+        return parts.join(sep) + more;
+    }
+    /**
+     * Bind the filtering chips of an actor list (the block itself, or a list a `has-more` toggle
+     * just rebuilt: the nodes it throws away were bound too, and the new ones are not).
+     */
+    _bindActorChips(root) {
+        root.querySelectorAll('.protagonista-actor').forEach((chip) => {
+            chip.addEventListener('click', (e) => {
+                // Sin este corte el click sube a `.timeline-card`, que expande o colapsa la tarjeta: el
+                // filtro tendría que pelear con el gesto de abrir el detalle.
+                e.stopPropagation();
+                this._applyCardFilter(CARD_CLICKABLE_FIELD, chip.dataset.value ?? '');
+            });
+        });
+    }
+    /**
+     * Bind what the "Actores principales" block has beyond its markup: the chips that filter, and
+     * the `has-more` toggle, which swaps the first actors for all of them (re-rendering the list,
+     * chips included, instead of writing the raw text like it used to).
+     */
+    _bindProtagonista(root, card) {
+        this._bindActorChips(root);
+        const prot = root.querySelector('.card-protagonista.has-more');
+        if (!prot)
+            return;
+        prot.addEventListener('click', (e) => {
+            e.stopPropagation();
+            prot.classList.toggle('expanded');
+            const list = prot.querySelector('.protagonista-list');
+            const expanded = prot.classList.contains('expanded');
+            list.innerHTML = this._buildActorsHtml(card.actores_principales || [], expanded);
+            this._bindActorChips(list);
+        });
     }
     /** Build the "Fuente" HTML block */
     _buildFuenteHtml(card) {
@@ -3624,20 +3694,7 @@ export default class Timeline {
         }
         if (protagFuenteSlot) {
             protagFuenteSlot.innerHTML = this._buildProtagonistaHtml(card) + this._buildFuenteHtml(card);
-            const prot = protagFuenteSlot.querySelector('.card-protagonista.has-more');
-            if (prot) {
-                prot.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    prot.classList.toggle('expanded');
-                    const list = prot.querySelector('.protagonista-list');
-                    if (prot.classList.contains('expanded')) {
-                        list.textContent = prot.dataset.full || '';
-                    }
-                    else {
-                        list.textContent = (card.actores_principales || []).slice(0, 3).join(', ') + '...';
-                    }
-                });
-            }
+            this._bindProtagonista(protagFuenteSlot, card);
         }
         if (mediaSlot) {
             mediaSlot.innerHTML = this._buildInlineImagesHtml(card) + this._buildInlineAdjuntosHtml(card);
@@ -4931,6 +4988,72 @@ export default class Timeline {
         this._syncSingleSelect(f);
         this._renderSelectTrigger(f);
         if (f.persist)
+            this._savePersistedFilterState();
+        this._applyFilters(true);
+    }
+    /**
+     * The group a chip inside a card filters through, or `null` when there is none to filter by:
+     * single mode has no panel at all (`_buildLayout` never runs there, so applying would throw),
+     * and a field the consumer did not declare — or declared without `cardClickable` — keeps the
+     * card exactly as it has always been, plain text.
+     */
+    _cardFilterGroup(field) {
+        if (this.singleId)
+            return null;
+        return this.filters.find((f) => f.field === field && f.cardClickable) ?? null;
+    }
+    /**
+     * Push `f.active` back into the DOM of its group. It exists for the one writer that changes the
+     * set without going through a control — the chips inside a card —: the checkboxes of a group are
+     * a view of that set, and a value that stays active inside the hidden tail of "Ver más" would be
+     * an applied filter nobody can see, so that group opens too. A `'select'` group redraws its rows
+     * and its trigger, which is what `_toggleSelectValue` does as well.
+     */
+    _syncFilterControl(f) {
+        if (f.type === 'select') {
+            this._syncSingleSelect(f);
+            this._renderSelectTrigger(f);
+            return;
+        }
+        let hiddenActive = false;
+        f.checkboxes.forEach((cb) => {
+            const on = f.active.has(cb.value);
+            cb.checked = on;
+            if (on && cb.closest('.filter-option-extra'))
+                hiddenActive = true;
+        });
+        if (hiddenActive && f.options)
+            f.options.classList.add('expanded');
+    }
+    /**
+     * Filter from a value the user clicked inside a card: every other group **and** the search term
+     * are dropped, and the clicked value becomes the only active one. Deliberately not a toggle —
+     * clicking it again just applies the same state (see `TimelineFilter.cardClickable`).
+     *
+     * It goes through `_applyFilters(true)` like any other control, so the toggles, the URL, the
+     * full map and the page reload of API mode all follow it without this method knowing about them.
+     */
+    _applyCardFilter(field, value) {
+        const target = this._cardFilterGroup(field);
+        if (!target)
+            return;
+        this.filters.forEach((g) => {
+            if (g === target || g.active.size === 0)
+                return;
+            g.active.clear();
+            this._syncFilterControl(g);
+        });
+        target.active.clear();
+        target.active.add(value);
+        this._syncFilterControl(target);
+        // Un término escrito es un filtro en uso: sin esto la lista se filtraría por el actor y por
+        // la búsqueda al mismo tiempo, y quedaría sin forma de ver qué está estrechando el resultado.
+        if (this.searchTerm !== '' || this.searchInput.value !== '') {
+            this.searchTerm = '';
+            this.searchInput.value = '';
+            this._closeSearch(true);
+        }
+        if (this.filters.some((g) => g.persist))
             this._savePersistedFilterState();
         this._applyFilters(true);
     }

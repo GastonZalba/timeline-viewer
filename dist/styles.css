@@ -517,6 +517,28 @@
   color: var(--tv-text-primary);
   font-weight: 600;
 }
+.publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-actor {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-actor:hover {
+  color: var(--tv-accent);
+  text-decoration: underline;
+}
+.publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-actor:focus-visible {
+  outline: 2px solid var(--tv-accent);
+  outline-offset: 1px;
+}
+.publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-actor.active {
+  color: var(--tv-accent);
+  font-weight: 600;
+}
 .publicaciones-container .timeline-item .timeline-card .card-protagonista.empty {
   font-style: italic;
   color: var(--tv-text-muted);

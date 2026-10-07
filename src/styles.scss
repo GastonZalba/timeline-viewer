@@ -673,6 +673,36 @@
           font-weight: 600;
         }
 
+        // Con un grupo `cardClickable` cada actor es un botón que filtra. Se lee como el texto que
+        // reemplaza (mismo font y color heredados) y solo el hover, el focus y el estado activo lo
+        // delatan: el bloque es una línea más de la tarjeta, no un menú.
+        .protagonista-actor {
+          font: inherit;
+          color: inherit;
+          background: none;
+          border: 0;
+          padding: 0;
+          margin: 0;
+          cursor: pointer;
+          border-radius: 3px;
+
+          &:hover {
+            color: var(--tv-accent);
+            text-decoration: underline;
+          }
+
+          &:focus-visible {
+            outline: 2px solid var(--tv-accent);
+            outline-offset: 1px;
+          }
+
+          // El único actor que el grupo está filtrando, para que el estado se lea sin abrir el panel.
+          &.active {
+            color: var(--tv-accent);
+            font-weight: 600;
+          }
+        }
+
         &.empty {
           font-style: italic;
           color: var(--tv-text-muted);

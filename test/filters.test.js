@@ -88,11 +88,12 @@ test('la opción `filters` arma los grupos del panel, en el orden declarado', ()
   assert.ok(menu, 'debería existir el panel de filtros');
   assert.equal(container.querySelectorAll('.filter-column').length, 2, 'esperaba 2 columnas');
   // Los grupos `select` no entran en la repartición de columnas: van en su propio bloque de ancho
-  // completo. Por eso el "Tono social" (el único `select` del demo) no aparece acá, y los cuatro
-  // grupos `menu` que quedan se reparten por mitades.
+  // completo. Por eso ni "Tono social" ni "Actores principales" aparecen acá, y los cuatro grupos
+  // `menu` que quedan se reparten por mitades.
   const selects = menu.querySelectorAll('.filter-selects .filter-select');
-  assert.equal(selects.length, 1, 'esperaba el bloque de selects del panel');
+  assert.equal(selects.length, 2, 'esperaba el bloque de selects del panel');
   assert.equal(selects[0].dataset.filterField, 'tonos_sociales');
+  assert.equal(selects[1].dataset.filterField, 'actores_principales');
   // La primera mitad de los grupos `menu` va en la primera columna, el resto en la segunda.
   assert.deepEqual(columnLabels(container, 0), ['Año publicación', 'Contenido']);
   assert.deepEqual(columnLabels(container, 1), ['Tipo de fuente', 'Fuente oficial']);
@@ -791,7 +792,7 @@ test('`group: "filtros_internos"` sin `internalButtons` no se renderiza, y el re
   });
   assert.equal(container.querySelector('#filtros-internos-wrap'), null, 'sin toolbar interno no hay flyout');
   assert.equal(container.querySelectorAll('.filter-menu .filter-option').length > 0, true, 'el panel se arma igual');
-  assert.equal(container.querySelectorAll('.filter-section').length, 5, 'los 5 grupos del panel');
+  assert.equal(container.querySelectorAll('.filter-section').length, 6, 'los 6 grupos del panel');
 });
 
 test('el taxónomo activo recalcula los conteos de los grupos declarados y derivados', () => {

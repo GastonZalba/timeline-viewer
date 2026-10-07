@@ -125,7 +125,7 @@ test.describe('filtros configurables en el navegador', () => {
     expect(headers.length).toBeLessThanOrEqual(3);
     expect(headers.every((t) => t.trim().length > 0)).toBe(true);
     // Y el panel conserva los suyos, uno por grupo, sin mezclarse con los del flyout.
-    expect(await page.locator('.filter-menu .filter-header').count()).toBe(5);
+    expect(await page.locator('.filter-menu .filter-header').count()).toBe(6);
     // Un botón se enciende con los valores de su propio destino: el del flyout, si el ejemplo
     // declara algún default ahí; el del panel, si alguno fuera en el panel (hoy no).
     const conDefaults = declaredDefaults('filtros_internos').size > 0;
