@@ -17,8 +17,8 @@
   // `validado !== true` (`.timeline-card.sin-validar`): el mismo `--tv-bg-card` virado al rojo o al
   // naranja, para que el estado se lea de un vistazo sin depender del badge. Los velos de la
   // miniatura son `rgb()` fijos, no variables.
-  --tv-bg-card-discarded: #3a1f26;
-  --tv-bg-card-unvalidated: #3d2a14;
+  --tv-bg-card-discarded: #451c1c;
+  --tv-bg-card-unvalidated: #331d32;
   --tv-bg-overlay: rgba(96, 165, 250, 0.07);
   --tv-bg-hover: rgba(0, 0, 0, 0.5);
   --tv-border-card: #0e1116;
@@ -44,6 +44,7 @@
   --tv-color-map-light: #fb6f00;
 
   --tv-work-note: #ef44a2;
+  --tv-descartado: #cb3536;
 }
 
 .publicaciones-container {
@@ -400,7 +401,7 @@
 
       .card-no-validado,
       .card-descartado {
-        background: #d97706;
+        background: var(--tv-work-note);
         color: #fff;
         font-size: 0.65rem;
         font-weight: 600;
@@ -413,7 +414,7 @@
       // El badge de "Descartado" comparte forma con los otros dos pero no color: el rojo del descarte
       // es el mismo que el del fondo de la carta de abajo.
       .card-descartado {
-        background: #cb3536;
+        background: var(--tv-descartado);
       }
 
       &.not-captured {
@@ -478,6 +479,13 @@
       // `background-image` de la base. El wrap también se tiñe, que es lo que se ve mientras carga.
       &.descartada {
         background: var(--tv-bg-card-discarded);
+        background: repeating-linear-gradient(
+          -45deg,
+          var(--tv-bg-card),
+          var(--tv-bg-card) 10px,
+          var(--tv-bg-card-discarded) 10px,
+          var(--tv-bg-card-discarded) 20px
+        );
 
         .card-image-wrap {
           background: var(--tv-bg-card-discarded);

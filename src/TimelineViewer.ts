@@ -627,6 +627,24 @@ const FULLMAP_FOCUS_DURATION = 400;
 const FULLMAP_DETAIL_TOP_MIN_WIDTH = 1700;
 
 /**
+ * Margen (px) con el que el punto seleccionado tiene que quedar de la ficha del mapa general y de
+ * los bordes del mapa: es el radio del círculo que se pinta con la ficha abierta (marker base +
+ * `TEMAS_MAP_SELECTED_RADIUS_DELTA` + `TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`, o sea 9+3+4=16).
+ * Con menos margen la corrección dejaría el círculo rozando el borde del panel, que es el mismo
+ * problema a medio resolver.
+ */
+const FULLMAP_PANEL_CLEAR_PX =
+  TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA + TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS;
+
+/**
+ * Milisegundos del desplazamiento de vista que corre cuando la ficha del mapa general abre encima
+ * del punto que la abrió (ver `_adjustFullMapViewForPanel`). Más corto que `FULLMAP_FOCUS_DURATION`
+ * porque el vuelo es corto —del orden del ancho del panel— y no cambia de zoom; igual que allá, con
+ * duración y no con `setCenter` para que se lea como un ajuste y no como un corte.
+ */
+const FULLMAP_PANEL_PAN_DURATION = 200;
+
+/**
  * Normalize a text so it can be searched as a plain substring: without accents and without case,
  * so "politica" finds "Política" and the other way around. Done **once per value**, when the list
  * of a `'select'` group is built, which is what keeps typing in the search box cheap on a field
@@ -4813,6 +4831,96 @@ export default class Timeline {
       // fallo se viera solo en unos). En local `detail` es `null` y manda `card`, que ya es entero.
       this._bindFullMapCardTemas(cardEl, detail ?? card);
       this._revealFullMapTema(cardEl, point.idSubtema, true);
+      // La ficha acaba de aparecer encima del mapa: si tapa el círculo que la abrió, la vista se
+      // corre lo justo para dejarlo a la vista. Va después del reveal porque mide el panel ya con su
+      // contenido final, y con la key de esta apertura por si mientras llegaba el detalle la
+      // selección cambió a otro punto (entonces la corrección es de otro círculo y se saltea).
+      void this._adjustFullMapViewForPanel(point, key);
+    });
+  }
+
+  /**
+   * Si la ficha recién abierta tapa el punto con el que se abrió, desplazar la vista —sin zoom—
+   * hasta dejarlo visible.
+   *
+   * La ficha es un panel flotante abajo a la izquierda (`.fullmap-detail`) y abrirlo no mueve la
+   * vista: un punto clickeado en la mitad izquierda queda debajo del panel y el usuario pierde de
+   * vista justo lo que eligió. La regla es "la vista se mueve lo mínimo necesario", y como el panel
+   * ocupa el flanco izquierdo hay dos direcciones posibles: pasar el punto por la **derecha** del
+   * panel (el panel estorba a la izquierda, así que salir por la derecha es el movimiento esperado)
+   * o **subirlo** por encima de su borde superior, para cuando la derecha no cabe en el mapa —panel
+   * casi tan ancho como el viewport—. Se elige la de menor vuelo, y si ninguna deja al círculo entero
+   * dentro del mapa no se mueve nada: un desplazamiento que saca al punto del canvas no cumple con
+   * "que quede visible".
+   *
+   * La coordenada que hay que despejar es donde el círculo **está pintado**:
+   * `selectedSpiderCenter()` si el `declutter` lo dejó en un anillo del spider (ahí está el círculo
+   * agrandado, no la coordenada propia, que es el centro del anillo), y la `lon`/`lat` del punto si
+   * pinta en su sitio. `refreshStyles()` ya corrió en `_openFullMapCard` antes de cualquier `await`,
+   * así que la lectura del anillo es del estado repintado con esta selección.
+   *
+   * `key` es la selección con la que se abrió la ficha: si mientras se esperaba `ol` el usuario
+   * clickeó otro punto —o la cerró—, esta corrección ya no es de ese círculo y se saltea.
+   */
+  protected async _adjustFullMapViewForPanel(point: FullMapPoint, key: string): Promise<void> {
+    const handle = this._fullMapHandle;
+    const panel = this.fullMapDetail;
+    if (!handle || !panel || panel.hidden) return;
+    // El caso del anillo no espera nada (la coordenada ya está proyectada); solo la propia tiene que
+    // pasar por `fromLonLat`, que es lo que hace falta `ol` para resolver.
+    let coord = handle.selectedSpiderCenter();
+    if (!coord) {
+      if (!Number.isFinite(point.lon) || !Number.isFinite(point.lat)) return;
+      const ol = await this._loadOpenLayers();
+      if (this._fullMapSelectedKey !== key || panel.hidden) return;
+      coord = ol.fromLonLat([point.lon, point.lat]);
+    }
+    const map = handle.map;
+    const view = map.getView();
+    // `getPixelFromCoordinate` puede devolver `null` si el mapa todavía no tiene frame state (el
+    // `.d.ts` no lo dice, pero el runtime corta por `frameState_`), y un rect en cero es el panel
+    // u oculto: en cualquiera de los dos casos no hay nada que medir.
+    const px = map.getPixelFromCoordinate(coord);
+    const mapRect = map.getTargetElement().getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    if (!px || !mapRect.width || !panelRect.width) return;
+    const clear = FULLMAP_PANEL_CLEAR_PX;
+    const markerX = mapRect.left + px[0];
+    const markerY = mapRect.top + px[1];
+    // ¿El círculo choca con la ficha? Es el rect del panel inflado por el radio contra el centro del
+    // círculo: en las esquinas es conservador (max-norm en vez de distancia) y acá alcanza, porque
+    // lo que se decide es "hace falta correr la vista" y un falso positivo solo agrega un vuelo
+    // mínimo que dejaba al punto igual de visible.
+    const covered =
+      markerX > panelRect.left - clear &&
+      markerX < panelRect.right + clear &&
+      markerY > panelRect.top - clear &&
+      markerY < panelRect.bottom + clear;
+    if (!covered) return;
+    // La barra flota encima del mapa (`z-index: 2`) igual que la ficha: subir el punto hasta el borde
+    // del panel lo metería debajo de la barra, que es el mismo problema con otro obstáculo. El techo
+    // real es el mayor entre el top del canvas y el bottom vivo de `.featured-row`.
+    const toolbarBottom = this.featuredRow ? this.featuredRow.getBoundingClientRect().bottom : 0;
+    const visibleTop = Math.max(mapRect.top, toolbarBottom) + clear;
+    // Los dos candidatos, en píxeles de pantalla, cada uno con su prueba de que el círculo sigue
+    // entero en el mapa después del vuelo (mismo margen en el borde de llegada). En empate gana la
+    // derecha, que es la dirección esperada contra un panel que estorba a la izquierda.
+    const moves: { dx: number; dy: number }[] = [];
+    const rightX = panelRect.right + clear;
+    if (rightX + clear <= mapRect.right) moves.push({ dx: rightX - markerX, dy: 0 });
+    const upY = panelRect.top - clear;
+    if (upY - clear >= visibleTop) moves.push({ dx: 0, dy: upY - markerY });
+    if (!moves.length) return;
+    const move = moves.reduce((a, b) => (Math.abs(b.dx + b.dy) < Math.abs(a.dx + a.dy) ? b : a));
+    const res = view.getResolution();
+    const center = view.getCenter();
+    if (!res || !center) return;
+    // Pixel → coordenada de vista: en X `px = (coord − centro) / res`, o sea que correr el centro
+    // hacia atrás hace que el punto avance; en Y el eje está invertido (`py = (centro − coord) /
+    // res`). Solo se anima el `center`: sin `resolution` la vista se desplaza sin acercar nada.
+    view.animate({
+      center: [center[0] - move.dx * res, center[1] + move.dy * res],
+      duration: FULLMAP_PANEL_PAN_DURATION
     });
   }
 
