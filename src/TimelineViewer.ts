@@ -188,6 +188,10 @@ const TEMAS_MAP_MARKER_RING_COLOR = '#ffffff';
  * apart. It is the marker diameter —18px, so the two numbers already touch at this distance— plus a
  * few px of slack, because a ringer separation of one or two px still reads as a single blob while
  * the map keeps zooming out.
+ *
+ * It is also the **widest a group is allowed to get**: `declutter` merges a marker only when it sits
+ * within this distance of every member of the group, so no spiderfy ring and no cluster ever stands
+ * for more than this across (see the complete linkage in `declutter`).
  */
 const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
 
@@ -206,15 +210,22 @@ const TEMAS_MAP_SPIDER_GAP = 1;
  * The line runs from the coordinate to the center of the circle and is painted **before** it, so
  * the last `TEMAS_MAP_MARKER_RADIUS` px stay hidden under the marker's own fill — which is why it
  * does not need a gap at its tip the way an arrow would.
- *
- * The tone color of the topic, like the marker it explains: the line answers "which one of the
- * circles is mine", and the answer is the one that carries the same color and number.
  */
 const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
+/**
+ * Color of that line, white for the same reason as `TEMAS_MAP_MARKER_RING_COLOR`: it is drawn over
+ * a raster map, and white is the one color that reads on any tile. The line does not need to carry
+ * the topic's tone anymore — the marker it points to keeps the color and the number that identify
+ * it — so it stays neutral and the tone colors are left to the circles.
+ */
+const TEMAS_MAP_SPIDER_LINE_COLOR = '#ffffff';
 
 /**
  * Zoom below which overlapping markers are drawn as a single cluster marker —one circle carrying
- * the count of the topics it stands for— instead of being spread apart by the spiderfy.
+ * the count of the topics it stands for— instead of being spread apart by the spiderfy. **This is
+ * the knob for how far the spiderfy reaches**: below this zoom no group is ever spread — every
+ * overlap becomes a count and only a lone topic keeps its own circle—, so a far view only ever
+ * aggregates, and where the spiderfy comes back it is capped by `TEMAS_MAP_SPIDER_MAX_GROUP`.
  *
  * The breakage it prevents is screen-space, not geographic: at a far view hundreds of points land
  * inside a few dozen pixels, and the spiderfy answers with a ring whose radius grows with the count
@@ -223,11 +234,12 @@ const TEMAS_MAP_SPIDER_LINE_WIDTH = 1.5;
  * whatever the count.
  *
  * The threshold only picks the mode the far view starts in; what guarantees the spiderfy never
- * grows past a readable ring in the range where clustering is available is its own cap,
- * `TEMAS_MAP_SPIDER_MAX_GROUP`. That pairing is why this value can be conservative: 7 is country
- * scale on the default view. Above `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` the cap is off by design.
+ * grows past a readable ring in the range where it is allowed back is its own cap,
+ * `TEMAS_MAP_SPIDER_MAX_GROUP`. That pairing is why this value can be conservative: at 8 a 40px
+ * cluster still stands for a couple of dozen km on the default view. Above
+ * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` the cap is off by design.
  */
-const TEMAS_MAP_CLUSTER_MAX_ZOOM = 7;
+const TEMAS_MAP_CLUSTER_MAX_ZOOM = 8;
 
 /**
  * Screen distance, in pixels, below which two markers become one cluster at the far view. It is
@@ -235,6 +247,11 @@ const TEMAS_MAP_CLUSTER_MAX_ZOOM = 7;
  * ring), so clusters have to sit further apart than two 18px markers do, or two counts read as one
  * blob. Below this distance a pair of points merges into one icon with the total, which is the
  * standard reading of a general view — nothing is lost, the count says how many are in there.
+ *
+ * It is also the **widest a cluster is allowed to get across**, for the same reason its sibling
+ * above caps the spiderfy: the grouping takes every pair of members within this distance, so the
+ * far view trades one giant count —whose centroid can land half a screen away from any marker— for
+ * several small ones sitting on the markers they stand for.
  */
 const TEMAS_MAP_CLUSTER_DISTANCE = 40;
 
@@ -403,6 +420,15 @@ const TEMAS_MAP_TOGGLE_CHEVRON_SVG =
 const FULLMAP_STATE_LOADING = 'loading';
 const FULLMAP_STATE_EMPTY = 'empty';
 const FULLMAP_STATE_ERROR = 'error';
+
+/**
+ * The one loading text of the general map, in the two moments there is one: the first open (the
+ * map does not exist yet) and every `GET {url}/points` of API mode with the map already on screen
+ * (the markers of the filter that just ended go away right away and this is what says why). Same
+ * criterion as the list, where `_renderApiLoading` drops the cards for skeletons —just that a map
+ * has no silhouette to placeholder, so the state is the message.
+ */
+const FULLMAP_LOADING_TEXT = 'Cargando elementos del mapa…';
 
 /**
  * Los dos rótulos del botón del mapa general, y el ícono de cada estado.
@@ -3479,7 +3505,7 @@ export default class Timeline {
       // El punto va en la propiedad `point` del feature y no cerrado en la función por lo mismo: la
       // selección se resuelve en cada repintado, así que la función tiene que poder leer el estado de
       // **ahora** y no el del momento en que se creó el feature.
-      const connector = new ol.Stroke({ color: p.color, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
+      const connector = new ol.Stroke({ color: TEMAS_MAP_SPIDER_LINE_COLOR, width: TEMAS_MAP_SPIDER_LINE_WIDTH });
       feature.set('point', p);
       // El estilo "pelado" se cachea por `color + seleccionado` porque se resuelve en cada repintado de
       // cada marker: sin el cache, mover el mapa crearía un `Style` por feature por frame.
@@ -3661,13 +3687,15 @@ export default class Timeline {
      * Three modes: the first two picked by `TEMAS_MAP_CLUSTER_MAX_ZOOM`, the third by
      * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`:
      *
-     * - **Spiderfy** (near view, below `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`): every marker starts at its
+     * - **Spiderfy** (near view, from `TEMAS_MAP_CLUSTER_MAX_ZOOM` up to
+     *   `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`): every marker starts at its
      *   own coordinate, and the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another
      *   are re-laid out on a circle around the group's centroid, each with the line back to its
      *   real coordinate. Unchanged from the original behavior, except that a group bigger than
      *   `TEMAS_MAP_SPIDER_MAX_GROUP` is no longer spread —that ring grows with the count and is
      *   what broke the far view— and is clustered instead.
-     * - **Cluster** (far view): every group within `TEMAS_MAP_CLUSTER_DISTANCE` becomes **one**
+     * - **Cluster** (far view, `zoom < TEMAS_MAP_CLUSTER_MAX_ZOOM`): every group within
+     *   `TEMAS_MAP_CLUSTER_DISTANCE` becomes **one**
      *   marker —a circle with the count— at the group's centroid. The leader feature paints it, the
      *   rest paint nothing, and the only lines on screen are the ones the spiderfy still owns at a
      *   near view.
@@ -3701,7 +3729,7 @@ export default class Timeline {
       const clusterMode = (zoom ?? TEMAS_MAP_CLUSTER_MAX_ZOOM) < TEMAS_MAP_CLUSTER_MAX_ZOOM;
       // The cap of `TEMAS_MAP_SPIDER_MAX_GROUP` turns off at a close zoom, where a cluster could
       // not be dissolved by clicking it (see `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`). The two flags can
-      // never be on together —7 vs 16—, so `clusterMode` below keeps deciding alone.
+      // never be on together —8 vs 15—, so `clusterMode` below keeps deciding alone.
       const noCluster = (zoom ?? TEMAS_MAP_NO_CLUSTER_MIN_ZOOM) >= TEMAS_MAP_NO_CLUSTER_MIN_ZOOM;
       const threshold = clusterMode ? TEMAS_MAP_CLUSTER_DISTANCE : TEMAS_MAP_SPIDER_THRESHOLD;
 
@@ -3716,7 +3744,8 @@ export default class Timeline {
         features[i].set('cluster', undefined);
         features[i].set('hidden', undefined);
       }
-      // The open point never joins a group: marking it used keeps it out of the BFS below, so it is
+      // The open point never joins a group: marking it used keeps it out of the grouping loop below,
+      // so it is
       // painted at its own coordinate —with its selected circle, which the z index puts over any
       // cluster next to it— and it gets its own point target at the end of this pass.
       for (let i = 0; i < n; i++) {
@@ -3725,22 +3754,32 @@ export default class Timeline {
 
       for (let i = 0; i < n; i++) {
         if (used[i] || !screens[i]) continue;
-        // Breadth-first growth: two markers belong together when either is within the threshold of
-        // **any** member, so a chain of near markers is spread as a single group instead of in
-        // arbitrary pairs.
+        // Complete-linkage growth: a marker joins only when it is within the threshold of **every**
+        // member, never of just one of them, so no group can span more than the threshold from edge
+        // to edge. The alternative —accepting a point near any member— chains: a row of markers
+        // forty px apart would merge into a single group covering half the screen, with a centroid
+        // that can land where there is no marker at all. Every pair of the group is checked, because
+        // the distance is symmetric: when the later member is pushed it is measured against all the
+        // ones already in, and a candidate rejected now would fail against any superset too — the
+        // group only grows—, so it is left for a later group to seed.
         const group = [i];
         used[i] = true;
-        for (let q = 0; q < group.length; q++) {
-          const a = screens[group[q]]!;
-          for (let j = 0; j < n; j++) {
-            if (used[j] || !screens[j]) continue;
-            const b = screens[j]!;
+        for (let j = 0; j < n; j++) {
+          if (used[j] || !screens[j]) continue;
+          const b = screens[j]!;
+          let joins = true;
+          for (const k of group) {
+            const a = screens[k]!;
             const dx = a[0] - b[0];
             const dy = a[1] - b[1];
-            if (dx * dx + dy * dy <= threshold * threshold) {
-              used[j] = true;
-              group.push(j);
+            if (dx * dx + dy * dy > threshold * threshold) {
+              joins = false;
+              break;
             }
+          }
+          if (joins) {
+            used[j] = true;
+            group.push(j);
           }
         }
         // A lone marker is painted on its own coordinate and is left alone.
@@ -3756,12 +3795,10 @@ export default class Timeline {
         cy /= group.length;
 
         if (clusterMode || (group.length > TEMAS_MAP_SPIDER_MAX_GROUP && !noCluster)) {
-          // One circle with the count, at the centroid. The color is the tone the members share, or
-          // the dark neutral when they are a mix —painting a mixed group green because its first
-          // member is green would say something the data does not.
+          // One circle with the count, at the centroid. The color is dark neutral
           const coord = map.getCoordinateFromPixel([cx, cy]);
           const tone = current[group[0]].color;
-          const color = group.every((k) => current[k].color === tone) ? tone : TEMAS_MAP_CLUSTER_FILL_DARK;
+          const color = TEMAS_MAP_CLUSTER_FILL_DARK;
           features[group[0]].set('cluster', {
             count: group.length,
             color,
@@ -3913,11 +3950,13 @@ export default class Timeline {
      * tiene guardado pertenece al set viejo; después los features, y recién entonces el `declutter`,
      * que es el que vuelve a armar `targets` con los puntos nuevos.
      *
-     * Un set vacío no hace nada: un mapa sin puntos no es un mapa, y el que decide qué mostrar sin
-     * puntos es `_refreshFullMap` (que escribe el mensaje), no esto.
+     * Un set vacío **sí** hace algo: borra los markers y deja la capa de tiles sola. Es lo que pasa
+     * cuando cambia un filtro en API mientras se pide el nuevo set —los puntos del filtro que terminó
+     * desaparecen de inmediato, igual que las tarjetas de la lista, y el cartelito de carga es lo que
+     * explica por qué—. El estado final lo decide igual `_refreshFullMap`: si el set nuevo viene vacío
+     * destruye el mapa y escribe el mensaje, si viene con puntos acá entran de una.
      */
     const updatePoints = (next: P[]): void => {
-      if (!next.length) return;
       clearHover();
       current = next;
       features = current.map(featureOf);
@@ -4092,17 +4131,32 @@ export default class Timeline {
    * volvía a pedir los PNG— y además se llevaba el `View.fit`, con lo que cada cambio de filtro
    * devolvía la vista al centro y perdía el pan y el zoom que el usuario había dejado.
    *
-   * El estado de carga tampoco se escribe cuando ya hay un mapa en pantalla: el mensaje "Cargando…"
-   * taparía el mapa para reemplazarlo por el mismo mapa. El `hidden` del estado previo lo resuelve
-   * `_setFullMapStatus`, y el error y el vacío sí se muestran —en esos dos casos no hay mapa que dejar
-   * en paz: en el vacío hay que tirar los puntos viejos abajo.
+   * El estado de carga sí se escribe cuando ya hay un mapa en pantalla, y solo en API: es el mismo
+   * criterio que la lista, donde las tarjetas desaparecen de inmediato y los skeletons toman su lugar
+   * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el cartelito
+   * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparece son los markers: los del filtro
+   * que terminó no significan nada para el que está por venir, y dejarlos mientras el server tarda
+   * uno o dos segundos sería una mentira con forma de respuesta vieja. La capa de tiles y la vista
+   * quedan —eso es justamente lo que `updatePoints` preserva—, así que se lee como "el mapa se está
+   * actualizando" y no como "el mapa se rompió". Cierra además la ficha del punto abierto, porque su
+   * marker acaba de irse. En modo local no hay nada que esperar (`_fullMapPointsFrom` es síncrono),
+   * así que solo se escribe el mensaje si el mapa todavía no existe (ahí sí se espera `ol`).
+   *
+   * El error y el vacío sí se muestran en los dos casos —en esos dos no hay mapa que dejar en paz:
+   * en el vacío hay que tirar los puntos viejos abajo—, y el vacío sigue siendo el único que
+   * destruye el mapa.
    */
   protected async _refreshFullMap(): Promise<void> {
     const canvas = this.fullMapCanvas;
     if (!canvas) return;
     const seq = ++this._fullMapSeq;
     const mounted = Boolean(this._fullMapHandle);
-    if (!mounted) this._setFullMapStatus(FULLMAP_STATE_LOADING, 'Cargando los puntos del mapa…');
+    const waiting = this.api;
+    if (!mounted || waiting) this._setFullMapStatus(FULLMAP_STATE_LOADING, FULLMAP_LOADING_TEXT);
+    if (mounted && waiting) {
+      this._closeFullMapCard();
+      this._fullMapHandle?.updatePoints([]);
+    }
     const loaded = this.api ? await this._fetchApiPoints() : this._fullMapPointsFrom(this.allCards);
     // La vista pudo cerrarse, o el filtro cambiar otra vez, mientras se pedían los puntos.
     if (seq !== this._fullMapSeq || !this._fullMapOpen || !canvas.isConnected) return;
@@ -4124,6 +4178,11 @@ export default class Timeline {
       return;
     }
     this._fullMapHandle = await this._mountFullMap(canvas, loaded);
+    // El mapa pudo montarse con los puntos de una query que ya no es la vigente: el cambio llegó
+    // mientras `ol` se importaba, y el `seq` de arriba no alcanza a cortarlo porque el await del
+    // import ocurre **después** del chequeo. Sin este segundo cierre los puntos viejos quedarían
+    // pintados bajo el cartelito de carga hasta que responda el query nuevo.
+    if (seq !== this._fullMapSeq) this._fullMapHandle?.updatePoints([]);
   }
 
   /**
@@ -4552,6 +4611,10 @@ export default class Timeline {
    * Every message is in Spanish because that is the language of the whole component, and all of them
    * are of the visible kind only in API mode, because in local mode the points are already in memory
    * and there is no request to wait for.
+   *
+   * The loading state also writes `aria-busy` on the canvas —the same flag `_renderApiLoading` puts on
+   * the list—, and this is the only place that touches it: a flag kept next to the message it belongs
+   * to cannot desync from it.
    */
   protected _setFullMapStatus(state: string | null, text: string): void {
     const el = this.fullMapStatus;
@@ -4560,11 +4623,14 @@ export default class Timeline {
       el.textContent = '';
       el.hidden = true;
       el.removeAttribute('data-state');
+      this.fullMapCanvas?.removeAttribute('aria-busy');
       return;
     }
     el.textContent = text;
     el.setAttribute('data-state', state);
     el.hidden = false;
+    if (state === FULLMAP_STATE_LOADING) this.fullMapCanvas?.setAttribute('aria-busy', 'true');
+    else this.fullMapCanvas?.removeAttribute('aria-busy');
   }
 
   /** Build the "Videos vinculados" HTML block */

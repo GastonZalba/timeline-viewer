@@ -47,22 +47,21 @@
   display: none;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-status {
-  display: flex;
-  padding: 6px 14px;
-  border-radius: 42px;
-  width: fit-content;
-  margin: 10px auto;
+  color: #fff;
+  display: inline;
+  border-radius: 0;
+  align-content: center;
   font-size: 0.7rem;
   font-weight: 300;
   font-style: italic;
-  color: var(--tv-text-muted);
   text-align: center;
-  background: rgba(14, 17, 22, 0.85);
+  background: rgba(14, 17, 22, 0.493);
   z-index: 3;
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-status[hidden] {
   display: none;
@@ -1285,7 +1284,7 @@
   height: 18px;
   border-radius: 50%;
   background: var(--tema-tone-color, var(--tv-accent));
-  color: var(--tv-text-dark);
+  color: #000;
   font-size: 0.62rem;
   font-weight: 700;
   line-height: 1;
@@ -1992,6 +1991,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+  max-height: 700px;
+  overflow-y: auto;
 }
 .publicaciones-container .publicaciones-timeline-section .filter-menu .filter-column {
   flex: 1;

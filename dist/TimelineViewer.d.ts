@@ -1455,10 +1455,20 @@ export default class Timeline {
      * volvía a pedir los PNG— y además se llevaba el `View.fit`, con lo que cada cambio de filtro
      * devolvía la vista al centro y perdía el pan y el zoom que el usuario había dejado.
      *
-     * El estado de carga tampoco se escribe cuando ya hay un mapa en pantalla: el mensaje "Cargando…"
-     * taparía el mapa para reemplazarlo por el mismo mapa. El `hidden` del estado previo lo resuelve
-     * `_setFullMapStatus`, y el error y el vacío sí se muestran —en esos dos casos no hay mapa que dejar
-     * en paz: en el vacío hay que tirar los puntos viejos abajo.
+     * El estado de carga sí se escribe cuando ya hay un mapa en pantalla, y solo en API: es el mismo
+     * criterio que la lista, donde las tarjetas desaparecen de inmediato y los skeletons toman su lugar
+     * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el cartelito
+     * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparece son los markers: los del filtro
+     * que terminó no significan nada para el que está por venir, y dejarlos mientras el server tarda
+     * uno o dos segundos sería una mentira con forma de respuesta vieja. La capa de tiles y la vista
+     * quedan —eso es justamente lo que `updatePoints` preserva—, así que se lee como "el mapa se está
+     * actualizando" y no como "el mapa se rompió". Cierra además la ficha del punto abierto, porque su
+     * marker acaba de irse. En modo local no hay nada que esperar (`_fullMapPointsFrom` es síncrono),
+     * así que solo se escribe el mensaje si el mapa todavía no existe (ahí sí se espera `ol`).
+     *
+     * El error y el vacío sí se muestran en los dos casos —en esos dos no hay mapa que dejar en paz:
+     * en el vacío hay que tirar los puntos viejos abajo—, y el vacío sigue siendo el único que
+     * destruye el mapa.
      */
     protected _refreshFullMap(): Promise<void>;
     /**
@@ -1624,6 +1634,10 @@ export default class Timeline {
      * Every message is in Spanish because that is the language of the whole component, and all of them
      * are of the visible kind only in API mode, because in local mode the points are already in memory
      * and there is no request to wait for.
+     *
+     * The loading state also writes `aria-busy` on the canvas —the same flag `_renderApiLoading` puts on
+     * the list—, and this is the only place that touches it: a flag kept next to the message it belongs
+     * to cannot desync from it.
      */
     protected _setFullMapStatus(state: string | null, text: string): void;
     /** Build the "Videos vinculados" HTML block */
