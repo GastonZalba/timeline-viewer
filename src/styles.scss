@@ -18,7 +18,6 @@
   // naranja, para que el estado se lea de un vistazo sin depender del badge. Los velos de la
   // miniatura son `rgb()` fijos, no variables.
   --tv-bg-card-discarded: #451c1c;
-  --tv-bg-card-unvalidated: #331d32;
   --tv-bg-overlay: rgba(96, 165, 250, 0.07);
   --tv-bg-hover: rgba(0, 0, 0, 0.5);
   --tv-border-card: #0e1116;
@@ -40,11 +39,12 @@
   // Offset de la barra de herramientas pegada del modo fullpage. Sube este valor si la página
   // del consumidor ya tiene un header propio fijo, para que la barra no quede debajo.
   --tv-sticky-top: 6px;
-  --tv-color-map: #e6761a;
-  --tv-color-map-light: #fb6f00;
+  --tv-color-map: #dbdbdb;
+  --tv-color-map-light: #fff;
 
-  --tv-work-note: #ef44a2;
-  --tv-descartado: #cb3536;
+  --tv-work-note: #e04733;
+  --tv-bg-card-unvalidated: #452c1c;
+  --tv-descartado: #ca2424;
 }
 
 .publicaciones-container {
@@ -896,13 +896,13 @@
         }
 
         &:hover {
-          background: rgba(230, 118, 26, 0.123);
+          background: rgba(255, 255, 255, 0.123);
           border: 1px solid var(--tv-color-map-light);
           color: var(--tv-color-map-light);
         }
 
         &[aria-expanded='true'] {
-          background: rgba(230, 118, 26, 0.2);
+          background: rgba(255, 255, 255, 0.2);
           border: 1px solid var(--tv-color-map-light);
           color: var(--tv-color-map-light);
 
@@ -1775,10 +1775,10 @@
       // general solo la marca, así que `_ensureCardDetail` puede reescribir el detalle entero sin que
       // el resaltado se pierda.
       &.tema-selected {
-        background: color-mix(in srgb, var(--tema-tone-color, var(--tv-accent)) 18%, transparent);
+        background: color-mix(in srgb, var(--tema-tone-color, var(--tv-accent)) 10%, transparent);
         border: 1px solid var(--tema-tone-color);
-        border-left: 0;
-        box-shadow: inset 2px 0 0 var(--tema-tone-color, var(--tv-accent));
+        border-left-width: 4px;
+        box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.5);
         border-radius: 4px;
         padding: 10px;
 
@@ -2364,24 +2364,25 @@
       background: var(--tv-work-note);
 
       &:hover {
-        background: var(--tv-work-note);
+        background: rgba(247, 86, 65, 0.7);
       }
 
       &.active {
-        background: rgba(239, 68, 68, 0.25);
+        background: rgba(224, 71, 51, 0.25);
         color: var(--tv-text-on-primary);
 
         &:hover {
-          background: rgba(239, 68, 68, 0.5);
+          background: rgba(224, 71, 51, 0.55);
         }
       }
     }
 
     .filtros-internos-toggle {
       position: relative;
+      background: rgba(224, 71, 51, 0.25);
 
       &.open {
-        background: rgba(239, 68, 68, 0.25);
+        background: var(--tv-work-note);
         color: var(--tv-text-on-primary);
       }
 
@@ -2450,23 +2451,28 @@
     // controles de la barra: `display: none` en la base, `inline-flex` con `&.expanded`. El mapa
     // general no es una parte del timeline, así que no tiene sentido ofrecerlo con la lista colapsada.
     .fullmap-toggle {
-      background: none;
       border: 1px solid var(--tv-color-map);
       color: var(--tv-text-on-primary);
       padding: 8px;
       border-radius: 42px;
       height: 34px;
-      width: 50px;
+      width: 60px;
       min-width: 50px;
       cursor: pointer;
       transition: all 0.3s ease;
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(230, 118, 26, 0.1);
+      // Ícono + chevron: sin el `gap` los dos svgs quedan pegados y la pareja se lee como un solo
+      // glifo. Los 4px entran en los 42px de contenido del botón (60 de ancho - 16 de padding - 2
+      // de borde): icono 15 + su `margin-left` 4 + gap 4 + chevron 15 = 38, con `box-sizing:
+      // border-box`.
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.2);
 
       &:hover {
-        background: rgba(230, 118, 26, 0.2);
+        background: rgba(255, 255, 255, 0.3);
+        border: 1px solid var(--tv-color-map);
       }
 
       // El estado sale del `aria-expanded` que escribe el handler, como el del botón del mapa de la
@@ -2484,7 +2490,15 @@
         display: block;
         width: 15px;
         height: 15px;
-        fill: var(--tv-color-map);
+        &:first-child {
+          fill: var(--tv-color-map);
+          &:not(:last-child) {
+            margin-left: 4px;
+          }
+        }
+        &.fullmap-toggle-chevron {
+          stroke: var(--tv-color-map);
+        }
       }
 
       &:focus-visible {

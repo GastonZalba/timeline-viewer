@@ -251,15 +251,18 @@ const TEMAS_MAP_CLUSTER_FILL_DARK = '#0e1116';
 /** Color of the count painted on a cluster: white, over the tone color or over the dark fill */
 const TEMAS_MAP_CLUSTER_TEXT_COLOR = '#ffffff';
 /**
- * Zoom levels a click on a cluster adds to the view. Two steps dissolve a cluster from any
- * starting zoom below `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` —where clusters still exist— without the
- * dead click a `fit` to the members' extent would produce when that extent already fills the
- * viewport — a fit that would not zoom in looks like nothing happened.
+ * Zoom levels a click on a cluster adds to the view: four, a deliberate jump and not a
+ * level-by-level walk, so that a couple of clicks take the far view —where `clusterMode` draws
+ * every group as a count— down to where the spiderfy spreads them. The call site clamps it against
+ * `TEMAS_MAP_FIT_MAX_ZOOM`, so near the ceiling the step is just whatever is left. A `fit` to the
+ * members' extent is never the answer: when that extent already fills the viewport it would not
+ * zoom at all and the click would look dead.
  */
-const TEMAS_MAP_CLUSTER_ZOOM_STEP = 2;
+const TEMAS_MAP_CLUSTER_ZOOM_STEP = 4;
 /**
- * Duration, in ms, of the zoom a click on a cluster animates. Not zero for the same reason as
- * `FULLMAP_FOCUS_DURATION`: the view is on screen, and the interpolation is what fires the
+ * Duration, in ms, of the zoom a click on a cluster animates. Deliberately **not** zero, unlike the
+ * focus of a topic from the panel (`_focusFullMapTema`): this is navigation over a map the user is
+ * already reading, so the interpolation is what shows where the zoom is heading, and it fires the
  * `moveend`s that re-run `declutter` on the way to the new zoom, dissolving the cluster as it goes.
  */
 const TEMAS_MAP_CLUSTER_ZOOM_DURATION = 400;
@@ -393,6 +396,23 @@ const TEMAS_MAP_NO_GEOM_SVG = '<svg version="1.1" xmlns="http://www.w3.org/2000/
  */
 const TEMAS_MAP_TOGGLE_CHEVRON_SVG = '<svg class="card-temas-map-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="6,9 12,15 18,9"/></svg>';
 /**
+ * Chevron of the general-map button of the toolbar, pointing **right** (the card's one points down;
+ * this button sits at the end of the toolbar row, so right reads as "the map is this way").
+ *
+ * It only travels with the **closed** markup: `_buildFullMapToggleHtml` emits it next to the map
+ * icon, and `_applyFullMapState` drops it when the view opens, leaving the close icon alone —el `>`
+ * dice "adentro del mapa", y estando en el mapa no hay nada hacia donde apuntar—. The SCSS keys off
+ * the class: `.fullmap-toggle svg` sizes both children to the icon's 15px, and
+ * `&.fullmap-toggle-chevron` es el que pinta el stroke —sin esa clase el `X` del estado abierto, que
+ * también es un svg, heredaría esa regla—, mientras que `fill="none"` vive en el markup porque el
+ * `fill` de `svg:first-child` es solo para el ícono del mapa.
+ *
+ * Los dos caminos que reescriben el `innerHTML` del botón (`_buildFullMapToggleHtml` y
+ * `_applyFullMapState`) tienen que coincidir: la asignación pinta el botón entero en cada cambio de
+ * estado, así que un chevron que uno de los dos olvide aparece o desaparece en el momento equivocado.
+ */
+const FULLMAP_TOGGLE_CHEVRON_SVG = '<svg class="fullmap-toggle-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9,6 15,12 9,18"/></svg>';
+/**
  * States of the general map (`showFullMap`), written as the `data-state` of `#fullmap-status` so the
  * SCSS can leave the box alone in the one state that has no text, and so the message is a single
  * attribute instead of three class names the TS would have to keep in sync.
@@ -513,15 +533,6 @@ const TONE_LABEL = { Positivo: 'Positivo', Negativo: 'Negativo', Neutro: 'Neutro
  */
 const FULLMAP_TONE_FIELD = 'tonos_sociales';
 /**
- * Milisegundos que dura el desplazamiento de la vista cuando se elige un tema desde la ficha.
- *
- * No es cero a propósito —a diferencia del `fit` de apertura, que tiene que estar listo antes del
- * primer pintado—: acá la vista ya está mostrando algo y el salto sería un corte. Con duración
- * OpenLayers interpola el centro y el zoom, que además dispara los `moveend` que re-declutterean los
- * markers en el camino.
- */
-const FULLMAP_FOCUS_DURATION = 400;
-/**
  * Ancho mínimo de viewport (px) a partir del cual la ficha del mapa general se saltea el clamp contra
  * la barra de herramientas y su alto puede llegar hasta arriba.
  *
@@ -531,6 +542,21 @@ const FULLMAP_FOCUS_DURATION = 400;
  * barra, así que no hace falta ninguna regla nueva en el SCSS.
  */
 const FULLMAP_DETAIL_TOP_MIN_WIDTH = 1700;
+/**
+ * Margen (px) con el que el punto seleccionado tiene que quedar de la ficha del mapa general y de
+ * los bordes del mapa: es el radio del círculo que se pinta con la ficha abierta (marker base +
+ * `TEMAS_MAP_SELECTED_RADIUS_DELTA` + `TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`, o sea 9+3+4=16).
+ * Con menos margen la corrección dejaría el círculo rozando el borde del panel, que es el mismo
+ * problema a medio resolver.
+ */
+const FULLMAP_PANEL_CLEAR_PX = TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SELECTED_RADIUS_DELTA + TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS;
+/**
+ * Milisegundos del desplazamiento de vista que corre cuando la ficha del mapa general abre encima
+ * del punto que la abrió (ver `_adjustFullMapViewForPanel`). El vuelo es corto —del orden del ancho
+ * del panel— y no cambia de zoom, así que con duración y no con `setCenter`: se lee como un ajuste
+ * y no como un corte. (El foco de un tema, en cambio, salta sin animación: ver `_focusFullMapTema`.)
+ */
+const FULLMAP_PANEL_PAN_DURATION = 200;
 /**
  * Normalize a text so it can be searched as a plain substring: without accents and without case,
  * so "politica" finds "Política" and the other way around. Done **once per value**, when the list
@@ -1238,13 +1264,17 @@ export default class Timeline {
      *
      * Sin la opción no hay markup, como con `sorters` y `filters`: es el mismo patrón de "lo que no
      * se declara no existe". Reusa el ícono de mapa plegado del botón de la tarjeta
-     * (`TEMAS_MAP_TOGGLE_SVG`) porque es la misma acción a otra escala.
+     * (`TEMAS_MAP_TOGGLE_SVG`) porque es la misma acción a otra escala, y le suma su chevron
+     * (`FULLMAP_TOGGLE_CHEVRON_SVG`, apuntando a la derecha) como el de la tarjeta. El chevron viaja
+     * solo con el estado **cerrado** —el botón nace cerrado, así que este markup es el que lo trae— y
+     * `_applyFullMapState` reescribe el mismo par al alternar, con la X del estado abierto sin
+     * chevron.
      */
     _buildFullMapToggleHtml() {
         if (!this.showFullMap)
             return '';
         return `<div class="fullmap-wrap">
-            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="publicaciones-fullmap-section" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}</button>
+            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="publicaciones-fullmap-section" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}${FULLMAP_TOGGLE_CHEVRON_SVG}</button>
           </div>`;
     }
     /**
@@ -3165,9 +3195,12 @@ export default class Timeline {
         this.fullMapToggle.setAttribute('aria-label', label);
         this.fullMapToggle.setAttribute('title', label);
         // El ícono va con el estado: el del mapa cuando el listado es lo que se está viendo, la `X` cuando
-        // lo que está en pantalla es el mapa. El `aria-hidden` del svg lo saca del árbol de accesibilidad,
-        // así que el nombre del botón es solo el `aria-label` de arriba en los dos casos.
-        this.fullMapToggle.innerHTML = open ? FULLMAP_CLOSE_SVG : TEMAS_MAP_TOGGLE_SVG;
+        // lo que está en pantalla es el mapa. El chevron va **solo con el cerrado** (`>` que apunta adentro
+        // del mapa); abierto, el botón es solo la `X`. Los dos caminos que reescriben este `innerHTML` (el
+        // markup inicial de `_buildFullMapToggleHtml` y esta línea) tienen que coincidir. El `aria-hidden`
+        // de los svg los saca del árbol de accesibilidad, así que el nombre del botón es solo el
+        // `aria-label` de arriba en los dos casos.
+        this.fullMapToggle.innerHTML = open ? FULLMAP_CLOSE_SVG : TEMAS_MAP_TOGGLE_SVG + FULLMAP_TOGGLE_CHEVRON_SVG;
     }
     /**
      * Resolve the points of the general map and paint them.
@@ -3505,6 +3538,103 @@ export default class Timeline {
             // fallo se viera solo en unos). En local `detail` es `null` y manda `card`, que ya es entero.
             this._bindFullMapCardTemas(cardEl, detail ?? card);
             this._revealFullMapTema(cardEl, point.idSubtema, true);
+            // La ficha acaba de aparecer encima del mapa: si tapa el círculo que la abrió, la vista se
+            // corre lo justo para dejarlo a la vista. Va después del reveal porque mide el panel ya con su
+            // contenido final, y con la key de esta apertura por si mientras llegaba el detalle la
+            // selección cambió a otro punto (entonces la corrección es de otro círculo y se saltea).
+            void this._adjustFullMapViewForPanel(point, key);
+        });
+    }
+    /**
+     * Si la ficha recién abierta tapa el punto con el que se abrió, desplazar la vista —sin zoom—
+     * hasta dejarlo visible.
+     *
+     * La ficha es un panel flotante abajo a la izquierda (`.fullmap-detail`) y abrirlo no mueve la
+     * vista: un punto clickeado en la mitad izquierda queda debajo del panel y el usuario pierde de
+     * vista justo lo que eligió. La regla es "la vista se mueve lo mínimo necesario", y como el panel
+     * ocupa el flanco izquierdo hay dos direcciones posibles: pasar el punto por la **derecha** del
+     * panel (el panel estorba a la izquierda, así que salir por la derecha es el movimiento esperado)
+     * o **subirlo** por encima de su borde superior, para cuando la derecha no cabe en el mapa —panel
+     * casi tan ancho como el viewport—. Se elige la de menor vuelo, y si ninguna deja al círculo entero
+     * dentro del mapa no se mueve nada: un desplazamiento que saca al punto del canvas no cumple con
+     * "que quede visible".
+     *
+     * La coordenada que hay que despejar es donde el círculo **está pintado**:
+     * `selectedSpiderCenter()` si el `declutter` lo dejó en un anillo del spider (ahí está el círculo
+     * agrandado, no la coordenada propia, que es el centro del anillo), y la `lon`/`lat` del punto si
+     * pinta en su sitio. `refreshStyles()` ya corrió en `_openFullMapCard` antes de cualquier `await`,
+     * así que la lectura del anillo es del estado repintado con esta selección.
+     *
+     * `key` es la selección con la que se abrió la ficha: si mientras se esperaba `ol` el usuario
+     * clickeó otro punto —o la cerró—, esta corrección ya no es de ese círculo y se saltea.
+     */
+    async _adjustFullMapViewForPanel(point, key) {
+        const handle = this._fullMapHandle;
+        const panel = this.fullMapDetail;
+        if (!handle || !panel || panel.hidden)
+            return;
+        // El caso del anillo no espera nada (la coordenada ya está proyectada); solo la propia tiene que
+        // pasar por `fromLonLat`, que es lo que hace falta `ol` para resolver.
+        let coord = handle.selectedSpiderCenter();
+        if (!coord) {
+            if (!Number.isFinite(point.lon) || !Number.isFinite(point.lat))
+                return;
+            const ol = await this._loadOpenLayers();
+            if (this._fullMapSelectedKey !== key || panel.hidden)
+                return;
+            coord = ol.fromLonLat([point.lon, point.lat]);
+        }
+        const map = handle.map;
+        const view = map.getView();
+        // `getPixelFromCoordinate` puede devolver `null` si el mapa todavía no tiene frame state (el
+        // `.d.ts` no lo dice, pero el runtime corta por `frameState_`), y un rect en cero es el panel
+        // u oculto: en cualquiera de los dos casos no hay nada que medir.
+        const px = map.getPixelFromCoordinate(coord);
+        const mapRect = map.getTargetElement().getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
+        if (!px || !mapRect.width || !panelRect.width)
+            return;
+        const clear = FULLMAP_PANEL_CLEAR_PX;
+        const markerX = mapRect.left + px[0];
+        const markerY = mapRect.top + px[1];
+        // ¿El círculo choca con la ficha? Es el rect del panel inflado por el radio contra el centro del
+        // círculo: en las esquinas es conservador (max-norm en vez de distancia) y acá alcanza, porque
+        // lo que se decide es "hace falta correr la vista" y un falso positivo solo agrega un vuelo
+        // mínimo que dejaba al punto igual de visible.
+        const covered = markerX > panelRect.left - clear &&
+            markerX < panelRect.right + clear &&
+            markerY > panelRect.top - clear &&
+            markerY < panelRect.bottom + clear;
+        if (!covered)
+            return;
+        // La barra flota encima del mapa (`z-index: 2`) igual que la ficha: subir el punto hasta el borde
+        // del panel lo metería debajo de la barra, que es el mismo problema con otro obstáculo. El techo
+        // real es el mayor entre el top del canvas y el bottom vivo de `.featured-row`.
+        const toolbarBottom = this.featuredRow ? this.featuredRow.getBoundingClientRect().bottom : 0;
+        const visibleTop = Math.max(mapRect.top, toolbarBottom) + clear;
+        // Los dos candidatos, en píxeles de pantalla, cada uno con su prueba de que el círculo sigue
+        // entero en el mapa después del vuelo (mismo margen en el borde de llegada). En empate gana la
+        // derecha, que es la dirección esperada contra un panel que estorba a la izquierda.
+        const moves = [];
+        const rightX = panelRect.right + clear;
+        if (rightX + clear <= mapRect.right)
+            moves.push({ dx: rightX - markerX, dy: 0 });
+        const upY = panelRect.top - clear;
+        if (upY - clear >= visibleTop)
+            moves.push({ dx: 0, dy: upY - markerY });
+        if (!moves.length)
+            return;
+        const move = moves.reduce((a, b) => (Math.abs(b.dx + b.dy) < Math.abs(a.dx + a.dy) ? b : a));
+        const res = view.getResolution();
+        const center = view.getCenter();
+        if (!res || !center)
+            return;
+        // Pixel → coordenada de vista: en X `px = (coord − centro) / res`, o sea que correr el centro
+        // hacia atrás hace que el punto avance; en Y el eje está invertido (`py = (centro − coord) /
+        // res`). Solo se anima el `center`: sin `resolution` la vista se desplaza sin acercar nada.
+        view.animate({
+            center: [center[0] - move.dx * res, center[1] + move.dy * res],
+            duration: FULLMAP_PANEL_PAN_DURATION
         });
     }
     /**
@@ -3545,12 +3675,17 @@ export default class Timeline {
      * la misma tarjeta hace exactamente lo mismo, centrando el nuevo punto. Antes solo el segundo click
      * —sobre el tema ya seleccionado— hacía `fit`, con lo cual clickear una fila nueva se quedaba en el
      * zoom viejo y no llegaba al punto elegido.
+     *
+     * **La vista salta, no vuela** (`duration: 0`): un vuelo de 400ms pedía tiles intermedios que
+     * OpenLayers descartaba a mitad de camino —fondo roto al llegar— y, en zoom cercano, se leía peor
+     * que el corte. Con el salto solo se piden los tiles del destino.
      */
     _focusFullMapTema(cardEl, card, temaIndex) {
         const tema = (card.temas || [])[temaIndex];
         const geom = tema ? this._temaGeomOf(tema) : null;
-        const view = this._fullMapHandle?.map.getView() || null;
-        if (!tema || !geom || !view)
+        const handle = this._fullMapHandle;
+        const view = handle?.map.getView() || null;
+        if (!tema || !geom || !view || !handle)
             return;
         const key = `${String(card.id)}#${tema.id_subtema ?? ''}`;
         // El criterio es la **selección**, no "la última fila clickeada": un tema distinto al que ya
@@ -3561,9 +3696,10 @@ export default class Timeline {
         if (!alreadySelected) {
             this._fullMapCardId = String(card.id);
             this._fullMapSelectedKey = key;
-            // El círculo tiene que crecer y subir **antes** de que se mueva la vista, o el usuario ve el
-            // mapa viajar sin ver qué punto es el que lo provoke.
-            this._fullMapHandle?.refreshStyles();
+            // Va antes del `fit`: el círculo tiene que crecer y subir **en el sitio** para que el usuario
+            // vea cuál es el punto que provoca el salto, y el `declutter` de acá es el que escribe la
+            // propiedad `spider` de la que después lee `selectedSpiderCenter()`, o sea el destino.
+            handle.refreshStyles();
         }
         // Sin `scroll`: la fila se acaba de clickear, o sea que ya está a la vista. Scrollearla al centro
         // sería mover la lectura del usuario debajo del puntero sin que lo haya pedido.
@@ -3576,13 +3712,20 @@ export default class Timeline {
             // desplazado en el anillo del spider, la coordenada propia es el centro de ese anillo y
             // centrar ahí dejaría el marcador elegido del lado del visor en lugar de en el medio. Fuera
             // de un anillo (`null`) no cambia nada: se centra en la coordenada propia, como siempre.
-            const spiderCenter = this._fullMapHandle?.selectedSpiderCenter() ?? null;
+            const spiderCenter = handle.selectedSpiderCenter() ?? null;
             const center = spiderCenter ?? ol.fromLonLat([geom.lon, geom.lat]);
             // El `fit` de un punto: el extent no tiene tamaño, así que la resolución sale del
             // `minResolution` de `maxZoom` — que es el tope que ya usa el `fit` de apertura — y el punto
-            // queda centrado. El `duration` (y no `setCenter`) interpola el viaje y dispara los `moveend`
-            // que re-declutterean los markers por el camino.
-            view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: FULLMAP_FOCUS_DURATION });
+            // queda centrado. Sin duración, a propósito: durante los 400ms que tardaba la interpolación se
+            // pedían tiles intermedios que OpenLayers descartaba antes de llegar (fondo roto al destino) y,
+            // en zoom cercano, el viaje se leía peor que el corte. Con el salto solo se piden los del destino.
+            view.fit(new ol.OlPoint(center), { maxZoom: TEMAS_MAP_FIT_MAX_ZOOM, duration: 0 });
+            // Mismo par `renderSync` + `refreshStyles` que el `fit` de apertura y el de re-apertura: el
+            // `fit` movió todos los píxeles y `declutter` agrupa contra los del último frame pintado, así
+            // que sin un render re-agruparía contra la vista vieja. El `moveend` que dispara el propio
+            // `fit` lo vuelve a correr en el siguiente frame, pero no se puede depender de cuándo llegue.
+            handle.map.renderSync();
+            handle.refreshStyles();
         });
     }
     /**

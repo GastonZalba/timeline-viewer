@@ -1210,7 +1210,11 @@ export default class Timeline {
      *
      * Sin la opción no hay markup, como con `sorters` y `filters`: es el mismo patrón de "lo que no
      * se declara no existe". Reusa el ícono de mapa plegado del botón de la tarjeta
-     * (`TEMAS_MAP_TOGGLE_SVG`) porque es la misma acción a otra escala.
+     * (`TEMAS_MAP_TOGGLE_SVG`) porque es la misma acción a otra escala, y le suma su chevron
+     * (`FULLMAP_TOGGLE_CHEVRON_SVG`, apuntando a la derecha) como el de la tarjeta. El chevron viaja
+     * solo con el estado **cerrado** —el botón nace cerrado, así que este markup es el que lo trae— y
+     * `_applyFullMapState` reescribe el mismo par al alternar, con la X del estado abierto sin
+     * chevron.
      */
     protected _buildFullMapToggleHtml(): string;
     /**
@@ -1650,6 +1654,30 @@ export default class Timeline {
      */
     protected _openFullMapCard(point: FullMapPoint): Promise<void>;
     /**
+     * Si la ficha recién abierta tapa el punto con el que se abrió, desplazar la vista —sin zoom—
+     * hasta dejarlo visible.
+     *
+     * La ficha es un panel flotante abajo a la izquierda (`.fullmap-detail`) y abrirlo no mueve la
+     * vista: un punto clickeado en la mitad izquierda queda debajo del panel y el usuario pierde de
+     * vista justo lo que eligió. La regla es "la vista se mueve lo mínimo necesario", y como el panel
+     * ocupa el flanco izquierdo hay dos direcciones posibles: pasar el punto por la **derecha** del
+     * panel (el panel estorba a la izquierda, así que salir por la derecha es el movimiento esperado)
+     * o **subirlo** por encima de su borde superior, para cuando la derecha no cabe en el mapa —panel
+     * casi tan ancho como el viewport—. Se elige la de menor vuelo, y si ninguna deja al círculo entero
+     * dentro del mapa no se mueve nada: un desplazamiento que saca al punto del canvas no cumple con
+     * "que quede visible".
+     *
+     * La coordenada que hay que despejar es donde el círculo **está pintado**:
+     * `selectedSpiderCenter()` si el `declutter` lo dejó en un anillo del spider (ahí está el círculo
+     * agrandado, no la coordenada propia, que es el centro del anillo), y la `lon`/`lat` del punto si
+     * pinta en su sitio. `refreshStyles()` ya corrió en `_openFullMapCard` antes de cualquier `await`,
+     * así que la lectura del anillo es del estado repintado con esta selección.
+     *
+     * `key` es la selección con la que se abrió la ficha: si mientras se esperaba `ol` el usuario
+     * clickeó otro punto —o la cerró—, esta corrección ya no es de ese círculo y se saltea.
+     */
+    protected _adjustFullMapViewForPanel(point: FullMapPoint, key: string): Promise<void>;
+    /**
      * En modo mapa, volver clickeable cada tema de la ficha que tiene punto en el mapa.
      *
      * Solo los que tienen `geom` —`_temaGeomOf`—: un tema sin ubicación no tiene a dónde llevar la
@@ -1672,6 +1700,10 @@ export default class Timeline {
      * la misma tarjeta hace exactamente lo mismo, centrando el nuevo punto. Antes solo el segundo click
      * —sobre el tema ya seleccionado— hacía `fit`, con lo cual clickear una fila nueva se quedaba en el
      * zoom viejo y no llegaba al punto elegido.
+     *
+     * **La vista salta, no vuela** (`duration: 0`): un vuelo de 400ms pedía tiles intermedios que
+     * OpenLayers descartaba a mitad de camino —fondo roto al llegar— y, en zoom cercano, se leía peor
+     * que el corte. Con el salto solo se piden los tiles del destino.
      */
     protected _focusFullMapTema(cardEl: HTMLElement, card: TimelineItem, temaIndex: number): void;
     /**

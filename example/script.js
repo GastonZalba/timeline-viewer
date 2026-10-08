@@ -147,7 +147,7 @@ const baseOptions = {
   // Con ?fullmap el botón de la barra abre un mapa con todos los temas ubicados del filtro actual,
   // en vez del listado. En modo API los puntos salen de `GET /api/points`.
   showFullMap: useFullMap,
-  relatedLabel: (count) => (count === 1 ? 'publicación relacionada' : 'publicaciones relacionadas'),
+  relatedLabel: (count) => (count === 1 ? 'publicación' : 'publicaciones'),
   // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos
   // grupos se llenan con los valores que devuelve `GET /api/facets`.
@@ -158,8 +158,8 @@ const baseOptions = {
   singleId,
   // El mapa de "Temas destacados" usa la capa estándar de OpenStreetMap por defecto; para verlo sin
   // fondo alcanza con `temasMapTiles: ''`.
-  temasMapTiles: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'
-  //temasMapAttribution: ''
+  temasMapTiles: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+  temasMapAttribution: ''
 };
 
 if (useApi) {
