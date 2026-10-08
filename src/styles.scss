@@ -43,7 +43,7 @@
   --tv-color-map-light: #fff;
 
   --tv-work-note: #e04733;
-  --tv-bg-card-unvalidated: #452c1c;
+  --tv-bg-card-unvalidated: #413129;
   --tv-descartado: #ca2424;
 }
 
@@ -79,7 +79,7 @@
       display: none;
     }
 
-    // El mensaje (cargando / sin puntos / error) vive **sobre** del canvas.
+    // El estado (loader de carga / sin puntos / error) vive **sobre** del canvas.
     .fullmap-status {
       color: #fff;
       display: inline;
@@ -105,6 +105,56 @@
       // en vez de un estado, y el tono negativo ya está en las variables del componente.
       &[data-state='error'] {
         color: var(--tv-tone-negative);
+      }
+
+      // El estado de carga no es texto sino un loader (`FULLMAP_LOADING_HTML`): se centra con un
+      // `flex` propio —el `align-content: center` del bloque centra líneas de texto, no un hijo
+      // bloque— y el loader queda en el medio del mapa. El `aria-busy` del canvas es lo que lo
+      // comunica a lectores de pantalla.
+      &[data-state='loading'] {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      // Loader de puntos (CSS puro, sin dependencias). Va anidado acá y no a nivel global para no
+      // chocar con un `.loader` del consumidor, y sin tocar `--size` para conservar la escala pedida.
+      .loader {
+        --color-1: #fff;
+        --size: 1px;
+
+        width: calc(16 * var(--size));
+        height: calc(16 * var(--size));
+        border-radius: 50%;
+        display: block;
+        margin: calc(30 * var(--size)) auto;
+        position: relative;
+        background: var(--color-1);
+        box-sizing: border-box;
+      }
+      .loader::before,
+      .loader::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: calc(2 * var(--size)) solid var(--color-1);
+        box-sizing: border-box;
+        animation: ripple 1.4s ease-out infinite;
+      }
+      .loader::after {
+        animation-delay: -0.7s;
+      }
+
+      @keyframes ripple {
+        0% {
+          transform: scale(1);
+          opacity: 0.8;
+        }
+        100% {
+          transform: scale(4);
+          opacity: 0;
+        }
       }
     }
 
@@ -206,7 +256,7 @@
       overflow: hidden;
       border: none;
       border-radius: 0;
-      background: var(--tv-bg-secondary);
+      background: var(--tv-bg-primary);
       flex: 1;
     }
 
@@ -716,6 +766,19 @@
           &.active {
             color: var(--tv-accent);
             font-weight: 600;
+          }
+        }
+
+        // El indicador de "hay más" del bloque. Reemplaza los "..." que se leían como texto suelto
+        // (y se perdían entre los nombres) por un signo entre corchetes que se lee como control.
+        // El click no vive acá: lo maneja `.card-protagonista.has-more`, este span es solo la marca.
+        .protagonista-more {
+          color: var(--tv-accent);
+          font-weight: 600;
+          white-space: nowrap;
+
+          &:hover {
+            color: var(--tv-accent-light);
           }
         }
 
@@ -1823,8 +1886,8 @@
     // escribe `_bindTemasMapToggle`.
     .card-temas-map-body.expanded ~ .card-temas-list {
       // Con el mapa abierto la lista se lee como un índice compacto del mapa, no como la lista de
-      // temas completa: se aprieta el gap de 22px a 8px y se va el borde de cada ítem.
-      gap: 8px;
+      // temas completa: se aprieta el gap de 22px a 2px y se va el borde de cada ítem.
+      gap: 2px;
 
       .tema-map-ref {
         display: inline-flex;

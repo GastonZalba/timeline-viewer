@@ -31,7 +31,7 @@
   --tv-color-map: #dbdbdb;
   --tv-color-map-light: #fff;
   --tv-work-note: #e04733;
-  --tv-bg-card-unvalidated: #452c1c;
+  --tv-bg-card-unvalidated: #413129;
   --tv-descartado: #ca2424;
 }
 
@@ -72,6 +72,46 @@
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-status[data-state=error] {
   color: var(--tv-tone-negative);
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-status[data-state=loading] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-status .loader {
+  --color-1: #fff;
+  --size: 1px;
+  width: calc(16 * var(--size));
+  height: calc(16 * var(--size));
+  border-radius: 50%;
+  display: block;
+  margin: calc(30 * var(--size)) auto;
+  position: relative;
+  background: var(--color-1);
+  box-sizing: border-box;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-status .loader::before,
+.publicaciones-container .publicaciones-fullmap-section .fullmap-status .loader::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: calc(2 * var(--size)) solid var(--color-1);
+  box-sizing: border-box;
+  animation: ripple 1.4s ease-out infinite;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-status .loader::after {
+  animation-delay: -0.7s;
+}
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail {
   position: absolute;
@@ -139,7 +179,7 @@
   overflow: hidden;
   border: none;
   border-radius: 0;
-  background: var(--tv-bg-secondary);
+  background: var(--tv-bg-primary);
   flex: 1;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-canvas.is-hover-marker {
@@ -540,6 +580,14 @@
 .publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-actor.active {
   color: var(--tv-accent);
   font-weight: 600;
+}
+.publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-more {
+  color: var(--tv-accent);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.publicaciones-container .timeline-item .timeline-card .card-protagonista .protagonista-more:hover {
+  color: var(--tv-accent-light);
 }
 .publicaciones-container .timeline-item .timeline-card .card-protagonista.empty {
   font-style: italic;
@@ -1400,7 +1448,7 @@
   border-left-color: var(--tema-tone-color);
 }
 .publicaciones-container .timeline-item .card-temas-map-body.expanded ~ .card-temas-list {
-  gap: 8px;
+  gap: 2px;
 }
 .publicaciones-container .timeline-item .card-temas-map-body.expanded ~ .card-temas-list .tema-map-ref {
   display: inline-flex;

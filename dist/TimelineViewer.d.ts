@@ -1572,8 +1572,8 @@ export default class Timeline {
      *
      * El estado de carga sí se escribe cuando ya hay un mapa en pantalla, y solo en API: es el mismo
      * criterio que la lista, donde las tarjetas desaparecen de inmediato y los skeletons toman su lugar
-     * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el cartelito
-     * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparecen son los markers: los del filtro
+     * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el loader
+     * centrado de siempre (`FULLMAP_LOADING_HTML`) y lo que desaparecen son los markers: los del filtro
      * que terminó no significan nada para el que está por venir, y dejarlos mientras el server tarda
      * uno o dos segundos sería una mentira con forma de respuesta vieja. La capa de tiles y la vista
      * quedan —eso es justamente lo que `updatePoints` preserva—, así que se lee como "el mapa se está
@@ -1785,6 +1785,9 @@ export default class Timeline {
      * SCSS keys on and `null` means "nothing to say", which also hides the box: with points on screen
      * it would take height away from the map for nothing.
      *
+     * `content` is plain text for the empty and error states, and the loader markup for the loading
+     * one: the SCSS branch of each is what decides how it reads (see `.fullmap-status .loader`).
+     *
      * Every message is in Spanish because that is the language of the whole component, and all of them
      * are of the visible kind only in API mode, because in local mode the points are already in memory
      * and there is no request to wait for.
@@ -1793,7 +1796,7 @@ export default class Timeline {
      * the list—, and this is the only place that touches it: a flag kept next to the message it belongs
      * to cannot desync from it.
      */
-    protected _setFullMapStatus(state: string | null, text: string): void;
+    protected _setFullMapStatus(state: string | null, content: string): void;
     /** Build the "Videos vinculados" HTML block */
     protected _buildVideosHtml(card: TimelineItem): string;
     /** Build the inline "Imágenes" HTML block */

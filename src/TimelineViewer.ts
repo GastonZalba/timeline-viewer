@@ -500,13 +500,17 @@ const FULLMAP_STATE_EMPTY = 'empty';
 const FULLMAP_STATE_ERROR = 'error';
 
 /**
- * The one loading text of the general map, in the two moments there is one: the first open (the
+ * The one loading mark of the general map, in the two moments there is one: the first open (the
  * map does not exist yet) and every `GET {url}/points` of API mode with the map already on screen
  * (the markers of the filter that just ended go away right away and this is what says why). Same
  * criterion as the list, where `_renderApiLoading` drops the cards for skeletons —just that a map
- * has no silhouette to placeholder, so the state is the message.
+ * has no silhouette to placeholder, so the state is the mark.
+ *
+ * Es un loader animado en vez de texto: el cartel "Cargando elementos del mapa…" se leía como un
+ * error pegado sobre el mapa. El markup lo estiliza `.fullmap-status .loader` (CSS puro, sin
+ * dependencias) y el `aria-busy` que acompaña al estado es lo que lo comunica a lectores de pantalla.
  */
-const FULLMAP_LOADING_TEXT = 'Cargando elementos del mapa…';
+const FULLMAP_LOADING_HTML = '<span class="loader"></span>';
 
 /**
  * Los dos rótulos del botón del mapa general, y el ícono de cada estado.
@@ -3277,7 +3281,12 @@ export default class Timeline {
         ` data-value="${this._escapeHtml(token)}" title="Filtrar por ${this._escapeHtml(label)}">${text}</span>`
       );
     });
-    const more = actors.length > CARD_CLICKABLE_MAX && !showAll ? '...' : '';
+    const more =
+      actors.length > CARD_CLICKABLE_MAX
+        ? showAll
+          ? ' <span class="protagonista-more" title="Ver menos">[-]</span>'
+          : '... <span class="protagonista-more" title="Ver más">[+]</span>'
+        : '';
     return parts.join(sep) + more;
   }
 
@@ -4572,8 +4581,8 @@ export default class Timeline {
    *
    * El estado de carga sí se escribe cuando ya hay un mapa en pantalla, y solo en API: es el mismo
    * criterio que la lista, donde las tarjetas desaparecen de inmediato y los skeletons toman su lugar
-   * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el cartelito
-   * centrado de siempre (`FULLMAP_LOADING_TEXT`) y lo que desaparecen son los markers: los del filtro
+   * (`_renderApiLoading`). Acá no hay silueta que placeholderar, así que el estado es el loader
+   * centrado de siempre (`FULLMAP_LOADING_HTML`) y lo que desaparecen son los markers: los del filtro
    * que terminó no significan nada para el que está por venir, y dejarlos mientras el server tarda
    * uno o dos segundos sería una mentira con forma de respuesta vieja. La capa de tiles y la vista
    * quedan —eso es justamente lo que `updatePoints` preserva—, así que se lee como "el mapa se está
@@ -4602,7 +4611,7 @@ export default class Timeline {
     const seq = ++this._fullMapSeq;
     const mounted = Boolean(this._fullMapHandle);
     const waiting = this.api;
-    if (!mounted || waiting) this._setFullMapStatus(FULLMAP_STATE_LOADING, FULLMAP_LOADING_TEXT);
+    if (!mounted || waiting) this._setFullMapStatus(FULLMAP_STATE_LOADING, FULLMAP_LOADING_HTML);
     if (mounted && waiting) {
       this._closeFullMapCard();
       this._fullMapHandle?.updatePoints([]);
@@ -5168,6 +5177,9 @@ export default class Timeline {
    * SCSS keys on and `null` means "nothing to say", which also hides the box: with points on screen
    * it would take height away from the map for nothing.
    *
+   * `content` is plain text for the empty and error states, and the loader markup for the loading
+   * one: the SCSS branch of each is what decides how it reads (see `.fullmap-status .loader`).
+   *
    * Every message is in Spanish because that is the language of the whole component, and all of them
    * are of the visible kind only in API mode, because in local mode the points are already in memory
    * and there is no request to wait for.
@@ -5176,7 +5188,7 @@ export default class Timeline {
    * the list—, and this is the only place that touches it: a flag kept next to the message it belongs
    * to cannot desync from it.
    */
-  protected _setFullMapStatus(state: string | null, text: string): void {
+  protected _setFullMapStatus(state: string | null, content: string): void {
     const el = this.fullMapStatus;
     if (!el) return;
     if (state === null) {
@@ -5186,7 +5198,8 @@ export default class Timeline {
       this.fullMapCanvas?.removeAttribute('aria-busy');
       return;
     }
-    el.textContent = text;
+    if (state === FULLMAP_STATE_LOADING) el.innerHTML = content;
+    else el.textContent = content;
     el.setAttribute('data-state', state);
     el.hidden = false;
     if (state === FULLMAP_STATE_LOADING) this.fullMapCanvas?.setAttribute('aria-busy', 'true');
