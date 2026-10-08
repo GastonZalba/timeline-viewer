@@ -273,7 +273,7 @@ When the card is expanded, `link_web` and every entry of `links_videos` are auto
 | YouTube   | `/watch?v=`, `youtu.be/`, `/embed/`, `/shorts/` | Direct `<iframe>` with 16:9 aspect ratio          |
 | Instagram | `/p/`, `/reel/`, `/tv/`        | Official [embed.js](https://www.instagram.com/embed.js) via `<blockquote class="instagram-media">` |
 | Twitter/X | `/username/status/ID`          | Official [Twitter Widgets](https://platform.twitter.com/widgets.js) via `<blockquote class="twitter-tweet">` |
-| Facebook  | `/posts/`, `/videos/`, `/permalink.php`, `/photo.php`, `/watch`, `/story.php`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` |
+| Facebook  | `/posts/`, `/videos/`, `/reel/`, `/permalink.php`, `/photo.php`, `/watch`, `/story.php`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` (`<div class="fb-video">` for reels, which Meta only accepts in the video plugin) |
 | Direct file | URL ending in `.mp4`, `.webm`, `.mov`, `.m4v`, `.ogv` (query/fragment allowed) | Native `<video controls playsinline preload="metadata" loading="lazy">` |
 
 Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of raw iframes. The scripts are loaded **lazily**.

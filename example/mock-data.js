@@ -19,7 +19,7 @@ const allItems = [
     validado: true,
     capturado: true,
     descartado: false,
-    actores_principales: ['Ana García', 'Carlos Ruiz'],
+    actores_principales: ['Ministerio de Infraestructura y Servicios Públicos de la Provincia de Buenos Aires', 'Ana García', 'Carlos Ruiz'],
     notas_de_trabajo: 'Verificar si el framework ya tiene soporte oficial para SSR. Preguntar al equipo de backend si podemos integrarlo en el sprint 14.',
     adjuntos: ['https://archivos.ejemplo.com/informes/informe-lanzamiento-framework.pdf'],
     screenshot: 'https://picsum.photos/seed/captura/400/800',
@@ -32,7 +32,8 @@ const allItems = [
       'https://cdn.jwplayer.com/videos/bS96065R-SomplJdm.mp4',
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       'https://www.youtube.com/watch?v=jNQXAC9IVRw',
-      'https://www.youtube.com/watch?v=9bZkp7q19f0'
+      'https://www.youtube.com/watch?v=9bZkp7q19f0',
+      'https://www.facebook.com/reel/1507257184326171'
     ],
     // Grupos de links de navegación que se renderizan al pie de la tarjeta en modo
     // single. Viaja en el detalle del ítem (`GET {api}/{id}`), no en la lista paginada.

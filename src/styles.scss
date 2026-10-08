@@ -682,9 +682,16 @@
           font-weight: 600;
         }
 
-        // Con un grupo `cardClickable` cada actor es un botón que filtra. Se lee como el texto que
+        // Con un grupo `cardClickable` cada actor es un chip que filtra. Se lee como el texto que
         // reemplaza (mismo font y color heredados) y solo el hover, el focus y el estado activo lo
         // delatan: el bloque es una línea más de la tarjeta, no un menú.
+        //
+        // El chip es un `<span role="button" tabindex="0">` y no un `<button>` (ver
+        // `_buildActorsHtml`): el inline-block del UA del botón convierte a un nombre más largo
+        // que el renglón en una caja del ancho de la tarjeta que corta el párrafo —el separador y
+        // los demás actores caen a la línea siguiente, y Chromium fuerza ese valor aunque se pida
+        // `display: inline`—; `display: contents` sí desataría la caja, pero deja el chip
+        // inalcanzable con teclado. Un span fluye como el texto que este bloque pretende ser.
         .protagonista-actor {
           font: inherit;
           color: inherit;
@@ -718,8 +725,10 @@
         }
       }
 
+      // Sin "Ver más" el párrafo se muestra entero: un nombre largo no tiene por qué quedar
+      // cortado a la mitad (el corte, que no lleva elipsis, se leía como layout roto).
       &.expanded .card-protagonista {
-        max-height: 60px;
+        max-height: none;
         opacity: 1;
         margin-top: 10px;
       }
@@ -728,8 +737,10 @@
         cursor: pointer;
       }
 
-      &.expanded .card-protagonista.expanded {
-        max-height: none;
+      // Con "Ver más" la lista larga sí se acorta a la preview de siempre, hasta que el usuario
+      // la abre (ahí `.expanded` del bloque matchea y el `:not` de arriba deja de aplicar).
+      &.expanded .card-protagonista.has-more:not(.expanded) {
+        max-height: 60px;
       }
 
       .card-tone-wrap {
@@ -1641,7 +1652,7 @@
     }
 
     .card-iframe-facebook {
-      min-height: 350px;
+      min-height: 150px;
       overflow: hidden;
     }
 

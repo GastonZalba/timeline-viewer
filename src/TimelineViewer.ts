@@ -47,8 +47,9 @@ const TWITTER_EMBED_BASE = 'https://twitter.com/';
 const TWITTER_WIDGETS_SCRIPT = 'https://platform.twitter.com/widgets.js';
 
 const FACEBOOK_POST_REGEX = /(?:facebook\.com)\/([^/]+)\/posts\/(?:[^/]+\/)?(\d+)/;
+const FACEBOOK_REEL_REGEX = /facebook\.com\/reel\//;
 const FACEBOOK_OTHER_REGEX =
-  /(?:facebook\.com\/(?:[^/]+\/videos\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
+  /(?:facebook\.com\/(?:[^/]+\/videos\/|reel\/|permalink\.php|photo\.php|watch|story\.php)|fb\.watch)/;
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
@@ -1336,6 +1337,14 @@ interface ImageInfo {
 interface LinkInfo {
   url: string;
   type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video';
+  /**
+   * Plugin de Facebook que debe renderizar este link: `'post'` (default) o `'video'`.
+   *
+   * Solo lo setea `_parseLinkWeb` para las URLs que Meta no acepta en `plugins/post.php`: una
+   * reel es video (`/reel/` va por el endpoint de video de oEmbed), y con el `fb-post` el plugin
+   * responde 400 y el embed queda vacío.
+   */
+  fbTag?: 'post' | 'video';
 }
 
 /**
@@ -2826,6 +2835,9 @@ export default class Timeline {
     if (m) return { url: `${TWITTER_EMBED_BASE}${m[1]}/status/${m[2]}`, type: 'twitter' };
     m = url.match(FACEBOOK_POST_REGEX);
     if (m) return { url: `${FACEBOOK_EMBED_BASE}${m[1]}/posts/${m[2]}`, type: 'facebook' };
+    // Antes que `FACEBOOK_OTHER_REGEX` (que ya incluye `reel/`): la reel se dibuja con el plugin
+    // de video, no con el de posts.
+    if (FACEBOOK_REEL_REGEX.test(url)) return { url: url, type: 'facebook', fbTag: 'video' };
     m = url.match(FACEBOOK_OTHER_REGEX);
     if (m) return { url: url, type: 'facebook' };
     // Al final, no al principio: una plataforma reconocida gana siempre. El falso positivo de un
@@ -2849,7 +2861,9 @@ export default class Timeline {
       return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}" data-embed-url="${embedUrl.url}"><div class="card-iframe-shimmer"></div></div>`;
     }
     if (embedUrl.type === 'facebook') {
-      return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><div class="fb-post" data-href="${embedUrl.url}" data-show-text="true" data-width="auto"></div></div>`;
+      // Reel → `fb-video`: Meta solo acepta `/reel/` en `plugins/video.php`, no en `post.php`.
+      const fbTag = embedUrl.fbTag === 'video' ? 'fb-video' : 'fb-post';
+      return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><div class="${fbTag}" data-href="${embedUrl.url}" data-show-text="true" data-width="auto" data-allowfullscreen="true"></div></div>`;
     }
     if (embedUrl.type === 'twitter') {
       return `<div class="card-iframe-wrap card-iframe-${embedUrl.type}"><div class="card-iframe-shimmer"></div><blockquote class="twitter-tweet" data-dnt="true"><a href="${embedUrl.url}"></a></blockquote></div>`;
@@ -3237,11 +3251,16 @@ export default class Timeline {
   /**
    * The actor list of the block, for the collapsed and the expanded state of `has-more`.
    *
-   * With a `cardClickable` group on the field the names are `<button>`s that filter on click (see
+   * With a `cardClickable` group on the field the names are chips that filter on click (see
    * `_applyCardFilter`), and the token is the value of the group — the very same one the panel
    * filters by, so both stay in sync without the card knowing anything about filters. Without it
    * this is plain text, exactly what the block has always been (only escaped now: the actors come
    * from the scraping pipeline, and they were being interpolated raw).
+   *
+   * El chip es un `<span role="button" tabindex="0">` y no un `<button>`: el inline-block del UA
+   * corta el párrafo con un nombre largo y Chromium fuerza ese valor aunque se pida `display:
+   * inline` (ver `.protagonista-actor` en el SCSS). Como un span no activa el click con Enter ni
+   * con Espacio como hace un botón, `_bindActorChips` se lo resuelve a mano.
    */
   protected _buildActorsHtml(actors: string[], showAll: boolean): string {
     const group = this._cardFilterGroup(CARD_CLICKABLE_FIELD);
@@ -3254,8 +3273,8 @@ export default class Timeline {
       const label = this._filterOptionLabel(group, token);
       const active = group.active.size === 1 && group.active.has(token);
       return (
-        `<button type="button" class="protagonista-actor${active ? ' active' : ''}"` +
-        ` data-value="${this._escapeHtml(token)}" title="Filtrar por ${this._escapeHtml(label)}">${text}</button>`
+        `<span class="protagonista-actor${active ? ' active' : ''}" role="button" tabindex="0"` +
+        ` data-value="${this._escapeHtml(token)}" title="Filtrar por ${this._escapeHtml(label)}">${text}</span>`
       );
     });
     const more = actors.length > CARD_CLICKABLE_MAX && !showAll ? '...' : '';
@@ -3271,6 +3290,15 @@ export default class Timeline {
       chip.addEventListener('click', (e: Event) => {
         // Sin este corte el click sube a `.timeline-card`, que expande o colapsa la tarjeta: el
         // filtro tendría que pelear con el gesto de abrir el detalle.
+        e.stopPropagation();
+        this._applyCardFilter(CARD_CLICKABLE_FIELD, chip.dataset.value ?? '');
+      });
+      // El chip es un span con `role="button"`, así que no dispara click con Enter ni con Espacio
+      // como haría un `<button>`: el teclado se resuelve acá. Espacio además hay que cortarlo,
+      // porque su default es scrollear la página.
+      chip.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
         e.stopPropagation();
         this._applyCardFilter(CARD_CLICKABLE_FIELD, chip.dataset.value ?? '');
       });
@@ -4900,9 +4928,9 @@ export default class Timeline {
     // `.d.ts` no lo dice, pero el runtime corta por `frameState_`), y un rect en cero es el panel
     // u oculto: en cualquiera de los dos casos no hay nada que medir.
     const px = map.getPixelFromCoordinate(coord);
-    const mapRect = map.getTargetElement().getBoundingClientRect();
+    const mapRect = map.getTargetElement()?.getBoundingClientRect();
     const panelRect = panel.getBoundingClientRect();
-    if (!px || !mapRect.width || !panelRect.width) return;
+    if (!px || !mapRect?.width || !panelRect.width) return;
     const clear = FULLMAP_PANEL_CLEAR_PX;
     const markerX = mapRect.left + px[0];
     const markerY = mapRect.top + px[1];

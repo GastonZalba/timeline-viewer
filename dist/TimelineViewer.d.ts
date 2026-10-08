@@ -608,6 +608,14 @@ interface ImageInfo {
 interface LinkInfo {
     url: string;
     type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video';
+    /**
+     * Plugin de Facebook que debe renderizar este link: `'post'` (default) o `'video'`.
+     *
+     * Solo lo setea `_parseLinkWeb` para las URLs que Meta no acepta en `plugins/post.php`: una
+     * reel es video (`/reel/` va por el endpoint de video de oEmbed), y con el `fb-post` el plugin
+     * responde 400 y el embed queda vacío.
+     */
+    fbTag?: 'post' | 'video';
 }
 /**
  * Controls a filter group can be rendered with.
@@ -1335,11 +1343,16 @@ export default class Timeline {
     /**
      * The actor list of the block, for the collapsed and the expanded state of `has-more`.
      *
-     * With a `cardClickable` group on the field the names are `<button>`s that filter on click (see
+     * With a `cardClickable` group on the field the names are chips that filter on click (see
      * `_applyCardFilter`), and the token is the value of the group — the very same one the panel
      * filters by, so both stay in sync without the card knowing anything about filters. Without it
      * this is plain text, exactly what the block has always been (only escaped now: the actors come
      * from the scraping pipeline, and they were being interpolated raw).
+     *
+     * El chip es un `<span role="button" tabindex="0">` y no un `<button>`: el inline-block del UA
+     * corta el párrafo con un nombre largo y Chromium fuerza ese valor aunque se pida `display:
+     * inline` (ver `.protagonista-actor` en el SCSS). Como un span no activa el click con Enter ni
+     * con Espacio como hace un botón, `_bindActorChips` se lo resuelve a mano.
      */
     protected _buildActorsHtml(actors: string[], showAll: boolean): string;
     /**
