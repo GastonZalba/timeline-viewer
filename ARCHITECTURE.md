@@ -50,43 +50,43 @@ new Timeline({ container, items, ... })
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `constructor(config)` | 101 | Recibe `TimelineOptions`, inicializa propiedades, lee el estado de la URL (`_readUrlState()`) y llama `_init()` |
-| `_init()` | 8173 | Orquesta todo: layout → búsqueda → filtros → sort → render → eventos. Con `stateInUrl` siembra los filtros del link antes de los checkboxes y deja la URL escribible antes de restaurar la página |
+| `constructor(config)` | 2021 | Recibe `TimelineOptions`, inicializa propiedades, lee el estado de la URL (`_readUrlState()`) y llama `_init()` |
+| `_init()` | 8207 | Orquesta todo: layout → búsqueda → filtros → sort → render → eventos. Con `stateInUrl` siembra los filtros del link antes de los checkboxes y deja la URL escribible antes de restaurar la página |
 
 ### Rendering
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_buildLayout()` | 2550 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
-| `_renderAll()` | 7849 | Renderiza featured + timeline + load-more. Método principal de "refresh" (rebuild completo) |
-| `_renderFeatured(cards)` | 3044 | Renderiza el stack de tarjetas superpuestas |
-| `_renderTimeline(cards, instant = false)` | 5659 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`). Con `instant: true` (rama API con skeletons) las tarjetas nacen con `visible`, sin entrada por slide |
-| `_appendTimelineItems(items, startIndex)` | 5695 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
-| `_createTimelineItem(card, index)` | 3074 | Crea una tarjeta individual con todos sus event listeners |
-| `_renderLoadMoreButton()` | 7925 | Agrega el botón "Cargar más" al final del timeline. Su rama local también llama a `_renderStatus()`: es el único click que hace crecer la lista sin pasar por `_renderAll()`, así que sin eso el conteo se quedaría en el rango anterior |
-| `_insertBeforeFooter(el)` | 5620 | Helper: inserta antes del footer o al final si no hay footer |
-| `_insertBeforeTrailing(el)` | 5636 | Helper: inserta al final de las tarjetas, antes del bloque final (load-more / status / footer) |
-| `_appendPageItems()` | 7434 | Modo API: pide la página siguiente y **agrega** las tarjetas nuevas, sin rebuild. Saca el botón de "Cargar más" si `_hasMorePages()` pasa a `false` |
-| `_renderApiLoading()` | 7553 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
-| `_clearApiLoading()` | 7622 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
-| `_pageSize()` | 7079 | Tamaño de página del modo actual: `_apiPageSize()` en API, `itemsPerPage` en local (0 = sin paginación). Lo que usan `_pageCount()` y `_statusCountText()` |
-| `_statusCountText()` | 7661 | Texto del conteo de la fila de status: "Mostrando A-B de Y publicaciones". El total y el "cuánto hay en pantalla" los saca de `_apiTotal`/`allCards` en API y de `allCards`/`_localDisplayCards()` en local; el `start` sale de `_currentPage()` con el paginador y es 1 fijo con "Cargar más" |
-| `_renderStatus()` | 7725 | Fila de status al pie de la lista: cargando / error / conteo. El error y la carga son exclusivos de API; el conteo se emite en los dos modos y también con `pagination: true`, cuyo rango es el de la página en pantalla. Se abstiene mientras hay skeletons |
-| `_renderSingleCard()` | 8132 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
-| `_buildTaxonomies(taxonomias)` | 5293 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
-| `_bindTaxonomyToggles(root)` | 5332 | Modo single: bindea los "Ver más (N)" del bloque de links, en los grupos que superan `TAXONOMY_VISIBLE_LINKS`. Cada toggle es independiente: alterna la clase `expanded` de su `ul.card-taxonomy-list` (y su `aria-expanded`) |
+| `_buildLayout()` | 2573 | Inyecta el HTML skeleton completo, cachea 12+ referencias DOM |
+| `_renderAll()` | 7883 | Renderiza featured + timeline + load-more. Método principal de "refresh" (rebuild completo) |
+| `_renderFeatured(cards)` | 3072 | Renderiza el stack de tarjetas superpuestas |
+| `_renderTimeline(cards, instant = false)` | 5711 | Renderiza la lista de tarjetas del timeline desde cero (`innerHTML = ''`). Con `instant: true` (rama API con skeletons) las tarjetas nacen con `visible`, sin entrada por slide |
+| `_appendTimelineItems(items)` | 5747 | Agrega tarjetas al final **sin tocar las existentes** (paginación de API) y devuelve los nodos creados para observarlos |
+| `_createTimelineItem(card)` | 3102 | Crea una tarjeta individual con todos sus event listeners |
+| `_renderLoadMoreButton()` | 7959 | Agrega el botón "Cargar más" al final del timeline. Su rama local también llama a `_renderStatus()`: es el único click que hace crecer la lista sin pasar por `_renderAll()`, así que sin eso el conteo se quedaría en el rango anterior |
+| `_insertBeforeFooter(el)` | 5672 | Helper: inserta antes del footer o al final si no hay footer |
+| `_insertBeforeTrailing(el)` | 5688 | Helper: inserta al final de las tarjetas, antes del bloque final (load-more / status / footer) |
+| `_appendPageItems()` | 7469 | Modo API: pide la página siguiente y **agrega** las tarjetas nuevas, sin rebuild. Saca el botón de "Cargar más" si `_hasMorePages()` pasa a `false` |
+| `_renderApiLoading()` | 7587 | Modo API: reemplaza lista y stack de destacadas por tarjetas fantasma (shimmer) mientras llega una respuesta que las va a sustituir |
+| `_clearApiLoading()` | 7656 | Modo API: baja el estado de carga (skeletons + `aria-busy`) sin tocar nada más. La respuesta real lo llama desde `_renderAll`; el fallo, desde el `catch` de `_fetchPage` |
+| `_pageSize()` | 7114 | Tamaño de página del modo actual: `_apiPageSize()` en API, `itemsPerPage` en local (0 = sin paginación). Lo que usan `_pageCount()` y `_statusCountText()` |
+| `_statusCountText()` | 7695 | Texto del conteo de la fila de status: "Mostrando A-B de Y publicaciones". El total y el "cuánto hay en pantalla" los saca de `_apiTotal`/`allCards` en API y de `allCards`/`_localDisplayCards()` en local; el `start` sale de `_currentPage()` con el paginador y es 1 fijo con "Cargar más" |
+| `_renderStatus()` | 7759 | Fila de status al pie de la lista: cargando / error / conteo. El error y la carga son exclusivos de API; el conteo se emite en los dos modos y también con `pagination: true`, cuyo rango es el de la página en pantalla. Se abstiene mientras hay skeletons |
+| `_renderSingleCard()` | 8166 | Modo single (`singleId`): renderiza una única tarjeta ya expandida sin chrome de timeline |
+| `_buildTaxonomies(taxonomias)` | 5345 | Modo single: markup del bloque de links de navegación que el propio ítem declara en `taxonomias`. Filtra grupos/items incompletos y devuelve `''` si no hay nada que renderizar |
+| `_bindTaxonomyToggles(root)` | 5384 | Modo single: bindea los "Ver más (N)" del bloque de links, en los grupos que superan `TAXONOMY_VISIBLE_LINKS`. Cada toggle es independiente: alterna la clase `expanded` de su `ul.card-taxonomy-list` (y su `aria-expanded`) |
 
 ### UI/Interacción
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_toggleExpand(scrollTo?)` | 5891 | Alterna entre vista featured (colapsada) y timeline (expandida) |
-| `_scrollToSection()` | 5958 | Smooth scroll para hacer visible el timeline |
-| `_applySort(field, asc)` | 6016 | Fija el sorter activo (`_sortField` + `_sortAsc`) y refresca la lista: re-ordena el pool en local y re-pide la página en API |
-| `_bindSortToggle()` | 8297 | Bindea el menú de orden: el botón abre/cierra, y un `change` en sus radios llama a `_applySort()` |
-| `_applyFilters(immediate)` | 7775 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
-| `_syncFilterToggleState()` | 7760 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-wrap` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
-| `_openSearch()` / `_closeSearch(force)` | 4605 | Abre el buscador (`.open` + foco) y lo colapsa. El colapso se corta si el campo tiene texto: un término escrito es un filtro en uso, y esconderlo dejaría al filtro puesto sin forma de sacarlo. `force` lo usa <kbd>Esc</kbd>, que primero vacía el campo |
+| `_toggleExpand(scrollTo?)` | 5926 | Alterna entre vista featured (colapsada) y timeline (expandida) |
+| `_scrollToSection()` | 5993 | Smooth scroll para hacer visible el timeline |
+| `_applySort(field, asc)` | 6051 | Fija el sorter activo (`_sortField` + `_sortAsc`) y refresca la lista: re-ordena el pool en local y re-pide la página en API |
+| `_bindSortToggle()` | 8331 | Bindea el menú de orden: el botón abre/cierra, y un `change` en sus radios llama a `_applySort()` |
+| `_applyFilters(immediate)` | 7809 | Filtra datos y re-renderiza todo. En modo API el parámetro `immediate` pide el borde de entrada del debounce. El resto de los métodos de filtros viven en [Sistema de filtros](#sistema-de-filtros) |
+| `_syncFilterToggleState()` | 7794 | Enciende `#filter-toggle` / `#filtros-internos-toggle` / `#search-wrap` según lo activo en cada dominio (los grupos `filtros_internos` solo encienden su propio botón, nunca el del panel) |
+| `_openSearch()` / `_closeSearch(force)` | 8356 / 8367 | Abre el buscador (`.open` + foco) y lo colapsa. El colapso se corta si el campo tiene texto: un término escrito es un filtro en uso, y esconderlo dejaría al filtro puesto sin forma de sacarlo. `force` lo usa <kbd>Esc</kbd>, que primero vacía el campo |
 | `_readUrlState()` | ver [Estado en la URL](#estado-en-la-url) | Con `stateInUrl`: lee el link **una vez**, desde el constructor, y deja el término, el orden, la taxonomía y la página ya puestos antes del primer render |
 | `_applyUrlFilterState()` | ídem | Siembra los tokens del link en `f.active` **antes** de `_buildFilterCheckboxes()`, sin cruzarlos contra los valores del grupo (que en API todavía no existen) |
 | `_restoreUrlPage()` | ídem | Modo local: deja la página del link en pantalla, recortada a la última |
@@ -96,47 +96,46 @@ new Timeline({ container, items, ... })
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_parseLinkWeb(url)` | 2812 | Detecta URLs de YouTube/Instagram/Twitter/Facebook y archivos de video directo, retorna `LinkInfo` |
-| `_isDirectVideoUrl(url)` | 2839 | True si la URL termina en `.mp4`/`.webm`/`.mov`/`.m4v`/`.ogv` (reusa `_getFileExt`, así el query string del CDN no molesta) |
-| `_buildEmbed(embedUrl)` | 2844 | Arma el markup del embed. Los tipos con SDK llevan shimmer; `video` lleva un `<video controls playsinline preload="metadata" loading="lazy">` sin shimmer |
-| `_processCardEmbeds(cardEl)` | 5489 | Procesa los embeds de la tarjeta al expandir. Para `video` no hay SDK: solo copia el `aspectRatio` real desde `videoWidth`/`videoHeight` en `loadedmetadata` |
-| `_preloadEmbedLibraries()` | 5784 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook**. `video` y `youtube` no cargan nada |
+| `_parseLinkWeb(url)` | 2835 | Detecta URLs de YouTube/Instagram/Twitter/Facebook y archivos de video directo, retorna `LinkInfo` |
+| `_isDirectVideoUrl(url)` | 2865 | True si la URL termina en `.mp4`/`.webm`/`.mov`/`.m4v`/`.ogv` (reusa `_getFileExt`, así el query string del CDN no molesta) |
+| `_buildEmbed(embedUrl)` | 2870 | Arma el markup del embed. Los tipos con SDK llevan shimmer; `video` lleva un `<video controls playsinline preload="metadata" loading="lazy">` sin shimmer |
+| `_processCardEmbeds(cardEl)` | 5541 | Procesa los embeds de la tarjeta al expandir. Para `video` no hay SDK: solo copia el `aspectRatio` real desde `videoWidth`/`videoHeight` en `loadedmetadata` |
+| `_preloadEmbedLibraries()` | 5819 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook**. `video` y `youtube` no cargan nada |
 
 ### Mapa de temas (OpenLayers)
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_buildTemasHtml(card, located)` | 3309 | Markup del bloque "Temas destacados": header con el subtítulo y el toggle, el body del mapa y la lista. Cada tema lleva un badge `.tema-map-ref` (número si está ubicado, ícono de pin tachado si no) |
-| `_temaGeomOf(tema)` | 3379 | Valida el `geom` de un tema: devuelve `{ lat, lon }` o `null` si falta, no es objeto o está fuera de rango (`lat` ∉ [-90, 90], `lon` ∉ [-180, 180], `NaN`/`Infinity`). Un punto inválido se trata igual que ausente: el tema se lista y solo se saltea su marcador |
-| `_temasLocated(temas)` | 3396 | Única pasada que filtra los temas con `geom` usable y les asigna `index` (1-based, el del mapa) + `temaIndex` (posición original en la lista) + `idSubtema` (`id_subtema` del tema, la identidad con la que la fila del fullmap se cruza con el punto) + `color` por tono. De acá salen tanto los badges como los círculos |
-| `_buildTemasMapToggleHtml(located)` | 3438 | Botón (ícono del mapa + flechita, sin texto) que abre el mapa. `''` sin temas ubicados. Acción en `aria-label` + `title` ("Ver mapa"/"Ocultar mapa"); la flechita gira 180° por CSS desde el mismo `aria-expanded`; puro |
-| `_buildTemasMapBodyHtml(located)` | 3455 | Body del mapa (`.card-temas-map-body` + `.card-temas-map-canvas`), oculto hasta el primer open. `''` sin temas ubicados |
-| `_bindTemasMapToggle(slot, located)` | 3479 | Bindea el toggle (alterna `expanded`/`hidden`/`aria-expanded`/labels, con `stopPropagation`) y, en el primer open, monta el mapa en un `requestAnimationFrame` |
-| `_loadOpenLayers()` | 3513 | `import()` dinámico de los módulos de `ol` (Map, View, geometrías, capas, fuentes, estilos, overlay, controles, proj) y del plugin de zoom. Cachea la promesa |
-| `_mountTemasMap(canvas, located)` | 3590 | Montaje del mapa de la tarjeta: llama a `_mountTemasMapOn` y registra el handle en `_temasMaps` (el teardown es `_destroyTemasMaps`) |
-| `_mountTemasMapOn(canvas, points, options)` | 3620 | El mapa compartido (tarjeta y general): features (círculos + texto, estilo por función), overlay de tooltip, `constrainResolution: true` en el `View` (todo zoom entero: el `fit` floor-ea al nivel más lejano que encuadra), `renderSync()` + `declutter()` (agrupamiento todos-contra-todos: un punto entra solo si está a ≤ el umbral de **todos** los miembros, así ningún grupo pasa de ese ancho y una cadena de cercanos ya no se fusiona en uno gigante) y los listeners de `pointermove`/`singleclick`. `declutter()` elige modo por zoom: **clúster** por debajo de `TEMAS_MAP_CLUSTER_MAX_ZOOM` (un círculo con el conteo en el centroide, `feature.cluster` en el líder y `hidden` en el resto, cuyo estilo es `[]` = no pintar nada) o **spiderfy** (separa los markers solapados y guarda en `feature.spider` la línea —negra, `TEMAS_MAP_SPIDER_LINE_COLOR`— de vuelta al origen y la geometría desplazada); un grupo de más de `TEMAS_MAP_SPIDER_MAX_GROUP` (12) se agrupa como clúster por debajo de `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` (15), y a partir de ese zoom el tope se apaga y **todo** grupo se estira en anillo, sin clústeres (a la vista cercana un clúster es un callejón sin salida: su click no puede disolverlo), el punto seleccionado **no desarma ningún grupo**: en un anillo (`spider`) se queda desplazado y su bundle de selección —sombra (`TEMAS_MAP_SELECTED_SHADE_*`, dos discos con `zIndex` -1, abajo de todo), círculo más grande (`TEMAS_MAP_SELECTED_RADIUS_DELTA` + `TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`, radio 16 sobre el marker base de 9) con aro de 2px (`TEMAS_MAP_SELECTED_Z_INDEX`, arriba) y número— se pinta sobre la geometría desplazada (la rama del `spider` copia los estilos hacia `spider.marker` con el flag `grown`), y solo de un **conteo** se lo saca: la rama de clúster lo filtra de `members` y pinta el conteo solo si quedan 2 o más; `TemasMapHandle.selectedSpiderCenter()` devuelve la coordenada desplazada para que el `fit` de `_focusFullMapTema` centre donde está el círculo. `targets` es lo que leen el hit test del hover y del click (el click en un clúster hace `view.animate` + `TEMAS_MAP_CLUSTER_ZOOM_STEP` (4) de zoom, con tope `TEMAS_MAP_FIT_MAX_ZOOM` = 15, que además es el `maxZoom` de la `View`) |
-| `_mountFullMap(canvas, points)` | 4723 | Wrapper del mapa general (`showFullMap`): le pasa a `_mountTemasMapOn` el tooltip de dos líneas, `onMarkerClick: _openFullMapCard` y `isSelected` por `_fullMapSelectedKey` |
-| `_adjustFullMapViewForPanel(point, key)` | 4881 | Si la ficha recién abierta tapa el punto clickeado, corre la vista —solo `center`, nunca zoom—: choque contra el panel inflado por `FULLMAP_PANEL_CLEAR_PX` (16), dos candidatos (derecha del panel / encima de su top, con el techo en el bottom de la barra), gana el vuelo más chico y si ninguno deja el círculo entero en el mapa no se mueve. La coordenada es la pintada (`selectedSpiderCenter()` si hay anillo); el guard `key` descarta la corrección si la selección cambió durante el `await` de `ol` |
-| `_destroyTemasMaps()` | 4383 | Suelta cada mapa guardado en `_temasMaps` (`overlay.setMap(null)` + `map.setTarget(undefined)` + `dispose()`). Se llama antes de vaciar la lista (`_renderTimeline`, `_renderApiLoading`) |
+| `_buildTemasHtml(card, located)` | 3356 | Markup del bloque "Temas destacados": header con el subtítulo y el toggle, el body del mapa y la lista. Cada tema lleva un badge `.tema-map-ref` (número si está ubicado, ícono de pin tachado si no) |
+| `_temaGeomOf(tema)` | 3426 | Valida el `geom` de un tema: devuelve `{ lat, lon }` o `null` si falta, no es objeto o está fuera de rango (`lat` ∉ [-90, 90], `lon` ∉ [-180, 180], `NaN`/`Infinity`). Un punto inválido se trata igual que ausente: el tema se lista y solo se saltea su marcador |
+| `_temasLocated(temas)` | 3443 | Única pasada que filtra los temas con `geom` usable y les asigna `index` (1-based, el del mapa) + `temaIndex` (posición original en la lista) + `idSubtema` (`id_subtema` del tema, la identidad con la que la fila del fullmap se cruza con el punto) + `color` por tono. De acá salen tanto los badges como los círculos |
+| `_buildTemasMapToggleHtml(located)` | 3485 | Botón (ícono del mapa + flechita, sin texto) que abre el mapa. `''` sin temas ubicados. Acción en `aria-label` + `title` ("Ver mapa"/"Ocultar mapa"); la flechita gira 180° por CSS desde el mismo `aria-expanded`; puro |
+| `_buildTemasMapBodyHtml(located)` | 3502 | Body del mapa (`.card-temas-map-body` + `.card-temas-map-canvas`), oculto hasta el primer open. `''` sin temas ubicados |
+| `_bindTemasMapToggle(slot, located)` | 3526 | Bindea el toggle (alterna `expanded`/`hidden`/`aria-expanded`/labels, con `stopPropagation`) y, en el primer open, monta el mapa en un `requestAnimationFrame` |
+| `_loadOpenLayers()` | 3560 | `import()` dinámico de los módulos de `ol` (Map, View, geometrías, capas, fuentes, estilos, overlay, controles, proj) y del plugin de zoom. Cachea la promesa |
+| `_mountTemasMap(canvas, located)` | 3637 | Montaje del mapa de la tarjeta: llama a `_mountTemasMapOn` y registra el handle en `_temasMaps` (el teardown es `_destroyTemasMaps`) |
+| `_mountTemasMapOn(canvas, points, options)` | 3667 | El mapa compartido (tarjeta y general): features (círculos + texto, estilo por función), overlay de tooltip, `constrainResolution: true` en el `View` (todo zoom entero: el `fit` floor-ea al nivel más lejano que encuadra), `renderSync()` + `declutter()` (agrupamiento todos-contra-todos: un punto entra solo si está a ≤ el umbral de **todos** los miembros, así ningún grupo pasa de ese ancho y una cadena de cercanos ya no se fusiona en uno gigante) y los listeners de `pointermove`/`singleclick`. `declutter()` elige modo por zoom: **clúster** por debajo de `TEMAS_MAP_CLUSTER_MAX_ZOOM` (un círculo con el conteo en el centroide, `feature.cluster` en el líder y `hidden` en el resto, cuyo estilo es `[]` = no pintar nada) o **spiderfy** (separa los markers solapados y guarda en `feature.spider` la línea —negra, `TEMAS_MAP_SPIDER_LINE_COLOR`— de vuelta al origen y la geometría desplazada); un grupo de más de `TEMAS_MAP_SPIDER_MAX_GROUP` (12) se agrupa como clúster por debajo de `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` (15), y a partir de ese zoom el tope se apaga y **todo** grupo se estira en anillo, sin clústeres (a la vista cercana un clúster es un callejón sin salida: su click no puede disolverlo), el punto seleccionado **no desarma ningún grupo**: en un anillo (`spider`) se queda desplazado y su bundle de selección —sombra (`TEMAS_MAP_SELECTED_SHADE_*`, dos discos con `zIndex` -1, abajo de todo), círculo más grande (`TEMAS_MAP_SELECTED_RADIUS_DELTA` + `TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`, radio 16 sobre el marker base de 9) con aro de 2px (`TEMAS_MAP_SELECTED_Z_INDEX`, arriba) y número— se pinta sobre la geometría desplazada (la rama del `spider` copia los estilos hacia `spider.marker` con el flag `grown`), y solo de un **conteo** se lo saca: la rama de clúster lo filtra de `members` y pinta el conteo solo si quedan 2 o más; `TemasMapHandle.selectedSpiderCenter()` devuelve la coordenada desplazada para que el `fit` de `_focusFullMapTema` centre donde está el círculo. `targets` es lo que leen el hit test del hover y del click (el click en un clúster hace `view.animate` + `TEMAS_MAP_CLUSTER_ZOOM_STEP` (4) de zoom, con tope `TEMAS_MAP_FIT_MAX_ZOOM` = 15, que además es el `maxZoom` de la `View`) |
+| `_mountFullMap(canvas, points)` | 4771 | Wrapper del mapa general (`showFullMap`): le pasa a `_mountTemasMapOn` el tooltip de dos líneas, `onMarkerClick: _openFullMapCard` y `isSelected` por `_fullMapSelectedKey` |
+| `_adjustFullMapViewForPanel(point, key)` | 4929 | Si la ficha recién abierta tapa el punto clickeado, corre la vista —solo `center`, nunca zoom—: choque contra el panel inflado por `FULLMAP_PANEL_CLEAR_PX` (16), dos candidatos (derecha del panel / encima de su top, con el techo en el bottom de la barra), gana el vuelo más chico y si ninguno deja el círculo entero en el mapa no se mueve. La coordenada es la pintada (`selectedSpiderCenter()` si hay anillo); el guard `key` descarta la corrección si la selección cambió durante el `await` de `ol` |
+| `_destroyTemasMaps()` | 4430 | Suelta cada mapa guardado en `_temasMaps` (`overlay.setMap(null)` + `map.setTarget(undefined)` + `dispose()`). Se llama antes de vaciar la lista (`_renderTimeline`, `_renderApiLoading`) |
 
 ### Utilidades
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_formatDate(dateStr)` | 2792 | Fecha YYYY-MM-DD → string locale `es-ES` |
-| `_formatDateTime(dateStr)` | 2799 | Datetime ISO → string locale `es-ES` |
+| `_formatDate(dateStr)` | 2815 | Fecha YYYY-MM-DD → string locale `es-ES` |
+| `_formatDateTime(dateStr)` | 2822 | Datetime ISO → string locale `es-ES` |
 | `_getFileExt(url)` | — | Extrae la extensión de una URL en minúsculas |
 | `_fileIconSvg(ext)` | — | SVG de icono de archivo según extensión (pdf vs genérico) |
-| `_openLightGallery(images, title, showFileName, startIndex?)` | 2868 | Abre modal lightGallery con galería de imágenes |
-| `_absoluteUrl(url)` | 2966 | Resuelve una URL del ítem contra `window.location.href` para poder compartirla (devuelve el valor crudo si no es una URL válida). Se usa con `link_view_entry` |
-| `_escapeHtml(value)` | 2926 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores del dato de `taxonomias` (`content`, `link` y `label`), que siempre son texto plano |
+| `_openLightGallery(images, title, showFileName, startIndex?)` | 2896 | Abre modal lightGallery con galería de imágenes |
+| `_absoluteUrl(url)` | 2994 | Resuelve una URL del ítem contra `window.location.href` para poder compartirla (devuelve el valor crudo si no es una URL válida). Se usa con `link_view_entry` |
+| `_escapeHtml(value)` | 2954 | Escapa `& < > " '` para interpolar texto plano en markup o atributos. Se usa en los valores del dato de `taxonomias` (`content`, `link` y `label`), que siempre son texto plano |
 
 ### Observers
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_setupObserver()` | 5736 | IntersectionObserver para animación de entrada de featured cards |
-| `_setupTimelineObserver(items?)` | 5759 | IntersectionObserver para animación de entrada de timeline items. `items` acota qué se observa (la paginación pasa solo las tarjetas nuevas); por defecto observa todas las `.timeline-item` del container |
+| `_setupTimelineObserver(items?)` | 5794 | IntersectionObserver para animación de entrada de timeline items. `items` acota qué se observa (la paginación pasa solo las tarjetas nuevas); por defecto observa todas las `.timeline-item` del container |
 
 ## Estructura DOM
 
@@ -410,25 +409,25 @@ Mapa de métodos (líneas actuales):
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_normalizeFilters(filters)` | 2144 | Valida la opción `filters`, resuelve defaults (`group`, `persist`, `allowEmpty`, `column`) y normaliza el `label` a string (ausente / `null` / en blanco queda `''`, sin descartar el grupo), resuelve los `items` de cada grupo y reparte los grupos `'menu'` en dos columnas (la primera mitad de la declaración a la columna 0, el resto a la 1) |
-| `_resolveFilterItems(field, items)` | 2221 | Convierte los `items` declarados en los tokens de los checkboxes: `token` (los valores unidos por comas, que es el `input.value` y el query param) + `tokens` (uno por valor, para comparar contra el ítem), más `label` y `checked`. Devuelve `null` con warning si la declaración no se puede usar (vacía, un ítem sin `label` / sin `value`, tokens repetidos, un valor con coma) |
-| `_buildFilterOptionsHtml(f)` | 2365 | Markup del slot de un grupo: `.filter-section` + `.filter-header` (solo si `f.label` no está vacío) + `.filter-options[data-filter-field]`, **idéntico para los dos destinos**: el flyout de `filtros_internos` también muestra headers, y un grupo sin `label` se dibuja igual, solo que sin header. El `id` es solo un handle de debug: el wiring va por `data-filter-field`, así un `field` inválido como selector CSS no rompe nada |
-| `_buildFilterMenuHtml()` | 2426 | Markup del panel `.filter-wrap` (botón `#filter-toggle` + `#filter-menu`) con las dos columnas y, al final, la fila `.filter-menu-footer` con el `button.filter-clear` ("Limpiar filtros"). `''` si no hay grupos `'menu'` |
-| `_buildInternalButtonsHtml()` | 2495 | Markup del toolbar interno: toggle de notas de trabajo +, si hay grupos `'filtros_internos'`, el `.filtros-internos-wrap` con `#filtros-internos-toggle` y `#filtros-internos-menu`. Ambos condicionales a `internalButtons` y a la opción `filters` |
-| `_attachFilterOptions()` | 2657 | Apunta cada `FilterDef.options` al slot que `_buildLayout` le renderizó (lookup por `data-filter-field`). Un grupo sin slot (ej. `'filtros_internos'` sin `internalButtons`) conserva su config y `_buildFilterCheckboxes` simplemente lo esquiva |
-| `_filterToken(value)` | 6066 | El token de un valor crudo: `String(value)`, con `null` / `undefined` como `'null'`. Todo el matching y los query params pasan por acá |
-| `_filterValuesOf(f, item)` | 6077 | Tokens que un ítem lleva para el grupo: lo que devuelve `extract`, o `item[field]` (arrays expandidos, todo tokenizado). Un `null` / `undefined` **es** el token `'null'`, así que matchea el valor que lo declara; un grupo derivado los descarta al armar la lista de valores, porque ahí no hay nadie a quien atribuírselos |
-| `_filterActiveTokens(f)` | 6097 | Los tokens que el grupo está filtrando: los `input.value` de los checkboxes tildados, partidos por comas (un `value: [false, null]` aporta los dos). Lo usan tanto `_applyFilters()` como la cuenta de `_buildFilterCheckboxes()` |
-| `_filterLabelOf(f, value)` | 6107 | Label de un valor de un grupo **derivado**: lo que devuelve `formatLabel`, o el valor mismo salvo `true` → "Sí" / `false` → "No". Un valor declarado trae su `label` en el `items` y no pasa por acá |
-| `_filterMaxVisible(f)` | 6057 | Resuelve el corte "Ver más": `f.maxVisible`, o el default `DEFAULT_FILTER_MAX_VISIBLE = 5`. Debajo de 2 no hay corte |
-| `_buildFilterCheckboxes()` | 6279 | Construye los checkboxes de cada grupo con sus valores y conteos (ver flujo abajo) y aplica el corte "Ver más". En la rama derivada también decide si ofrece el bucket vacío (`allowEmpty`), y en todo caso lo deja último |
-| `_buildFilterMore(f, overflow)` | 6987 | Agrega el `button.filter-more` al final del grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
-| `_loadPersistedFilterState()` | 7017 | Lee la key `tv-filtros-internos-filters` de `localStorage` (los valores son los `input.value`, o sea tokens) |
-| `_savePersistedFilterState()` | 7029 | Escribe el estado de los grupos con `persist: true` (solo en el gesture del usuario) |
-| `_seedFilterActive(f, values, savedState)` | 6255 | Con qué valores arranca un grupo en cada rebuild: **URL → `localStorage` (`persist`) → `checked` declarado**, en ese orden, y el cruce es **por tokens** (un valor declarado con lista es un solo token que es un CSV). Que la URL gane es lo que hace que un filtro compartido sobreviva a los rebuilds (los facets de API, un cambio de taxonomía) |
-| `_buildQueryParams(page)` | 7280 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`), más `page`/`pageSize`, `sort` (dirección) y `sortBy` (el sorter activo). Es el mismo vocabulario que usa la URL del navegador (ver [Estado en la URL](#estado-en-la-url)) |
-| `_syncFilterToggleState()` | 7760 | Enciende los botones por dominio (ver arriba) y escribe el `disabled` del `#filter-clear` con el mismo alcance que el puntito del panel |
-| `_clearFilters()` | 6717 | El handler del "Limpiar filtros": vacía `active` de los grupos `'menu'` (sin tocar `filtros_internos` ni la búsqueda), sincroniza cada control con `_syncFilterControl()`, escribe `[]` en `_urlFilters` por cada campo del panel —si no, `_seedFilterActive()` los reviviría en el próximo rebuild desde la URL o desde los `checked` declarados—, persiste si algún grupo del panel tiene `persist` y cierra con `_applyFilters(true)` |
+| `_normalizeFilters(filters)` | 2164 | Valida la opción `filters`, resuelve defaults (`group`, `persist`, `allowEmpty`, `column`) y normaliza el `label` a string (ausente / `null` / en blanco queda `''`, sin descartar el grupo), resuelve los `items` de cada grupo y reparte los grupos `'menu'` en dos columnas (la primera mitad de la declaración a la columna 0, el resto a la 1) |
+| `_resolveFilterItems(field, items)` | 2241 | Convierte los `items` declarados en los tokens de los checkboxes: `token` (los valores unidos por comas, que es el `input.value` y el query param) + `tokens` (uno por valor, para comparar contra el ítem), más `label` y `checked`. Devuelve `null` con warning si la declaración no se puede usar (vacía, un ítem sin `label` / sin `value`, tokens repetidos, un valor con coma) |
+| `_buildFilterOptionsHtml(f)` | 2385 | Markup del slot de un grupo: `.filter-section` + `.filter-header` (solo si `f.label` no está vacío) + `.filter-options[data-filter-field]`, **idéntico para los dos destinos**: el flyout de `filtros_internos` también muestra headers, y un grupo sin `label` se dibuja igual, solo que sin header. El `id` es solo un handle de debug: el wiring va por `data-filter-field`, así un `field` inválido como selector CSS no rompe nada |
+| `_buildFilterMenuHtml()` | 2446 | Markup del panel `.filter-wrap` (botón `#filter-toggle` + `#filter-menu`) con las dos columnas y, al final, la fila `.filter-menu-footer` con el `button.filter-clear` ("Limpiar filtros"). `''` si no hay grupos `'menu'` |
+| `_buildInternalButtonsHtml()` | 2515 | Markup del toolbar interno: toggle de notas de trabajo +, si hay grupos `'filtros_internos'`, el `.filtros-internos-wrap` con `#filtros-internos-toggle` y `#filtros-internos-menu`. Ambos condicionales a `internalButtons` y a la opción `filters` |
+| `_attachFilterOptions()` | 2680 | Apunta cada `FilterDef.options` al slot que `_buildLayout` le renderizó (lookup por `data-filter-field`). Un grupo sin slot (ej. `'filtros_internos'` sin `internalButtons`) conserva su config y `_buildFilterCheckboxes` simplemente lo esquiva |
+| `_filterToken(value)` | 6101 | El token de un valor crudo: `String(value)`, con `null` / `undefined` como `'null'`. Todo el matching y los query params pasan por acá |
+| `_filterValuesOf(f, item)` | 6112 | Tokens que un ítem lleva para el grupo: lo que devuelve `extract`, o `item[field]` (arrays expandidos, todo tokenizado). Un `null` / `undefined` **es** el token `'null'`, así que matchea el valor que lo declara; un grupo derivado los descarta al armar la lista de valores, porque ahí no hay nadie a quien atribuírselos |
+| `_filterActiveTokens(f)` | 6132 | Los tokens que el grupo está filtrando: los `input.value` de los checkboxes tildados, partidos por comas (un `value: [false, null]` aporta los dos). Lo usan tanto `_applyFilters()` como la cuenta de `_buildFilterCheckboxes()` |
+| `_filterLabelOf(f, value)` | 6142 | Label de un valor de un grupo **derivado**: lo que devuelve `formatLabel`, o el valor mismo salvo `true` → "Sí" / `false` → "No". Un valor declarado trae su `label` en el `items` y no pasa por acá |
+| `_filterMaxVisible(f)` | 6092 | Resuelve el corte "Ver más": `f.maxVisible`, o el default `DEFAULT_FILTER_MAX_VISIBLE = 5`. Debajo de 2 no hay corte |
+| `_buildFilterCheckboxes()` | 6314 | Construye los checkboxes de cada grupo con sus valores y conteos (ver flujo abajo) y aplica el corte "Ver más". En la rama derivada también decide si ofrece el bucket vacío (`allowEmpty`), y en todo caso lo deja último |
+| `_buildFilterMore(f, overflow)` | 7022 | Agrega el `button.filter-more` al final del grupo colapsado y lo deja en su estado inicial (abierto si el grupo tiene algún valor tildado) |
+| `_loadPersistedFilterState()` | 7052 | Lee la key `tv-filtros-internos-filters` de `localStorage` (los valores son los `input.value`, o sea tokens) |
+| `_savePersistedFilterState()` | 7064 | Escribe el estado de los grupos con `persist: true` (solo en el gesture del usuario) |
+| `_seedFilterActive(f, values, savedState)` | 6290 | Con qué valores arranca un grupo en cada rebuild: **URL → `localStorage` (`persist`) → `checked` declarado**, en ese orden, y el cruce es **por tokens** (un valor declarado con lista es un solo token que es un CSV). Que la URL gane es lo que hace que un filtro compartido sobreviva a los rebuilds (los facets de API, un cambio de taxonomía) |
+| `_buildQueryParams(page)` | 7315 | Arma los params de la request de lista: los tokens tildados de cada grupo unidos por comas (`validado=false,null`), más `page`/`pageSize`, `sort` (dirección) y `sortBy` (el sorter activo). Es el mismo vocabulario que usa la URL del navegador (ver [Estado en la URL](#estado-en-la-url)) |
+| `_syncFilterToggleState()` | 7794 | Enciende los botones por dominio (ver arriba) y escribe el `disabled` del `#filter-clear` con el mismo alcance que el puntito del panel |
+| `_clearFilters()` | 6752 | El handler del "Limpiar filtros": vacía `active` de los grupos `'menu'` (sin tocar `filtros_internos` ni la búsqueda), sincroniza cada control con `_syncFilterControl()`, escribe `[]` en `_urlFilters` por cada campo del panel —si no, `_seedFilterActive()` los reviviría en el próximo rebuild desde la URL o desde los `checked` declarados—, persiste si algún grupo del panel tiene `persist` y cierra con `_applyFilters(true)` |
 
 Flujo:
 
@@ -472,7 +471,7 @@ Son transiciones de clase, no `@keyframes`: el elemento nace en su estado inicia
 Usan `IntersectionObserver` (sin librerías externas):
 
 - **Timeline items**: un observer por cada `.timeline-item`, con root en el **viewport** (no lleva `root`, así que `#timeline-cards` sigue siendo su propia caja con scroll), threshold 0.1 y rootMargin `0px 0px 100px 0px`. Agrega `.visible` y se desuscribe: es un latch de una sola vez.
-- **Featured cards**: sin observer — la entrada la dispara un `requestAnimationFrame` en `_renderAll()` / `_init()`. `_setupObserver()` es código muerto. El efecto cascada no es un `index * 0.08s` calculado en JS: es la tabla `@for` de `nth-child` del SCSS, que reparte `transition-delay` (0s…0.9s), `left`, `z-index` y `scale` por posición.
+- **Featured cards**: sin observer — la entrada la dispara un `requestAnimationFrame` en `_renderAll()` / `_init()`. El efecto cascada no es un `index * 0.08s` calculado en JS: es la tabla `@for` de `nth-child` del SCSS, que reparte `transition-delay` (0s…0.9s), `left`, `z-index` y `scale` por posición.
 
 El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente en el mismo frame que la inserción y la transición no correría, porque el navegador no tendría un valor computado previo desde el cual transicionar.
 
@@ -484,7 +483,6 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 |-----------|------|-------------|
 | `container` | `HTMLElement` | Elemento DOM del consumidor |
 | `items` | `TimelineItem[]` | Datos originales recibidos |
-| `_originalCards` | `TimelineItem[]` | Copia ordenada de items (antes de filtros) |
 | `allCards` | `TimelineItem[]` | Items filtrados y/o ordenados |
 | `_displayedCount` | `number` | Cantidad de items visibles (paginación) |
 | `featured_count` | `number` | Cantidad de cards en el stack featured |
@@ -533,6 +531,7 @@ El `requestAnimationFrame` no es decorativo: sin él la clase estaría presente 
 | `.expanded` | `.publicaciones-timeline-section` | Timeline visible, featured oculto |
 | `.has-taxonomy` | `.publicaciones-timeline-section` | El selector de taxonomías está activo (`content` con grupos): con el timeline expandido oculta `#remaining-count` porque el contador pasa a verse en la píldora del selector |
 | `.fullpage` | `.publicaciones-timeline-section` | Modo fullpage (`fullpage: true`): timeline siempre abierto y sin colapsar, sin handle de resize, sin scroll interno en `#timeline-cards` y con `.featured-row` pegada al top. Lo agrega `_buildLayout()` |
+| `.fullmap-open` | `.publicaciones-container` | El mapa general (`showFullMap`) está abierto y el timeline oculto. La refleja `_applyFullMapState()` en el `container` del consumidor para que pueda ajustar lo que está fuera del componente. Con el timeline en fullpage achica `.featured-row` a `width: max-content` (solo quedan los botones del toolbar) |
 | `.expanded` | `.timeline-card` | Tarjeta individual expandida |
 | `.descartada` | `.timeline-card` | Ítem `descartado: true`: fondo de la carta en `--tv-bg-card-discarded` (rojo), con un velo del mismo tono sobre la miniatura (que es opaca y taparía el fondo). La pone `_createTimelineItem()` |
 | `.sin-validar` | `.timeline-card` | Ítem `validado !== true` (mismo criterio que el badge "Sin validar", o sea incluye el `null`): lo mismo que `.descartada` pero en `--tv-bg-card-unvalidated` (naranja). El selector es `:not(.descartada)`, así que un ítem que llega con los dos estados se pinta de rojo |

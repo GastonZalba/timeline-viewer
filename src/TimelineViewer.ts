@@ -3076,7 +3076,7 @@ export default class Timeline {
     // no-op natural sobre un `querySelectorAll` sin resultados.
     if (this.fullpage) return;
     this.featuredContainer.innerHTML = '';
-    cards.forEach((card, i) => {
+    cards.forEach((card) => {
       const el = document.createElement('div');
       el.className = 'featured-card';
       const imgHtml = card.thumbnail
@@ -3099,7 +3099,7 @@ export default class Timeline {
   }
 
   /** Create a single timeline card element with all its event listeners */
-  protected _createTimelineItem(card: TimelineItem, index: number): HTMLElement {
+  protected _createTimelineItem(card: TimelineItem): HTMLElement {
     const el = document.createElement('div');
     el.className = 'timeline-item';
     if (card.capturado !== true) {
@@ -4836,7 +4836,7 @@ export default class Timeline {
       return;
     }
 
-    const itemEl = this._createTimelineItem(card, 0);
+    const itemEl = this._createTimelineItem(card);
     // La columna de fecha es de la línea de tiempo: acá no hay línea vertical ni dots, y sin la
     // fecha la cabecera de la tarjeta queda desalineada contra el panel.
     const dateCol = itemEl.querySelector('.timeline-date-col');
@@ -5722,8 +5722,8 @@ export default class Timeline {
       `;
       this.timelineCards.appendChild(el);
     } else {
-      cards.forEach((card, i) => {
-        const el = this._createTimelineItem(card, i);
+      cards.forEach((card) => {
+        const el = this._createTimelineItem(card);
         if (instant) el.classList.add('visible');
         this.timelineCards.appendChild(el);
       });
@@ -5744,15 +5744,15 @@ export default class Timeline {
    * lose the `visible` class and replay its entrance transition (the whole list blinking on
    * each page), drop the detail injected in the expanded ones, and reload every image.
    */
-  protected _appendTimelineItems(items: TimelineItem[], startIndex: number): HTMLElement[] {
+  protected _appendTimelineItems(items: TimelineItem[]): HTMLElement[] {
     // `_renderTimeline` only writes the "nothing to show" placeholder when the list comes back
     // empty. Appending cards makes it untrue, so it goes before the first real one lands.
     if (items.length) {
       this.timelineCards.querySelectorAll('.timeline-empty-item').forEach((el) => el.remove());
     }
     const added: HTMLElement[] = [];
-    items.forEach((card, i) => {
-      const el = this._createTimelineItem(card, startIndex + i);
+    items.forEach((card) => {
+      const el = this._createTimelineItem(card);
       this._insertBeforeTrailing(el);
       added.push(el);
     });
@@ -5782,23 +5782,6 @@ export default class Timeline {
       <div class="timeline-footer-text">Actualizado por última vez el ${formatted}.</div>
     `;
     this.timelineCards.appendChild(el);
-  }
-
-  /** Set up IntersectionObserver for the featured cards entrance animation */
-  protected _setupObserver(): void {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const cards = this.featuredContainer.querySelectorAll('.featured-card');
-            cards.forEach((c) => c.classList.add('visible'));
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(this.section);
   }
 
   /**
@@ -7495,13 +7478,12 @@ export default class Timeline {
       this._apiTotal = typeof data.total === 'number' ? data.total : this._apiTotal;
       this._apiPage = nextPage;
       this._apiLoading = false;
-      const start = this.allCards.length;
       const fresh = (data.items || []) as unknown as TimelineItem[];
       this.allCards.push(...fresh);
       this._displayedCount = this.allCards.length;
       // Only the new cards are added; `_renderAll` would rebuild the whole list and make every
       // card on screen replay its entrance animation. See `_appendTimelineItems`.
-      const added = this._appendTimelineItems(fresh, start);
+      const added = this._appendTimelineItems(fresh);
       // The load-more button is kept between pages (its handler reads `this._apiPage` live, so
       // one node serves every page) and only goes away when there is nothing left to ask for.
       if (!this._hasMorePages()) {
@@ -7996,8 +7978,8 @@ export default class Timeline {
 
       el.remove();
 
-      more.forEach((card, i) => {
-        this._insertBeforeFooter(this._createTimelineItem(card, i));
+      more.forEach((card) => {
+        this._insertBeforeFooter(this._createTimelineItem(card));
       });
 
       this._displayedCount = end;
@@ -8207,7 +8189,7 @@ export default class Timeline {
       this.section.innerHTML = `<div class="single-mode-message">No se encontró el artículo ${id}.</div>`;
       return;
     }
-    const itemEl = this._createTimelineItem(card, 0);
+    const itemEl = this._createTimelineItem(card);
     const dateCol = itemEl.querySelector('.timeline-date-col') as HTMLElement | null;
     if (dateCol) dateCol.remove();
     const collapseBtn = itemEl.querySelector('.card-collapse') as HTMLElement | null;
@@ -8403,7 +8385,15 @@ export default class Timeline {
       this._toggleExpand();
     });
     this._bindSortToggle();
-    if (this.showFullMap) this._bindFullMapToggle();
+    if (this.showFullMap) {
+      this._bindFullMapToggle();
+      document.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && this._fullMapOpen) {
+          this._fullMapOpen = false;
+          this._applyFullMapState();
+        }
+      });
+    }
     if (this.taxonomySelect) {
       this.taxonomySelect.addEventListener('change', () => this._onTaxonomyChange());
     }

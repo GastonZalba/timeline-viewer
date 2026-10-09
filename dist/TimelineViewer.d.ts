@@ -1335,7 +1335,7 @@ export default class Timeline {
     /** Render the featured (overlapping) cards row */
     protected _renderFeatured(cards: TimelineItem[]): void;
     /** Create a single timeline card element with all its event listeners */
-    protected _createTimelineItem(card: TimelineItem, index: number): HTMLElement;
+    protected _createTimelineItem(card: TimelineItem): HTMLElement;
     /** True if the card already carries its full detail payload (local mode) */
     protected _hasDetail(card: TimelineItem | TimelineItemSummary): boolean;
     /** Build the "Actores principales" HTML block */
@@ -1886,7 +1886,7 @@ export default class Timeline {
      * lose the `visible` class and replay its entrance transition (the whole list blinking on
      * each page), drop the detail injected in the expanded ones, and reload every image.
      */
-    protected _appendTimelineItems(items: TimelineItem[], startIndex: number): HTMLElement[];
+    protected _appendTimelineItems(items: TimelineItem[]): HTMLElement[];
     /**
      * Write (or rewrite) the last-updated footer at the end of the timeline. Extracted from
      * `_renderTimeline` because in API mode `lastUpdated` arrives with the facets response,
@@ -1894,8 +1894,6 @@ export default class Timeline {
      * avoids re-rendering the timeline and losing a card the user already expanded.
      */
     protected _renderLastUpdated(): void;
-    /** Set up IntersectionObserver for the featured cards entrance animation */
-    protected _setupObserver(): void;
     /**
      * Set up IntersectionObserver for the timeline items entrance animation.
      *

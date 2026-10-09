@@ -2271,6 +2271,7 @@
         border-radius: 50px;
         box-shadow: 4px 7px 6px #00000026;
         width: 100%;
+        min-width: fit-content;
 
         @media (max-width: 800px) {
           max-width: none;
@@ -2553,10 +2554,40 @@
       // border-box`.
       gap: 4px;
       background: rgba(255, 255, 255, 0.2);
+      position: relative;
+
+      // Halo cónico rotante en hover, el mismo del `.timeline-load-more-btn`: el anillo sale del
+      // borde del botón (`inset: -2px`) y gira con `--tv-row-angle`.
+      &::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        padding: 2px;
+        background: conic-gradient(
+          from var(--tv-row-angle),
+          transparent 0 70%,
+          #ffffff 90%,
+          #ffffff 100%
+        );
+        -webkit-mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
 
       &:hover {
         background: rgba(255, 255, 255, 0.3);
         border: 1px solid var(--tv-color-map);
+
+        &::before {
+          opacity: 1;
+          animation: tv-row-spin 2s linear infinite;
+        }
       }
 
       // El estado sale del `aria-expanded` que escribe el handler, como el del botón del mapa de la
@@ -2567,6 +2598,13 @@
 
         &:hover {
           background: var(--tv-accent-light);
+        }
+
+        // Con el mapa abierto no hay hover: el halo cónico y su giro desaparecen (el chevron ya no
+        // existe en este estado, `_applyFullMapState` deja solo la X).
+        &::before {
+          opacity: 0;
+          animation: none;
         }
       }
 
@@ -2582,7 +2620,12 @@
         }
         &.fullmap-toggle-chevron {
           stroke: var(--tv-color-map);
+          transition: transform 0.3s ease;
         }
+      }
+
+      &:hover .fullmap-toggle-chevron {
+        transform: translateX(4px);
       }
 
       &:focus-visible {

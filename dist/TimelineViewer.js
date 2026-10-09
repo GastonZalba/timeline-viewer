@@ -446,6 +446,12 @@ const FULLMAP_LOADING_HTML = '<span class="loader"></span>';
  */
 const FULLMAP_OPEN_LABEL = 'Ver mapa';
 const FULLMAP_EXIT_LABEL = 'Salir del mapa y ver como listado';
+/**
+ * Clase que el componente refleja en el `container` del consumidor mientras el mapa general está
+ * abierto (el timeline queda oculto), para que el consumidor pueda ajustar lo que está fuera del
+ * componente. El prefijo `tv-` la aparta de las clases internas.
+ */
+const FULLMAP_OPEN_CLASS = 'fullmap-open';
 const FULLMAP_CLOSE_SVG = '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>';
 /**
  * Values shown per filter group before the "Ver más (N)" toggle appears, when the `maxVisible`
@@ -1799,7 +1805,7 @@ export default class Timeline {
         if (this.fullpage)
             return;
         this.featuredContainer.innerHTML = '';
-        cards.forEach((card, i) => {
+        cards.forEach((card) => {
             const el = document.createElement('div');
             el.className = 'featured-card';
             const imgHtml = card.thumbnail
@@ -1822,7 +1828,7 @@ export default class Timeline {
         });
     }
     /** Create a single timeline card element with all its event listeners */
-    _createTimelineItem(card, index) {
+    _createTimelineItem(card) {
         const el = document.createElement('div');
         el.className = 'timeline-item';
         if (card.capturado !== true) {
@@ -3180,6 +3186,7 @@ export default class Timeline {
      */
     _applyFullMapState() {
         const open = this._fullMapOpen;
+        this.container.classList.toggle(FULLMAP_OPEN_CLASS, open);
         this.timelineContainer.hidden = open;
         this.featuredContainer.hidden = open;
         if (this.fullMapView)
@@ -3505,7 +3512,7 @@ export default class Timeline {
             panel.innerHTML = `<div class="fullmap-detail-loading">No se encontró la publicación ${this._escapeHtml(id)}.</div>`;
             return;
         }
-        const itemEl = this._createTimelineItem(card, 0);
+        const itemEl = this._createTimelineItem(card);
         // La columna de fecha es de la línea de tiempo: acá no hay línea vertical ni dots, y sin la
         // fecha la cabecera de la tarjeta queda desalineada contra el panel.
         const dateCol = itemEl.querySelector('.timeline-date-col');
@@ -4396,8 +4403,8 @@ export default class Timeline {
             this.timelineCards.appendChild(el);
         }
         else {
-            cards.forEach((card, i) => {
-                const el = this._createTimelineItem(card, i);
+            cards.forEach((card) => {
+                const el = this._createTimelineItem(card);
                 if (instant)
                     el.classList.add('visible');
                 this.timelineCards.appendChild(el);
@@ -4417,15 +4424,15 @@ export default class Timeline {
      * lose the `visible` class and replay its entrance transition (the whole list blinking on
      * each page), drop the detail injected in the expanded ones, and reload every image.
      */
-    _appendTimelineItems(items, startIndex) {
+    _appendTimelineItems(items) {
         // `_renderTimeline` only writes the "nothing to show" placeholder when the list comes back
         // empty. Appending cards makes it untrue, so it goes before the first real one lands.
         if (items.length) {
             this.timelineCards.querySelectorAll('.timeline-empty-item').forEach((el) => el.remove());
         }
         const added = [];
-        items.forEach((card, i) => {
-            const el = this._createTimelineItem(card, startIndex + i);
+        items.forEach((card) => {
+            const el = this._createTimelineItem(card);
             this._insertBeforeTrailing(el);
             added.push(el);
         });
@@ -4454,19 +4461,6 @@ export default class Timeline {
       <div class="timeline-footer-text">Actualizado por última vez el ${formatted}.</div>
     `;
         this.timelineCards.appendChild(el);
-    }
-    /** Set up IntersectionObserver for the featured cards entrance animation */
-    _setupObserver() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    const cards = this.featuredContainer.querySelectorAll('.featured-card');
-                    cards.forEach((c) => c.classList.add('visible'));
-                    observer.unobserve(entry.target);
-                }
-            });
-        }, { threshold: 0.1 });
-        observer.observe(this.section);
     }
     /**
      * Set up IntersectionObserver for the timeline items entrance animation.
@@ -6186,13 +6180,12 @@ export default class Timeline {
             this._apiTotal = typeof data.total === 'number' ? data.total : this._apiTotal;
             this._apiPage = nextPage;
             this._apiLoading = false;
-            const start = this.allCards.length;
             const fresh = (data.items || []);
             this.allCards.push(...fresh);
             this._displayedCount = this.allCards.length;
             // Only the new cards are added; `_renderAll` would rebuild the whole list and make every
             // card on screen replay its entrance animation. See `_appendTimelineItems`.
-            const added = this._appendTimelineItems(fresh, start);
+            const added = this._appendTimelineItems(fresh);
             // The load-more button is kept between pages (its handler reads `this._apiPage` live, so
             // one node serves every page) and only goes away when there is nothing left to ask for.
             if (!this._hasMorePages()) {
@@ -6700,8 +6693,8 @@ export default class Timeline {
             const end = Math.min(start + this.itemsPerPage, this.allCards.length);
             const more = this.allCards.slice(start, end);
             el.remove();
-            more.forEach((card, i) => {
-                this._insertBeforeFooter(this._createTimelineItem(card, i));
+            more.forEach((card) => {
+                this._insertBeforeFooter(this._createTimelineItem(card));
             });
             this._displayedCount = end;
             if (this._displayedCount < this.allCards.length) {
@@ -6912,7 +6905,7 @@ export default class Timeline {
             this.section.innerHTML = `<div class="single-mode-message">No se encontró el artículo ${id}.</div>`;
             return;
         }
-        const itemEl = this._createTimelineItem(card, 0);
+        const itemEl = this._createTimelineItem(card);
         const dateCol = itemEl.querySelector('.timeline-date-col');
         if (dateCol)
             dateCol.remove();
@@ -7109,8 +7102,15 @@ export default class Timeline {
             this._toggleExpand();
         });
         this._bindSortToggle();
-        if (this.showFullMap)
+        if (this.showFullMap) {
             this._bindFullMapToggle();
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && this._fullMapOpen) {
+                    this._fullMapOpen = false;
+                    this._applyFullMapState();
+                }
+            });
+        }
         if (this.taxonomySelect) {
             this.taxonomySelect.addEventListener('change', () => this._onTaxonomyChange());
         }
