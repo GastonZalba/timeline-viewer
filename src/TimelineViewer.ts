@@ -525,6 +525,13 @@ const FULLMAP_LOADING_HTML = '<span class="loader"></span>';
  */
 const FULLMAP_OPEN_LABEL = 'Ver mapa';
 const FULLMAP_EXIT_LABEL = 'Salir del mapa y ver como listado';
+
+/**
+ * Clase que el componente refleja en el `container` del consumidor mientras el mapa general está
+ * abierto (el timeline queda oculto), para que el consumidor pueda ajustar lo que está fuera del
+ * componente. El prefijo `tv-` la aparta de las clases internas.
+ */
+const FULLMAP_OPEN_CLASS = 'fullmap-open';
 const FULLMAP_CLOSE_SVG =
   '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>';
 
@@ -4516,6 +4523,7 @@ export default class Timeline {
    */
   protected _applyFullMapState(): void {
     const open = this._fullMapOpen;
+    this.container.classList.toggle(FULLMAP_OPEN_CLASS, open);
     this.timelineContainer.hidden = open;
     this.featuredContainer.hidden = open;
     if (this.fullMapView) this.fullMapView.hidden = !open;
