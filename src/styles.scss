@@ -39,8 +39,10 @@
   // Offset de la barra de herramientas pegada del modo fullpage. Sube este valor si la página
   // del consumidor ya tiene un header propio fijo, para que la barra no quede debajo.
   --tv-sticky-top: 6px;
+
   --tv-color-map: #dbdbdb;
   --tv-color-map-light: #fff;
+  --tv-color-map-dark: #b6b5b5;
 
   --tv-work-note: #e04733;
   --tv-bg-card-unvalidated: #413129;
@@ -942,7 +944,7 @@
         display: flex;
         gap: 5px;
         height: 25px;
-        border: 1px solid var(--tv-color-map);
+        border: 1px solid var(--tv-color-map-dark);
         background: transparent;
         color: var(--tv-color-map);
         cursor: pointer;
@@ -2536,7 +2538,7 @@
     // controles de la barra: `display: none` en la base, `inline-flex` con `&.expanded`. El mapa
     // general no es una parte del timeline, así que no tiene sentido ofrecerlo con la lista colapsada.
     .fullmap-toggle {
-      border: 1px solid var(--tv-color-map);
+      border: 1px solid var(--tv-color-map-dark);
       color: var(--tv-text-on-primary);
       padding: 8px;
       border-radius: 42px;
