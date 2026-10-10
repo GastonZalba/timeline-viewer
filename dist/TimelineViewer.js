@@ -414,6 +414,21 @@ const TEMAS_MAP_TOGGLE_CHEVRON_SVG = '<svg class="card-temas-map-chevron" width=
  */
 const FULLMAP_TOGGLE_CHEVRON_SVG = '<svg class="fullmap-toggle-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9,6 15,12 9,18"/></svg>';
 /**
+ * Etiqueta visible del botón del mapa general, que entra animada en el hover del botón y desaparece
+ * al salir. Se muestra siempre con `aria-hidden`: la acción ya está en el `aria-label`/`title` del
+ * botón, así que anunciarla de nuevo repetiría lo mismo dos veces.
+ */
+const FULLMAP_TOGGLE_TEXT = 'Ver Mapa';
+/**
+ * Contenido del botón del mapa general con la vista **cerrada**: ícono del mapa + etiqueta que el
+ * hover revela + chevron que apunta adentro. Es el marcado que `_buildFullMapToggleHtml` emite al
+ * nacer el botón y el que `_applyFullMapState` restaura al salir del mapa; **los dos caminos tienen
+ * que usar esta misma constante** (la asignación pinta el botón entero en cada cambio de estado, así
+ * que un elemento que uno de los dos olvide aparece o desaparece en el momento equivocado). Abierto,
+ * el `innerHTML` es solo `FULLMAP_CLOSE_SVG`, sin chevron ni etiqueta.
+ */
+const FULLMAP_CLOSED_MARKUP = `${TEMAS_MAP_TOGGLE_SVG}<span class="fullmap-toggle-label" aria-hidden="true">${FULLMAP_TOGGLE_TEXT}</span>${FULLMAP_TOGGLE_CHEVRON_SVG}`;
+/**
  * States of the general map (`showFullMap`), written as the `data-state` of `#fullmap-status` so the
  * SCSS can leave the box alone in the one state that has no text, and so the message is a single
  * attribute instead of three class names the TS would have to keep in sync.
@@ -444,8 +459,8 @@ const FULLMAP_LOADING_HTML = '<span class="loader"></span>';
  * Los rótulos van en `title` **y** en `aria-label`: el primero es lo que se lee al pasar el mouse y el
  * segundo lo que anuncia el lector de pantalla, y son los mismos textos.
  */
-const FULLMAP_OPEN_LABEL = 'Ver mapa';
-const FULLMAP_EXIT_LABEL = 'Salir del mapa y ver como listado';
+const FULLMAP_OPEN_LABEL = 'Ver temas en mapa';
+const FULLMAP_EXIT_LABEL = 'Salir del mapa';
 /**
  * Clase que el componente refleja en el `container` del consumidor mientras el mapa general está
  * abierto (el timeline queda oculto), para que el consumidor pueda ajustar lo que está fuera del
@@ -1196,7 +1211,7 @@ export default class Timeline {
             .filter((sections) => sections.length > 0);
         const selectsHtml = selects.map((f) => this._buildFilterOptionsHtml(f)).join('');
         return `<div class="filter-wrap">
-              <button class="filter-toggle" id="filter-toggle" title="Filtrar">
+              <button class="filter-toggle toolbar-round" id="filter-toggle" title="Filtrar">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
               <div class="filter-menu" id="filter-menu">
@@ -1222,7 +1237,7 @@ export default class Timeline {
             .join('');
         const dir = (value, label) => `<label class="sort-option"><input type="radio" name="tv-sort-dir" value="${value}"${(value === 'asc') === this._sortAsc ? ' checked' : ''} /> <span class="sort-option-label">${label}</span></label>`;
         return `<div class="sort-wrap">
-              <button class="sort-toggle" id="sort-toggle" title="Ordenar" aria-haspopup="true" aria-expanded="false">
+              <button class="sort-toggle toolbar-round" id="sort-toggle" title="Ordenar" aria-haspopup="true" aria-expanded="false">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="17,9 12,4 7,9" fill="currentColor"/><polygon points="17,15 12,20 7,15" fill="none" stroke-width="1.5"/></svg>
               </button>
               <div class="sort-menu" id="sort-menu">
@@ -1249,7 +1264,7 @@ export default class Timeline {
     _buildInternalButtonsHtml() {
         if (!this.internalButtons)
             return '';
-        const workNotesButton = `<button class="work-notes-toggle" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
+        const workNotesButton = `<button class="work-notes-toggle toolbar-round" id="work-notes-toggle" title="Ocultar notas de trabajo" aria-pressed="false">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11l5-5V5a2 2 0 0 0-2-2z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="13" y2="13"/></svg>
             </button>`;
         const internalGroups = this.filters.filter((f) => f.group === 'filtros_internos');
@@ -1260,7 +1275,7 @@ export default class Timeline {
         const selectsHtml = internalSelects.map((f) => this._buildFilterOptionsHtml(f)).join('');
         return `${workNotesButton}
             <div class="filtros-internos-wrap" id="filtros-internos-wrap">
-              <button class="filtros-internos-toggle" id="filtros-internos-toggle" title="Filtros internos">
+              <button class="filtros-internos-toggle toolbar-round" id="filtros-internos-toggle" title="Filtros internos">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
               </button>
               <div class="filtros-internos-menu" id="filtros-internos-menu">
@@ -1285,7 +1300,7 @@ export default class Timeline {
         if (!this.showFullMap)
             return '';
         return `<div class="fullmap-wrap">
-            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="publicaciones-fullmap-section" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${TEMAS_MAP_TOGGLE_SVG}${FULLMAP_TOGGLE_CHEVRON_SVG}</button>
+            <button type="button" class="fullmap-toggle" id="fullmap-toggle" aria-expanded="false" aria-controls="publicaciones-fullmap-section" title="${FULLMAP_OPEN_LABEL}" aria-label="${FULLMAP_OPEN_LABEL}">${FULLMAP_CLOSED_MARKUP}</button>
           </div>`;
     }
     /**
@@ -1323,7 +1338,7 @@ export default class Timeline {
               <span class="search-icon" aria-hidden="true">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               </span>
-              <input class="search-input" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
+              <input class="search-input toolbar-round" id="search-input" type="search" placeholder="Buscar..." autocomplete="off" aria-label="Buscar" />
             </div>
             ${filterMenuHtml}
             ${sortMenuHtml}
@@ -3237,7 +3252,7 @@ export default class Timeline {
         // markup inicial de `_buildFullMapToggleHtml` y esta línea) tienen que coincidir. El `aria-hidden`
         // de los svg los saca del árbol de accesibilidad, así que el nombre del botón es solo el
         // `aria-label` de arriba en los dos casos.
-        this.fullMapToggle.innerHTML = open ? FULLMAP_CLOSE_SVG : TEMAS_MAP_TOGGLE_SVG + FULLMAP_TOGGLE_CHEVRON_SVG;
+        this.fullMapToggle.innerHTML = open ? FULLMAP_CLOSE_SVG : FULLMAP_CLOSED_MARKUP;
     }
     /**
      * Resolve the points of the general map and paint them.

@@ -30,6 +30,7 @@
   --tv-sticky-top: 6px;
   --tv-color-map: #dbdbdb;
   --tv-color-map-light: #fff;
+  --tv-color-map-dark: #b6b5b5;
   --tv-work-note: #e04733;
   --tv-bg-card-unvalidated: #413129;
   --tv-descartado: #ca2424;
@@ -710,7 +711,7 @@
   display: flex;
   gap: 5px;
   height: 25px;
-  border: 1px solid var(--tv-color-map);
+  border: 1px solid var(--tv-color-map-dark);
   background: transparent;
   color: var(--tv-color-map);
   cursor: pointer;
@@ -1732,7 +1733,6 @@
   position: sticky;
   top: var(--tv-sticky-top);
   z-index: 15;
-  min-height: 0;
   background: var(--tv-bg-card-glass);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
@@ -1760,9 +1760,7 @@
   cursor: default;
   border: 0;
   background: none !important;
-  font-size: 0.8em;
   pointer-events: none;
-  padding-left: 0;
 }
 .publicaciones-container .publicaciones-timeline-section.fullpage .expand-toggle .expand-icon {
   display: none;
@@ -1770,12 +1768,21 @@
 .publicaciones-container .publicaciones-timeline-section.fullpage .expand-toggle .expand-text {
   gap: 10px;
 }
-.publicaciones-container .publicaciones-timeline-section.fullpage .expand-toggle #remaining-count {
-  width: auto;
-  min-width: 40px;
-  height: 28px;
-  padding: 0 10px;
-  font-size: 0.8rem;
+@container publicaciones (min-width: 611px) {
+  .publicaciones-container .publicaciones-timeline-section.fullpage .featured-row {
+    min-height: 0;
+  }
+  .publicaciones-container .publicaciones-timeline-section.fullpage .expand-toggle {
+    font-size: 0.8em;
+    padding-left: 0;
+  }
+  .publicaciones-container .publicaciones-timeline-section.fullpage .expand-toggle #remaining-count {
+    width: auto;
+    min-width: 40px;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 0.8rem;
+  }
 }
 @media (max-width: 600px) {
   .publicaciones-container .publicaciones-timeline-section.fullpage .filter-menu,
@@ -1961,7 +1968,7 @@
   margin-left: auto;
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle {
-  border: 1px solid var(--tv-color-map);
+  border: 1px solid var(--tv-color-map-dark);
   color: var(--tv-text-on-primary);
   padding: 8px;
   border-radius: 42px;
@@ -1995,13 +2002,34 @@
   background: rgba(255, 255, 255, 0.3);
   border: 1px solid var(--tv-color-map);
 }
+@container publicaciones (min-width: 611px) {
+  .publicaciones-container .publicaciones-timeline-section .fullmap-toggle:hover {
+    width: 116px;
+  }
+}
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle:hover::before {
   opacity: 1;
   animation: tv-row-spin 2s linear infinite;
 }
+.publicaciones-container .publicaciones-timeline-section .fullmap-toggle .fullmap-toggle-label {
+  display: block;
+  width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  transition: width 0.3s ease, opacity 0.3s ease;
+}
+@container publicaciones (min-width: 611px) {
+  .publicaciones-container .publicaciones-timeline-section .fullmap-toggle:hover .fullmap-toggle-label {
+    width: 56px;
+    opacity: 1;
+  }
+}
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle[aria-expanded=true] {
   background: var(--tv-accent);
   border: 0;
+  width: 60px;
 }
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle[aria-expanded=true]:hover {
   background: var(--tv-accent-light);
@@ -3472,13 +3500,44 @@
     overflow: hidden;
   }
   .publicaciones-container .publicaciones-timeline-section .featured-row {
-    min-height: 80px;
+    min-height: 40px;
     padding: 8px 6px;
     flex-wrap: wrap-reverse;
+  }
+  .publicaciones-container .publicaciones-timeline-section .toolbar-round {
+    box-sizing: border-box;
+    height: 30px;
+    width: 30px;
+    min-width: 30px;
+  }
+  .publicaciones-container .publicaciones-timeline-section .toolbar-round svg {
+    width: 12px;
+    height: 12px;
+  }
+  .publicaciones-container .publicaciones-timeline-section .search-wrap .search-icon {
+    left: 9px;
+  }
+  .publicaciones-container .publicaciones-timeline-section .search-wrap .search-icon svg {
+    width: 12px;
+    height: 12px;
+  }
+  .publicaciones-container .publicaciones-timeline-section .fullmap-toggle {
+    height: 30px;
+    width: 52px;
+    min-width: 44px;
+    gap: 2px;
+  }
+  .publicaciones-container .publicaciones-timeline-section .fullmap-toggle .fullmap-toggle-label {
+    display: none;
+  }
+  .publicaciones-container .publicaciones-timeline-section .fullmap-toggle svg {
+    width: 13px;
+    height: 13px;
   }
   .publicaciones-container .publicaciones-timeline-section .expand-toggle {
     font-size: 0.54rem;
     padding: 4px 11px 4px 4px;
+    height: 30px;
   }
   .publicaciones-container .publicaciones-timeline-section .timeline-item {
     margin-bottom: 20px;

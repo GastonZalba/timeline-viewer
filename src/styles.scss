@@ -2252,6 +2252,15 @@
     // empates gana el orden en el fuente, y lo que se necesita pisar es justamente
     // `min-height`, `background` y `border` de la fila de arriba.
     &.fullpage {
+      // La "píldora grande" de la barra pegada (`min-height: 0` de la fila, la píldora de
+      // `#remaining-count`, el tamaño de `.expand-toggle`) es un look de **escritorio**: en
+      // pantallas angostas los `@container publicaciones (max-width: 600px / 610px)` del final del
+      // archivo son lo que tiene que mandar, y como los container queries no suman especificidad,
+      // cualquier regla de acá con selectores más largos les ganaría y congelaría el tamaño grande
+      // (es el bug de "fullpage no achica `#remaining-count` ni la fila"). Por eso esas reglas viven
+      // en el bloque `@container publicaciones (min-width: 611px)` de abajo: solo corren cuando el
+      // container está lo suficientemente ancho como para que los bloques responsive estén apagados.
+      // Lo que sí queda siempre (sticky, fondo, blur, pill) es lo que no pelea con ningún bloque.
       .featured-row {
         position: sticky;
         top: var(--tv-sticky-top);
@@ -2259,9 +2268,6 @@
         // tarjetas, que es lo único que se abre desde acá y ahora queda flotando sobre
         // una barra inmóvil.
         z-index: 15;
-        // Sin featured cards visibles el `min-height: 140px` collapsed solo dejaría una
-        // franja muerta de la que la barra pegada colgaría.
-        min-height: 0;
         // Fondo translúcido + blur: en expanded la fila es transparente, pero acá la barra
         // queda pegada arriba mientras la página scrollea, así que el `backdrop-filter`
         // difumina las tarjetas que pasan por detrás y el fondo deja entreverlas.
@@ -2299,21 +2305,37 @@
         cursor: default;
         border: 0;
         background: none !important;
-        font-size: 0.8em;
         pointer-events: none;
-        padding-left: 0;
         .expand-icon {
           display: none;
         }
         .expand-text {
           gap: 10px;
         }
-        #remaining-count {
-          width: auto;
-          min-width: 40px;
-          height: 28px;
-          padding: 0 10px;
-          font-size: 0.8rem;
+      }
+
+      // La píldora grande de escritorio del modo fullpage (ver el comentario de arriba): solo corre
+      // con el container ancho, y se apaga por debajo de 610px para que manden los bloques
+      // responsive del final. El core de `.filtros-internos-wrap` y el resto de la barra no pelean
+      // con nadie, así que no entran acá.
+      @container publicaciones (min-width: 611px) {
+        .featured-row {
+          // Sin featured cards visibles el `min-height: 140px` collapsed solo dejaría una
+          // franja muerta de la que la barra pegada colgaría.
+          min-height: 0;
+        }
+
+        .expand-toggle {
+          font-size: 0.8em;
+          padding-left: 0;
+
+          #remaining-count {
+            width: auto;
+            min-width: 40px;
+            height: 28px;
+            padding: 0 10px;
+            font-size: 0.8rem;
+          }
         }
       }
 
@@ -2543,6 +2565,8 @@
       padding: 8px;
       border-radius: 42px;
       height: 34px;
+      // El morfo del hover es `width`: 60px cerrado (ícono + chevron) → 116px con la etiqueta animada.
+      // Es lo mismo que hace el buscador (34 → 180px): `width` fija entre dos valores, que sí anima.
       width: 60px;
       min-width: 50px;
       cursor: pointer;
@@ -2550,10 +2574,11 @@
       display: none;
       align-items: center;
       justify-content: center;
-      // Ícono + chevron: sin el `gap` los dos svgs quedan pegados y la pareja se lee como un solo
-      // glifo. Los 4px entran en los 42px de contenido del botón (60 de ancho - 16 de padding - 2
-      // de borde): icono 15 + su `margin-left` 4 + gap 4 + chevron 15 = 38, con `box-sizing:
-      // border-box`.
+      // Ícono + etiqueta + chevron: sin el `gap` los tres quedan pegados y la pareja se lee como un
+      // solo glifo. Cerrado, los 4px entran en los 42px de contenido del botón (60 de ancho - 16 de
+      // padding - 2 de borde): icono 15 + su `margin-left` 4 + gap 4 + chevron 15 = 38, con
+      // `box-sizing: border-box`. En hover la etiqueta crece de 0 a 56px y el botón la sigue
+      // (contenido 96px + 16 de padding + 2 de borde = 114; el 116 ajusta el `justify-content`).
       gap: 4px;
       background: rgba(255, 255, 255, 0.2);
       position: relative;
@@ -2566,12 +2591,7 @@
         inset: -2px;
         border-radius: inherit;
         padding: 2px;
-        background: conic-gradient(
-          from var(--tv-row-angle),
-          transparent 0 70%,
-          #ffffff 90%,
-          #ffffff 100%
-        );
+        background: conic-gradient(from var(--tv-row-angle), transparent 0 70%, #ffffff 90%, #ffffff 100%);
         -webkit-mask:
           linear-gradient(#fff 0 0) content-box,
           linear-gradient(#fff 0 0);
@@ -2585,10 +2605,39 @@
       &:hover {
         background: rgba(255, 255, 255, 0.3);
         border: 1px solid var(--tv-color-map);
-
+        @container publicaciones (min-width: 611px) {
+          // El ancho extra es el que la etiqueta ocupa al crecer; el `all 0.3s ease` del botón lo
+          // anima junto con el fondo y el borde.
+          width: 116px;
+        }
         &::before {
           opacity: 1;
           animation: tv-row-spin 2s linear infinite;
+        }
+      }
+
+      // La etiqueta "Ver Mapa" nace sin lugar (`width: 0`, `opacity: 0`) y en hover crece a 56px
+      // mientras se desvanece adentro. El `overflow: hidden` clampa el texto a ese ancho durante la
+      // transición (sin él ocuparía su ancho natural de un saque y no habría animación que ver), y el
+      // `white-space: nowrap` evita que la frase se corte a mitad. El ancho final es fijo (56px), el
+      // mismo criterio que las píldoras del buscador: no depende de la fuente del consumidor más que
+      // el `font-size: 0.75rem` de la barra.
+      .fullmap-toggle-label {
+        display: block;
+        width: 0;
+        opacity: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        font-size: 0.75rem;
+        transition:
+          width 0.3s ease,
+          opacity 0.3s ease;
+      }
+
+      @container publicaciones (min-width: 611px) {
+        &:hover .fullmap-toggle-label {
+          width: 56px;
+          opacity: 1;
         }
       }
 
@@ -2597,6 +2646,10 @@
       &[aria-expanded='true'] {
         background: var(--tv-accent);
         border: 0;
+        // Abierto el botón es solo la X, sin chevron ni etiqueta que justifiquen el ancho extra: la
+        // regla va acá (después del `&:hover` de arriba y con la misma especificidad) para que el
+        // hover de este estado no estire un botón vacío.
+        width: 60px;
 
         &:hover {
           background: var(--tv-accent-light);
@@ -4390,13 +4443,70 @@
       }
 
       .featured-row {
-        min-height: 80px;
+        min-height: 40px;
         padding: 8px 6px;
         flex-wrap: wrap-reverse;
       }
+
+      // Todos los controles redondos de la barra comparten el mismo círculo de 34px, así que en
+      // móvil se achican juntos desde acá: `.toolbar-round` es la clase compartida que el markup
+      // les pone (los cuatro toggles 1:1 y el círculo del buscador) y esta es la **única** regla
+      // que hay que tocar para el tamaño del conjunto. El `box-sizing` va explícito por el mismo
+      // motivo que en `.search-input`: sin un reset del consumidor el `border` se sumaría afuera.
+      // Los íconos, que van de 12 a 16px según el control, bajan todos a 12px para mantener la
+      // proporción; el del buscador es un `span` hermano del input y no un hijo, así que se
+      // recoloca aparte.
+      .toolbar-round {
+        box-sizing: border-box;
+        height: 30px;
+        width: 30px;
+        min-width: 30px;
+
+        svg {
+          width: 12px;
+          height: 12px;
+        }
+      }
+
+      // La lupa se centra en el círculo de 30px: su `left` fijo de 10px está calculado para los
+      // 34px (10 + 14 + 10), y con el ícono en 12px esos 10px lo corren a la izquierda.
+      .search-wrap .search-icon {
+        left: 9px;
+
+        svg {
+          width: 12px;
+          height: 12px;
+        }
+      }
+
+      // Las dos píldoras no son 1:1 y no entran en `.toolbar-round`, así que se achican aparte. En
+      // móvil el `fullmap-toggle` no expande —el ancho y la etiqueta del hover están gateados a
+      // `min-width: 611px`—, así que su ancho queda fijo (ícono 13 + gap 4 + chevron 13 = 30 de
+      // contenido, más padding y borde).
+      .fullmap-toggle {
+        height: 30px;
+        width: 52px;
+        min-width: 44px;
+        // La etiqueta "Ver Mapa" del hover está gateada a `min-width: 611px`, así que en móvil
+        // nunca aparece: se saca del flex (no alcanza con su `width: 0`, porque igual aporta un
+        // `gap`) para que ícono y chevron sean los dos únicos ítems. El `gap` baja a 2px para que
+        // no queden tan separados en el círculo chico.
+        gap: 2px;
+
+        .fullmap-toggle-label {
+          display: none;
+        }
+
+        svg {
+          width: 13px;
+          height: 13px;
+        }
+      }
+
       .expand-toggle {
         font-size: 0.54rem;
         padding: 4px 11px 4px 4px;
+        height: 30px;
       }
 
       .timeline-item {
