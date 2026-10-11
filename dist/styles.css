@@ -2053,9 +2053,6 @@
   stroke: var(--tv-color-map);
   transition: transform 0.3s ease;
 }
-.publicaciones-container .publicaciones-timeline-section .fullmap-toggle:hover .fullmap-toggle-chevron {
-  transform: translateX(4px);
-}
 .publicaciones-container .publicaciones-timeline-section .fullmap-toggle:focus-visible {
   outline: 2px solid var(--tv-color-map-light);
   outline-offset: 2px;

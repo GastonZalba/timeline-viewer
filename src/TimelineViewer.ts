@@ -540,8 +540,8 @@ const FULLMAP_LOADING_HTML = '<span class="loader"></span>';
  * Los rótulos van en `title` **y** en `aria-label`: el primero es lo que se lee al pasar el mouse y el
  * segundo lo que anuncia el lector de pantalla, y son los mismos textos.
  */
-const FULLMAP_OPEN_LABEL = 'Ver temas en mapa';
-const FULLMAP_EXIT_LABEL = 'Salir del mapa';
+const FULLMAP_OPEN_LABEL = 'Ver temas en Mapa';
+const FULLMAP_EXIT_LABEL = 'Salir del Mapa';
 
 /**
  * Clase que el componente refleja en el `container` del consumidor mientras el mapa general está
