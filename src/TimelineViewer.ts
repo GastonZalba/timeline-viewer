@@ -16,6 +16,7 @@ import type OlFeature from 'ol/Feature.js';
 import type OlPoint from 'ol/geom/Point.js';
 import type OlLineString from 'ol/geom/LineString.js';
 import type VectorLayer from 'ol/layer/Vector.js';
+import type HeatmapLayer from 'ol/layer/Heatmap.js';
 import type VectorSource from 'ol/source/Vector.js';
 import type TileLayer from 'ol/layer/Tile.js';
 import type XYZ from 'ol/source/XYZ.js';
@@ -120,21 +121,55 @@ const TEMAS_MAP_MAX_ZOOM = 20;
 const TEMAS_MAP_TILES_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /**
+ * Blur radius, in screen pixels, of the optional density layer of the general map (`fullMapHeatmap`):
+ * how far a single topic's weight bleeds into its neighbors. Wider than `RADIUS` on purpose, so a
+ * lone topic reads as a soft halo instead of a hard dot.
+ */
+const TEMAS_MAP_HEATMAP_BLUR = 24;
+
+/**
+ * Radius, in screen pixels, of the inner core of the density heatmap: the distance from a topic where
+ * the weight is painted at full strength before the blur fades it.
+ */
+const TEMAS_MAP_HEATMAP_RADIUS = 16;
+
+/**
+ * Color y alpha del fill de los markers **no agrupados** mientras la capa de densidad está
+ * encendida. Con el heatmap la mancha de color de cada punto compite con la gradiente —que ya
+ * cuenta "cuántos temas hay acá"—, así que los círculos sueltan su tono y se pintan **uniformes** y
+ * bien translúcidos: la topografía del amontonamiento la cuenta el heatmap, y los puntos solo
+ * necesitan seguir existiendo para el hover y el click. El seleccionado **no** entra en la regla
+ * (conserva el tono crudo y opaco, ver `selectedCircleOf`), y los clusters tienen la suya propia:
+ * con la capa encendida pierden el disco y quedan solo como el conteo blanco con halo oscuro (ver
+ * `clusterCircleOf`/`clusterTextOf`), porque su círculo taparía la gradiente igual que el de un
+ * marker.
+ */
+const TEMAS_MAP_HEATMAP_MARKER_COLOR = '#0e1116';
+const TEMAS_MAP_HEATMAP_MARKER_ALPHA = 0.25;
+
+/**
+ * Color ramp of the density heatmap, from the lowest to the highest concentration. The same default
+ * OpenLayers ships (blue ? cyan ? green ? yellow ? red) because it is the ramp a reader already
+ * associates with density, and the layer only ever shows it when the consumer opts in.
+ */
+const TEMAS_MAP_HEATMAP_GRADIENT = ['#00f', '#0ff', '#0f0', '#ff0', '#f00'];
+
+/**
  * Radius of a topic's marker, in screen pixels. The markers are circles and not pins: the tone color
  * and the number are all the marker has to say, and the circle matches the reference badge of the
  * list above the map (`.tema-map-ref`, 18px across) instead of implying, as a pin's tip does, a
  * precise point the pipeline does not have.
  */
-const TEMAS_MAP_MARKER_RADIUS = 9;
+const TEMAS_MAP_MARKER_RADIUS = 7;
 
 /**
  * Width of the ring around a marker, in screen pixels. It is what separates a mid-tone marker
  * from whatever the raster map has under it, and a dark ring needs more than a hairline to read,
  * so it sits at 1.5px: the stroke is centered on the radius, which still leaves 16.5px of tone
  * inside the 18px circle for the number painted in the middle, and two neighbors spread by the
- * spiderfy —fixed at 20px, see `TEMAS_MAP_SPIDER_GAP`— keep half a pixel of air between rings.
+ * spiderfy —fixed at 22px, see `TEMAS_MAP_SPIDER_GAP`— keep two and a half pixels of air between rings.
  */
-const TEMAS_MAP_MARKER_STROKE = 3;
+const TEMAS_MAP_MARKER_STROKE = 2;
 
 /**
  * Font size, in px, of the number painted in the center of a marker
@@ -204,11 +239,11 @@ const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
  * Extra gap, in pixels, left between the rings of two neighboring markers when they are spread on a
  * circle. The distance between consecutive markers stays fixed at
  * `2 * (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP)` whatever their count: the radius of the
- * circle grows with the count, so the count never squeezes the neighbors, and the gap is what
- * keeps a ring from bleeding into the next one: at that fixed pitch two 1.5px rings
- * (`TEMAS_MAP_MARKER_STROKE`) come within half a pixel and never touch.
+ * circle grows with the count, so the count never squeezes the neighbors, and the gap is what keeps
+ * a ring from bleeding into the next one: at that fixed 22px pitch two 1.5px rings
+ * (`TEMAS_MAP_MARKER_STROKE`) come within 2.5px and keep a small, clear air between them.
  */
-const TEMAS_MAP_SPIDER_GAP = 1;
+const TEMAS_MAP_SPIDER_GAP = 2;
 
 /**
  * Width of the line that ties a displaced marker back to the topic's own coordinate, in screen
@@ -311,7 +346,9 @@ const TEMAS_MAP_CLUSTER_FONT = 12;
  * family.
  */
 const TEMAS_MAP_CLUSTER_FILL_DARK = '#0e1116';
-/** Color of the count painted on a cluster: white, over the tone color or over the dark fill */
+/** Color of the count painted on a cluster: white, over the tone color or over the dark fill. With
+ * the density layer on the cluster disc is gone (see `clusterCircleOf`), so the count picks up a
+ * dark halo —`#000` at 3px, baked in `clusterTextOf`— to keep reading white against the heatmap. */
 const TEMAS_MAP_CLUSTER_TEXT_COLOR = '#ffffff';
 /**
  * Zoom levels a click on a cluster adds to the view: four, a deliberate jump and not a
@@ -553,7 +590,18 @@ const FULLMAP_CLOSE_SVG =
   '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true" focusable="false"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>';
 
 /**
- * Values shown per filter group before the "Ver más (N)" toggle appears, when the `maxVisible`
+ * Botón de la capa de densidad del mapa general (`fullMapHeatmap`). Son dos rótulos —encendida y
+ * apagada— y un ícono de llama, que es lo que se asocia con "calor" sin dibujar un gradiente en 16px.
+ * El estado se comunica con `aria-pressed` y con la clase activa del SCSS, no cambiando el glifo: es
+ * un interruptor, no un botón de dos destinos como el del mapa general.
+ */
+const FULLMAP_HEATMAP_LABEL = 'Ver densidad';
+const FULLMAP_HEATMAP_ACTIVE_LABEL = 'Ocultar densidad';
+const FULLMAP_HEATMAP_SVG =
+  '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>';
+
+/**
+ * Values shown per filter group before the "Ver m?s (N)" toggle appears, when the `maxVisible`
  * of the group itself does not say otherwise. Below 2 the group is never collapsed.
  */
 const DEFAULT_FILTER_MAX_VISIBLE = 5;
@@ -617,6 +665,13 @@ const RESIZE_MAX_HEIGHT = 1200;
 const RESIZE_STEP = 24;
 const RESIZE_STORAGE_KEY = 'tv-timeline-cards-height';
 const WORK_NOTES_STORAGE_KEY = 'tv-work-notes-hidden';
+/**
+ * `localStorage` key of the density toggle of the general map (`fullMapHeatmap`). The state is a
+ * UI preference of the consumer (not a data field), so it persists like the other toggles of the
+ * module (`tv-work-notes-hidden`): shared across instances and reloads, and only read when the
+ * option is on.
+ */
+const FULLMAP_HEATMAP_STORAGE_KEY = 'tv-fullmap-heatmap';
 /**
  * `localStorage` key of the state of the filters marked `persist`. The record inside is keyed by
  * `field`, not by a fixed list, so a filter declared later by the consumer persists like the ones
@@ -730,6 +785,7 @@ interface TemasMapModules {
   OlLineString: typeof OlLineString;
   OlOverlay: typeof OlOverlay;
   VectorLayer: typeof VectorLayer;
+  HeatmapLayer: typeof HeatmapLayer;
   VectorSource: typeof VectorSource;
   TileLayer: typeof TileLayer;
   XYZ: typeof XYZ;
@@ -884,6 +940,16 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
    * porque es una lectura, no un gesto sobre el mapa —mismo motivo que `fit`—.
    */
   selectedSpiderCenter(): number[] | null;
+  /**
+   * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida los círculos
+   * pasan a translúcidos (para que la densidad se lea debajo) y apagada vuelven al fill opaco del
+   * tono; el hover, el click, el spiderfy y la selección siguen funcionando por encima en las dos.
+   *
+   * Es un no-op en un mapa que no pidió la capa (el de la tarjeta), por el mismo motivo que
+   * `refreshStyles` es un gesto explícito y no parte de `updatePoints`: la visibilidad es una
+   * decisión del llamador, no algo que el cambio de set deba resolver.
+   */
+  setHeatmapVisible(visible: boolean): void;
 }
 
 /**
@@ -936,7 +1002,16 @@ interface TemasMapMountOptions<P> {
    */
   onMarkerMiss: (() => void) | null;
   /**
-   * Si el punto es el que está abierto en la ficha, o `false`/`null` si este mapa no marca ninguno.
+   * Whether to add the density heatmap layer under the markers. Only the general map asks for it
+   * (`fullMapHeatmap`): a card map has a handful of topics and a numbered marker per topic is the
+   * whole point, while the general map can carry hundreds and the concentration is itself the
+   * information. The layer is a second `ol.Heatmap` over the **same** source, so it follows
+   * `updatePoints` for free, and it reads each feature's own geometry ?the true coordinate? ignoring
+   * the spider/cluster displacement, which is exactly what "where do the topics pile up" should show.
+   */
+  heatmap?: boolean;
+  /**
+   * Si el punto es el que est? abierto en la ficha, o `false`/`null` si este mapa no marca ninguno.
    *
    * Va como **predicado**, no como un `Set` de ids, porque el estilo se resuelve por feature y en
    * cada repintado: con un `Set` el mapa habría que enterarse de los cambios a mano. Con el predicado,
@@ -1323,6 +1398,23 @@ export interface TimelineOptions {
    */
   showFullMap?: boolean;
   /**
+   * Capa de densidad del mapa general (default: false). Requiere `showFullMap`: agrega al mapa una
+   * capa `ol/layer/Heatmap` **debajo** de los marcadores, que se lee como "dónde se amontonan los
+   * temas" en vez de "qué temas hay", y un botón flotante sobre el canvas para encenderla y apagarla.
+   *
+   * Cada tema pesa lo mismo (`1`), as? que la intensidad depende solo de cu?ntos caen juntos: no hay
+   * campo nuevo ni configuraci?n de peso. El gradiente y el radio son constantes del componente
+   * (`TEMAS_MAP_HEATMAP_*`).
+   *
+   * Los marcadores **no** se apagan: la capa va por debajo y el hover, el click, el agrupamiento y
+   * la selecci?n siguen funcionando por encima. Arranca apagada; el estado sobrevive a cambiar de
+   * filtro y a que el mapa se destruya y se vuelva a montar.
+   *
+   * No tiene efecto en los mapas de tarjeta: es una funci?n del mapa general, donde la concentraci?n
+   * de cientos de puntos es la informaci?n. Con `showFullMap` apagado la opci?n no hace nada.
+   */
+  fullMapHeatmap?: boolean;
+  /**
    * Keep the state of the view in the browser URL (default: false), so the address bar is a
    * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
    *
@@ -1667,7 +1759,7 @@ const LG_WHEEL_ZOOM_FALLBACK_MAX = 4;
  * Plugin de lightGallery: **zoom con la rueda** sobre la imagen abierta.
  *
  * lightGallery 2.9 no lo trae. El plugin `zoom` maneja pinch (táctil), drag para panear y los
- * iconos +/−, pero no escucha `wheel`; y el `settings.mousewheel` del core, que sí escucha, es de
+ * iconos +/-, pero no escucha `wheel`; y el `settings.mousewheel` del core, que s? escucha, es de
  * navegación entre slides con un throttle de 1s, no de zoom (por eso queda en `false`).
  *
  * En vez de reimplementar el transform, el handler llama la API pública del plugin `zoom`
@@ -1854,11 +1946,20 @@ export default class Timeline {
    * every point on screen is rendered at all.
    */
   showFullMap: boolean;
+  /**
+   * General map (`fullMapHeatmap`): whether the map is allowed to show the density layer and the
+   * floating toggle that drives it. `false` means no markup, no layer and no `ol.Heatmap` import.
+   */
+  fullMapHeatmap: boolean;
   /** Null when `showFullMap` is off, or in single mode: no button means no view either */
   fullMapToggle: HTMLElement | null;
   fullMapView: HTMLElement | null;
   fullMapCanvas: HTMLElement | null;
   fullMapStatus: HTMLElement | null;
+  /** Botón que enciende y apaga la capa de densidad, o null si `fullMapHeatmap` está apagado */
+  fullMapHeatmapToggle: HTMLElement | null;
+  /** Whether the density layer is on. Solo estado: la visibilidad la aplica el handle del mapa. */
+  _fullMapHeatmap: boolean;
   /** The panel that holds the summary card of the clicked point, over the map */
   fullMapDetail: HTMLElement | null;
   /**
@@ -2063,12 +2164,25 @@ export default class Timeline {
     this._olModules = null;
     this._temasMaps = new Map();
     this.showFullMap = config.showFullMap === true;
+    this.fullMapHeatmap = config.fullMapHeatmap === true;
     this.fullMapToggle = null;
     this.fullMapView = null;
     this.fullMapCanvas = null;
     this.fullMapStatus = null;
+    this.fullMapHeatmapToggle = null;
     this.fullMapDetail = null;
     this._fullMapOpen = false;
+    // El arranque del toggle sale de `localStorage` (`tv-fullmap-heatmap`): es una preferencia de UI
+    // del consumidor, y si la dejó encendida, que reabra el mapa con la capa puesta. Se lee en el
+    // constructor, antes del primer build del layout, para que `_applyFullMapHeatmapState()` —que
+    // corre tras cada remonte— ya tenga el valor correcto.
+    let persistedHeatmap = false;
+    try {
+      persistedHeatmap = window.localStorage.getItem(FULLMAP_HEATMAP_STORAGE_KEY) === '1';
+    } catch {
+      /* localStorage unavailable */
+    }
+    this._fullMapHeatmap = persistedHeatmap;
     this._fullMapHandle = null;
     this._fullMapPoints = [];
     this._fullMapSeq = 0;
@@ -2579,9 +2693,17 @@ export default class Timeline {
    */
   protected _buildFullMapViewHtml(): string {
     if (!this.showFullMap) return '';
+    // El botón de densidad solo existe si la opción lo pidió: sin `fullMapHeatmap` no hay capa que
+    // encender y un botón muerto sobre el mapa sería peor que no tenerlo. Nace apagado, igual que el
+    // estado del componente (`_fullMapHeatmap`), así que `aria-pressed` y `_applyFullMapState` no
+    // pueden discrepar.
+    const heatmapToggle = this.fullMapHeatmap
+      ? `<button type="button" class="fullmap-heatmap-toggle" id="fullmap-heatmap-toggle" aria-pressed="false" title="${FULLMAP_HEATMAP_LABEL}" aria-label="${FULLMAP_HEATMAP_LABEL}">${FULLMAP_HEATMAP_SVG}</button>`
+      : '';
     return `<section class="publicaciones-fullmap-section" id="publicaciones-fullmap-section" hidden>
           <div class="fullmap-status" id="fullmap-status" hidden></div>
           <div class="fullmap-canvas" id="fullmap-canvas"></div>
+          ${heatmapToggle}
           <div class="fullmap-detail" id="fullmap-detail" hidden></div>
         </section>`;
   }
@@ -2668,6 +2790,7 @@ export default class Timeline {
     this.fullMapView = this.container.querySelector('#publicaciones-fullmap-section') as HTMLElement | null;
     this.fullMapCanvas = this.container.querySelector('#fullmap-canvas') as HTMLElement | null;
     this.fullMapStatus = this.container.querySelector('#fullmap-status') as HTMLElement | null;
+    this.fullMapHeatmapToggle = this.container.querySelector('#fullmap-heatmap-toggle') as HTMLElement | null;
     this.fullMapDetail = this.container.querySelector('#fullmap-detail') as HTMLElement | null;
     // La clase le dice al SCSS que reescriba el layout (barra sticky, sin límite de altura,
     // sin ícono). El botón de expandir queda como contador: sin colapso posible, así que se
@@ -3584,6 +3707,7 @@ export default class Timeline {
         import('ol/geom/LineString.js'),
         import('ol/Overlay.js'),
         import('ol/layer/Vector.js'),
+        import('ol/layer/Heatmap.js'),
         import('ol/source/Vector.js'),
         import('ol/layer/Tile.js'),
         import('ol/source/XYZ.js'),
@@ -3604,6 +3728,7 @@ export default class Timeline {
           lineString,
           overlay,
           vLayer,
+          heatmapLayer,
           vSource,
           tLayer,
           xyz,
@@ -3623,6 +3748,7 @@ export default class Timeline {
           OlLineString: lineString.default,
           OlOverlay: overlay.default,
           VectorLayer: vLayer.default,
+          HeatmapLayer: heatmapLayer.default,
           VectorSource: vSource.default,
           TileLayer: tLayer.default,
           XYZ: xyz.default,
@@ -3698,18 +3824,33 @@ export default class Timeline {
     // nadie que lo lea.
     if (!canvas.isConnected || !points.length) return null;
 
+    // ¿La capa de densidad está encendida en este mapa? Con ella apagada los círculos pintan el tono
+    // **opaco**; encendida, pasan a translúcidos (`_hexToRgba`) para que la densidad se lea debajo
+    // —la transparencia es un efecto de la capa, no del mapa base—. Declarado acá y no al pie del
+    // mount porque el primer `declutter()` —que corre durante el montaje, antes del `return`— ya
+    // ejecuta la función de estilo y la lee: un `let` tardío la dejaría en el temporal dead zone y
+    // el mapa crashearía en la primera apertura.
+    let heatmapVisible = false;
+
     // One circle style per tone, shared by every marker of that tone. Unlike an `Icon`, a `Circle`
-    // has no image to decode, so the cache only saves object churn.
+    // has no image to decode, so the cache only saves object churn. La key lleva el estado del
+    // heatmap porque el fill es opaco o translúcido según él: sin el prefijo, el toggle no repintaría
+    // nada (la caché devolvería el style del estado anterior).
     const circles = new Map<string, CircleStyle>();
     const circleOf = (color: string): CircleStyle => {
-      let circle = circles.get(color);
+      const key = `${heatmapVisible ? 'h' : ''}${color}`;
+      let circle = circles.get(key);
       if (!circle) {
         circle = new ol.Circle({
           radius: TEMAS_MAP_MARKER_RADIUS,
-          fill: new ol.Fill({ color }),
+          // Con el heatmap apagado el fill es el tono crudo; encendido, uniforme y translúcido (ver
+          // `TEMAS_MAP_HEATMAP_MARKER_COLOR`).
+          fill: new ol.Fill({
+            color: heatmapVisible ? _hexToRgba(TEMAS_MAP_HEATMAP_MARKER_COLOR, TEMAS_MAP_HEATMAP_MARKER_ALPHA) : color
+          }),
           stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_MARKER_STROKE })
         });
-        circles.set(color, circle);
+        circles.set(key, circle);
       }
       return circle;
     };
@@ -3721,6 +3862,9 @@ export default class Timeline {
     // está desplazado en un anillo pinta este, y fuera de un anillo el de siempre. La caché lleva
     // los dos en la misma key por color, porque es un Style distinto y el repintado alterna entre
     // ellos según el `declutter` meta o saque al punto del anillo.
+    // **El fill no sigue al heatmap**: el elegido tiene que seguir diciendo "este es" también con la
+    // capa de densidad encendida, así que conserva el tono crudo y opaco aunque los demás markers
+    // se pinten uniformes y translúcidos (por eso la key no lleva el flag del heatmap).
     const selectedCircles = new Map<string, CircleStyle>();
     const selectedCircleOf = (color: string, grown: boolean): CircleStyle => {
       const key = `${color}|${grown ? 1 : 0}`;
@@ -3786,22 +3930,32 @@ export default class Timeline {
     // One circle per cluster color and one text per count, shared by every cluster that needs them.
     // The style function runs on every repaint of every feature, so without the cache a pan would
     // build a fresh `Circle` per cluster per frame —same reason as the `circleOf` caches above.
+    // Con la capa de densidad encendida el clúster cambia de lenguaje: el disco desaparece (un
+    // círculo opaco o translúcido taparía la gradiente igual que un marker) y queda solo el conteo
+    // con el halo oscuro que le agrega `clusterTextOf` para seguir leyéndose blanco sobre el
+    // heatmap. Por eso las dos cachés llevan el estado del heatmap en la key.
     const clusterCircles = new Map<string, CircleStyle>();
     const clusterCircleOf = (color: string): CircleStyle => {
-      let circle = clusterCircles.get(color);
+      const key = `${heatmapVisible ? 'h' : ''}${color}`;
+      let circle = clusterCircles.get(key);
       if (!circle) {
         circle = new ol.Circle({
           radius: TEMAS_MAP_CLUSTER_RADIUS,
-          fill: new ol.Fill({ color }),
-          stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_CLUSTER_STROKE })
+          ...(!heatmapVisible
+            ? {
+                fill: new ol.Fill({ color: _hexToRgba(color, 1) }),
+                stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_CLUSTER_STROKE })
+              }
+            : {})
         });
-        clusterCircles.set(color, circle);
+        clusterCircles.set(key, circle);
       }
       return circle;
     };
-    const clusterTexts = new Map<number, TextStyle>();
+    const clusterTexts = new Map<string, TextStyle>();
     const clusterTextOf = (count: number): TextStyle => {
-      let text = clusterTexts.get(count);
+      const key = `${heatmapVisible ? 'h' : ''}${count}`;
+      let text = clusterTexts.get(key);
       if (!text) {
         text = new ol.Text({
           text: String(count),
@@ -3810,9 +3964,16 @@ export default class Timeline {
           textBaseline: 'middle',
           // Mismo nudge que el número del marker: la constante es la misma y por la misma razón.
           offsetY: TEMAS_MAP_MARKER_TEXT_OFFSET_Y,
-          fill: new ol.Fill({ color: TEMAS_MAP_CLUSTER_TEXT_COLOR })
+          fill: new ol.Fill({ color: TEMAS_MAP_CLUSTER_TEXT_COLOR }),
+          // Con la densidad encendida no hay disco detrás (ver `clusterCircleOf`): el halo negro le
+          // da al conteo el contraste que el fill del clúster no le presta.
+          ...(heatmapVisible
+            ? {
+                stroke: new ol.Stroke({ color: '#000', width: 3 })
+              }
+            : {})
         });
-        clusterTexts.set(count, text);
+        clusterTexts.set(key, text);
       }
       return text;
     };
@@ -3946,6 +4107,19 @@ export default class Timeline {
         })
       );
     }
+    // The density layer goes **under** the markers: it is context, not the thing you click. It shares
+    // the very `source` of the markers, so `updatePoints` keeps it in sync with no extra bookkeeping,
+    // and it starts hidden ?`_refreshFullMap` applies the current state right after mounting?.
+    const heatmapLayer = options.heatmap
+      ? new ol.HeatmapLayer({
+          source,
+          blur: TEMAS_MAP_HEATMAP_BLUR,
+          radius: TEMAS_MAP_HEATMAP_RADIUS,
+          gradient: TEMAS_MAP_HEATMAP_GRADIENT,
+          visible: false
+        })
+      : null;
+    if (heatmapLayer) layers.push(heatmapLayer);
     layers.push(new ol.VectorLayer({ source }));
 
     // The center is only a starting point: `fit` below overrides it. It cannot be left out
@@ -4432,7 +4606,25 @@ export default class Timeline {
       declutter();
     };
 
-    return { map, overlay, updatePoints, refreshStyles, fit, selectedSpiderCenter };
+    /**
+     * Mostrar u ocultar la capa de densidad, si este mapa la pidió (ver `TemasMapHandle`). Un mapa
+     * sin capa —el de la tarjeta— simplemente no hace nada, que es lo que mantiene al mount
+     * genérico sin una rama por consumidor.
+     *
+     * El `refreshStyles()` no es opcional: cada factoría lee `heatmapVisible` —con la capa apagada
+     * los círculos van con su fill, y encendida los markers pasan a uniformes translúcidos, el
+     * seleccionado conserva su tono y los clusters pierden el disco—, y una variable de closure no
+     * repinta nada por sí sola. Sin él el toggle del heatmap cambiaría la densidad pero dejaría los
+     * círculos con el estilo del estado anterior hasta el próximo `declutter()` (el `moveend` de un
+     * zoom), no de inmediato.
+     */
+    const setHeatmapVisible = (visible: boolean): void => {
+      heatmapVisible = visible;
+      heatmapLayer?.setVisible(visible);
+      refreshStyles();
+    };
+
+    return { map, overlay, updatePoints, refreshStyles, fit, selectedSpiderCenter, setHeatmapVisible };
   }
 
   /**
@@ -4497,6 +4689,50 @@ export default class Timeline {
       }
       void this._refreshFullMap();
     });
+  }
+
+  /**
+   * Bind the density toggle of the general map (`fullMapHeatmap`).
+   *
+   * It is a switch on the **layer**, not on the view: the map is not remounted, the markers are not
+   * touched and the current pan and zoom stay exactly where they are. The only thing that changes is
+   * `_fullMapHeatmap`, which is state of the instance —so it survives a filter change and a remount—
+   * and the visibility of the layer, through the handle. The button (`aria-pressed` + the label) is
+   * the only UI to keep in sync, and `_applyFullMapHeatmapState()` is the single place that does it.
+   *
+   * No handler at all when the option is off: without the button (`_buildFullMapViewHtml` returns no
+   * markup) there is nothing to click and no layer to toggle.
+   */
+  protected _bindFullMapHeatmapToggle(): void {
+    const button = this.fullMapHeatmapToggle;
+    if (!button) return;
+    button.addEventListener('click', (e: Event) => {
+      e.stopPropagation();
+      this._fullMapHeatmap = !this._fullMapHeatmap;
+      try {
+        window.localStorage.setItem(FULLMAP_HEATMAP_STORAGE_KEY, this._fullMapHeatmap ? '1' : '0');
+      } catch {
+        /* localStorage unavailable */
+      }
+      this._fullMapHandle?.setHeatmapVisible(this._fullMapHeatmap);
+      this._applyFullMapHeatmapState();
+    });
+  }
+
+  /**
+   * Reflect `_fullMapHeatmap` on the button, and push it to the map. Called on the toggle, and again
+   * after the map is (re)mounted, so a map that came back from an empty set or a destroyed view picks
+   * up the state that was already on instead of resetting to markers.
+   */
+  protected _applyFullMapHeatmapState(): void {
+    this._fullMapHandle?.setHeatmapVisible(this._fullMapHeatmap);
+    const button = this.fullMapHeatmapToggle;
+    if (!button) return;
+    const on = this._fullMapHeatmap;
+    button.setAttribute('aria-pressed', String(on));
+    const label = on ? FULLMAP_HEATMAP_ACTIVE_LABEL : FULLMAP_HEATMAP_LABEL;
+    button.setAttribute('aria-label', label);
+    button.setAttribute('title', label);
   }
 
   /**
@@ -4664,6 +4900,11 @@ export default class Timeline {
       return;
     }
     this._fullMapHandle = await this._mountFullMap(canvas, loaded);
+    // La capa de densidad nace oculta (ver `_mountTemasMapOn`): acá se le aplica el estado que el
+    // componente ya tenía, para que el mapa que vuelve de un set vacío —o de cualquier remontaje—
+    // no resetee el heatmap a marcadores. También es el único lugar que sincroniza el `aria-pressed`
+    // del botón cuando el mapa se acaba de montar.
+    this._applyFullMapHeatmapState();
     // El mapa pudo montarse con los puntos de una query que ya no es la vigente: el cambio llegó
     // mientras `ol` se importaba, y el `seq` de arriba no alcanza a cortarlo porque el await del
     // import ocurre **después** del chequeo. Sin este segundo cierre los puntos viejos quedarían
@@ -4791,6 +5032,7 @@ export default class Timeline {
   ): Promise<TemasMapHandle<FullMapPoint> | null> {
     return this._mountTemasMapOn(canvas, points, {
       markerLabel: null,
+      heatmap: this.fullMapHeatmap,
       hoverHtml: (p) =>
         `<span class="fullmap-tooltip-topic">${this._escapeHtml(p.titulo)}</span>` +
         `<span class="fullmap-tooltip-source">${this._escapeHtml(p.nombre_fuente)}</span>`,
@@ -4859,7 +5101,7 @@ export default class Timeline {
     const dateCol = itemEl.querySelector('.timeline-date-col');
     if (dateCol) dateCol.remove();
     // El colapso no tiene sentido acá: la tarjeta se abre siempre expandida, y sin este botón tampoco
-    // queda un "−" que la cerraría y dejaría el panel con el scroll perdido.
+    // queda un "-" que la cerrar?a y dejar?a el panel con el scroll perdido.
     const collapseBtn = itemEl.querySelector('.card-collapse');
     if (collapseBtn) collapseBtn.remove();
     itemEl.classList.add('visible');
@@ -4869,6 +5111,26 @@ export default class Timeline {
     const cardEl = itemEl.querySelector('.timeline-card') as HTMLElement | null;
     if (!cardEl) return;
     cardEl.classList.add('expanded');
+    // El scroll del panel no puede ser el de la tarjeta entera: scrollear la caja completa pierde la
+    // cabecera (imagen con el título encima), los badges y el botón de cerrar, que son los anclajes
+    // de la ficha. Se envuelven `.card-actions` + `.card-body` en `.fullmap-detail-scroll` —el único
+    // contenedor con scroll—, y el flex column del SCSS deja la cabecera fija arriba. Los controles
+    // colgados de la tarjeta (información, compartir, su menú) se sacan del wrapper: son
+    // `position: absolute` contra `.timeline-card`, y adentro del scroll su `top: 8px` cae fuera del
+    // recorte del contenedor y desaparecería.
+    const cardControls = Array.from(
+      cardEl.querySelectorAll<HTMLElement>('.card-info-btn, .card-share-btn, .card-info-menu')
+    );
+    const actionsEl = cardEl.querySelector('.card-actions') as HTMLElement | null;
+    const bodyEl = cardEl.querySelector('.card-body') as HTMLElement | null;
+    if (actionsEl && bodyEl) {
+      const scrollWrap = document.createElement('div');
+      scrollWrap.className = 'fullmap-detail-scroll';
+      cardEl.insertBefore(scrollWrap, actionsEl);
+      scrollWrap.appendChild(actionsEl);
+      scrollWrap.appendChild(bodyEl);
+    }
+    cardControls.forEach((ctrl) => cardEl.appendChild(ctrl));
     panel.innerHTML = this._buildFullMapDetailHtml();
     panel.querySelector('.fullmap-detail-body')?.appendChild(itemEl);
     // El botón va **dentro** de la tarjeta y no en un header del panel: `.timeline-card` es
@@ -4996,8 +5258,8 @@ export default class Timeline {
     const res = view.getResolution();
     const center = view.getCenter();
     if (!res || !center) return;
-    // Pixel → coordenada de vista: en X `px = (coord − centro) / res`, o sea que correr el centro
-    // hacia atrás hace que el punto avance; en Y el eje está invertido (`py = (centro − coord) /
+    // Pixel ? coordenada de vista: en X `px = (coord - centro) / res`, o sea que correr el centro
+    // hacia atr?s hace que el punto avance; en Y el eje est? invertido (`py = (centro - coord) /
     // res`). Solo se anima el `center`: sin `resolution` la vista se desplaza sin acercar nada.
     view.animate({
       center: [center[0] - move.dx * res, center[1] + move.dy * res],
@@ -8404,6 +8666,7 @@ export default class Timeline {
     this._bindSortToggle();
     if (this.showFullMap) {
       this._bindFullMapToggle();
+      this._bindFullMapHeatmapToggle();
       document.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'Escape' && this._fullMapOpen) {
           this._fullMapOpen = false;
@@ -8495,4 +8758,15 @@ export default class Timeline {
       if (this._fullMapOpen) this._syncFullMapDetailTop();
     });
   }
+}
+
+function _hexToRgba(hex: string, alpha: number): string {
+  let h = hex.trim();
+  if (h.startsWith('#')) h = h.slice(1);
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
 }

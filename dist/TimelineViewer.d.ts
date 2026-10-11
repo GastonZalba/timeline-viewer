@@ -5,6 +5,7 @@ import type OlFeature from 'ol/Feature.js';
 import type OlPoint from 'ol/geom/Point.js';
 import type OlLineString from 'ol/geom/LineString.js';
 import type VectorLayer from 'ol/layer/Vector.js';
+import type HeatmapLayer from 'ol/layer/Heatmap.js';
 import type VectorSource from 'ol/source/Vector.js';
 import type TileLayer from 'ol/layer/Tile.js';
 import type XYZ from 'ol/source/XYZ.js';
@@ -45,6 +46,7 @@ interface TemasMapModules {
     OlLineString: typeof OlLineString;
     OlOverlay: typeof OlOverlay;
     VectorLayer: typeof VectorLayer;
+    HeatmapLayer: typeof HeatmapLayer;
     VectorSource: typeof VectorSource;
     TileLayer: typeof TileLayer;
     XYZ: typeof XYZ;
@@ -142,6 +144,16 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
      * porque es una lectura, no un gesto sobre el mapa —mismo motivo que `fit`—.
      */
     selectedSpiderCenter(): number[] | null;
+    /**
+     * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida los círculos
+     * pasan a translúcidos (para que la densidad se lea debajo) y apagada vuelven al fill opaco del
+     * tono; el hover, el click, el spiderfy y la selección siguen funcionando por encima en las dos.
+     *
+     * Es un no-op en un mapa que no pidió la capa (el de la tarjeta), por el mismo motivo que
+     * `refreshStyles` es un gesto explícito y no parte de `updatePoints`: la visibilidad es una
+     * decisión del llamador, no algo que el cambio de set deba resolver.
+     */
+    setHeatmapVisible(visible: boolean): void;
 }
 /**
  * Lo mínimo que un punto necesita para existir en un mapa: dónde está y de qué color se lo pinta.
@@ -192,7 +204,16 @@ interface TemasMapMountOptions<P> {
      */
     onMarkerMiss: (() => void) | null;
     /**
-     * Si el punto es el que está abierto en la ficha, o `false`/`null` si este mapa no marca ninguno.
+     * Whether to add the density heatmap layer under the markers. Only the general map asks for it
+     * (`fullMapHeatmap`): a card map has a handful of topics and a numbered marker per topic is the
+     * whole point, while the general map can carry hundreds and the concentration is itself the
+     * information. The layer is a second `ol.Heatmap` over the **same** source, so it follows
+     * `updatePoints` for free, and it reads each feature's own geometry ?the true coordinate? ignoring
+     * the spider/cluster displacement, which is exactly what "where do the topics pile up" should show.
+     */
+    heatmap?: boolean;
+    /**
+     * Si el punto es el que est? abierto en la ficha, o `false`/`null` si este mapa no marca ninguno.
      *
      * Va como **predicado**, no como un `Set` de ids, porque el estilo se resuelve por feature y en
      * cada repintado: con un `Set` el mapa habría que enterarse de los cambios a mano. Con el predicado,
@@ -568,6 +589,23 @@ export interface TimelineOptions {
      */
     showFullMap?: boolean;
     /**
+     * Capa de densidad del mapa general (default: false). Requiere `showFullMap`: agrega al mapa una
+     * capa `ol/layer/Heatmap` **debajo** de los marcadores, que se lee como "dónde se amontonan los
+     * temas" en vez de "qué temas hay", y un botón flotante sobre el canvas para encenderla y apagarla.
+     *
+     * Cada tema pesa lo mismo (`1`), as? que la intensidad depende solo de cu?ntos caen juntos: no hay
+     * campo nuevo ni configuraci?n de peso. El gradiente y el radio son constantes del componente
+     * (`TEMAS_MAP_HEATMAP_*`).
+     *
+     * Los marcadores **no** se apagan: la capa va por debajo y el hover, el click, el agrupamiento y
+     * la selecci?n siguen funcionando por encima. Arranca apagada; el estado sobrevive a cambiar de
+     * filtro y a que el mapa se destruya y se vuelva a montar.
+     *
+     * No tiene efecto en los mapas de tarjeta: es una funci?n del mapa general, donde la concentraci?n
+     * de cientos de puntos es la informaci?n. Con `showFullMap` apagado la opci?n no hace nada.
+     */
+    fullMapHeatmap?: boolean;
+    /**
      * Keep the state of the view in the browser URL (default: false), so the address bar is a
      * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
      *
@@ -892,11 +930,20 @@ export default class Timeline {
      * every point on screen is rendered at all.
      */
     showFullMap: boolean;
+    /**
+     * General map (`fullMapHeatmap`): whether the map is allowed to show the density layer and the
+     * floating toggle that drives it. `false` means no markup, no layer and no `ol.Heatmap` import.
+     */
+    fullMapHeatmap: boolean;
     /** Null when `showFullMap` is off, or in single mode: no button means no view either */
     fullMapToggle: HTMLElement | null;
     fullMapView: HTMLElement | null;
     fullMapCanvas: HTMLElement | null;
     fullMapStatus: HTMLElement | null;
+    /** Botón que enciende y apaga la capa de densidad, o null si `fullMapHeatmap` está apagado */
+    fullMapHeatmapToggle: HTMLElement | null;
+    /** Whether the density layer is on. Solo estado: la visibilidad la aplica el handle del mapa. */
+    _fullMapHeatmap: boolean;
     /** The panel that holds the summary card of the clicked point, over the map */
     fullMapDetail: HTMLElement | null;
     /**
@@ -1524,6 +1571,25 @@ export default class Timeline {
      * por acá: ahí el que hace el `fit` es el montaje.
      */
     protected _bindFullMapToggle(): void;
+    /**
+     * Bind the density toggle of the general map (`fullMapHeatmap`).
+     *
+     * It is a switch on the **layer**, not on the view: the map is not remounted, the markers are not
+     * touched and the current pan and zoom stay exactly where they are. The only thing that changes is
+     * `_fullMapHeatmap`, which is state of the instance —so it survives a filter change and a remount—
+     * and the visibility of the layer, through the handle. The button (`aria-pressed` + the label) is
+     * the only UI to keep in sync, and `_applyFullMapHeatmapState()` is the single place that does it.
+     *
+     * No handler at all when the option is off: without the button (`_buildFullMapViewHtml` returns no
+     * markup) there is nothing to click and no layer to toggle.
+     */
+    protected _bindFullMapHeatmapToggle(): void;
+    /**
+     * Reflect `_fullMapHeatmap` on the button, and push it to the map. Called on the toggle, and again
+     * after the map is (re)mounted, so a map that came back from an empty set or a destroyed view picks
+     * up the state that was already on instead of resetting to markers.
+     */
+    protected _applyFullMapHeatmapState(): void;
     /**
      * Keep the topic panel of the general map below the toolbar.
      *

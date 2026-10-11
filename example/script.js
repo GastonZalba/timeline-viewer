@@ -28,6 +28,9 @@ import sorters from './sorters.js';
 // un mapa con un punto por tema ubicado de todo lo que hay en el filtro actual. Es independiente de
 // `?full`: el mapa se abre y se cierra igual con el timeline colapsado o expandido, y con `?full`
 // toma lo que queda de la ventana bajo la barra pegada.
+// ?heatmap suma la capa de densidad (`fullMapHeatmap`), que solo tiene efecto junto con `?fullmap`:
+// el mapa general gana un botón flotante que enciende y apaga un `ol/layer/Heatmap` debajo de los
+// marcadores.
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
 // el botón de compartir con esa misma URL.
@@ -45,6 +48,8 @@ const useMany = new URLSearchParams(window.location.search).has('many');
 const useSinInternos = new URLSearchParams(window.location.search).has('sininternos');
 // ?fullmap: la vista de mapa general (`showFullMap`), que no depende de ?full (ver la nota).
 const useFullMap = new URLSearchParams(window.location.search).has('fullmap');
+// ?heatmap: la capa de densidad del mapa general (`fullMapHeatmap`), que solo se ve con ?fullmap.
+const useHeatmap = new URLSearchParams(window.location.search).has('heatmap');
 const singleId = new URLSearchParams(window.location.search).get('id');
 
 /**
@@ -147,6 +152,8 @@ const baseOptions = {
   // Con ?fullmap el botón de la barra abre un mapa con todos los temas ubicados del filtro actual,
   // en vez del listado. En modo API los puntos salen de `GET /api/points`.
   showFullMap: useFullMap,
+  // Con ?heatmap el mapa general suma la capa de densidad y el botón que la enciende (ver la nota).
+  fullMapHeatmap: useHeatmap,
   relatedLabel: (count) => (count === 1 ? 'publicación' : 'publicaciones'),
   // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos

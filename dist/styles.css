@@ -153,17 +153,39 @@
   color: #ffffff;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail-body {
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--tv-accent) transparent;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
   border-radius: 8px;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail-body .timeline-item {
   margin-bottom: 0;
   box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail-body .timeline-item .timeline-card {
   margin-left: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--tv-accent) transparent;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-detail .card-image-wrap {
+  flex-shrink: 0;
+  height: calc(2.47em + 14px + 8px + 20px);
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail-loading {
   padding: 24px 12px;
@@ -185,6 +207,36 @@
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-canvas.is-hover-marker {
   cursor: pointer;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle {
+  position: absolute;
+  right: 0.5em;
+  bottom: 8.5em;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true] {
+  background: var(--tv-accent);
+  color: #ffffff;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true]:hover {
+  background: var(--tv-accent);
+  filter: brightness(1.1);
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-error {
   display: flex;
@@ -1238,6 +1290,9 @@
   margin: 0;
   padding: 14px 12px 8px;
 }
+.publicaciones-container .timeline-item .timeline-card.expanded .card-image-wrap {
+  border-bottom: 1px solid var(--tv-accent);
+}
 .publicaciones-container .timeline-item .card-img-oficial {
   display: inline-flex;
   align-items: center;
@@ -1247,6 +1302,30 @@
 }
 .publicaciones-container .timeline-item .timeline-card.expanded .card-img-oficial {
   display: none;
+}
+.publicaciones-container .timeline-item .card-oficial-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  flex-shrink: 0;
+  margin-left: 6px;
+  width: 22px;
+  height: 22px;
+  background: var(--tv-accent-dark);
+  border-radius: 50%;
+}
+.publicaciones-container .timeline-item .card-oficial {
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  color: var(--tv-text-on-primary);
+}
+.publicaciones-container .timeline-item .card-fuente .card-oficial {
+  margin-left: 0;
 }
 @keyframes card-image-shimmer {
   0% {
@@ -1499,7 +1578,6 @@
   padding: 12px 16px;
   background: rgba(59, 130, 246, 0.09);
   border-bottom: 1px solid var(--tv-accent);
-  border-top: 1px solid var(--tv-accent);
 }
 .publicaciones-container .timeline-item .card-actions .card-actions-row {
   display: flex;
@@ -1633,30 +1711,6 @@
   to {
     --tv-row-angle: 360deg;
   }
-}
-.publicaciones-container .publicaciones-timeline-section .card-oficial-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  flex-shrink: 0;
-  margin-left: 6px;
-  width: 22px;
-  height: 22px;
-  background: var(--tv-accent-dark);
-  border-radius: 50%;
-}
-.publicaciones-container .publicaciones-timeline-section .card-oficial {
-  width: 12px;
-  height: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  vertical-align: middle;
-  color: var(--tv-text-on-primary);
-}
-.publicaciones-container .publicaciones-timeline-section .card-fuente .card-oficial {
-  margin-left: 0;
 }
 .publicaciones-container .publicaciones-timeline-section.expanded.has-taxonomy #remaining-text {
   margin-left: 5px;
