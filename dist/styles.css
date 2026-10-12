@@ -123,7 +123,6 @@
   max-height: calc(100vh - var(--tv-fullmap-top, 8px) - 24px);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail[hidden] {
   display: none;
@@ -155,10 +154,8 @@
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail-body {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
   flex: 1;
   min-height: 0;
-  border-radius: 8px;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-detail-body .timeline-item {
   margin-bottom: 0;
@@ -192,8 +189,9 @@
   font-size: 0.75rem;
   font-weight: 300;
   font-style: italic;
-  color: var(--tv-text-muted);
+  color: var(--tv-text-primary);
   text-align: center;
+  text-shadow: 0 2px 2px black;
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-canvas {
   height: 100vh;

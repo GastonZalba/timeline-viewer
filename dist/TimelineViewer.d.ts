@@ -167,7 +167,18 @@ interface TemasMapPlottable {
     color: string;
 }
 /**
- * Lo que las dos vistas del mapa le pasan distinto al mismo armadilio de OpenLayers
+ * Parámetros ya resueltos de la capa de densidad que el mapa general pasa al armadillo común. Viven
+ * fuera de `FullMapHeatmapOptions` (la config pública) porque acá llegan los values concretos con
+ * los que se construye el `ol/layer/Heatmap` —los defaults del componente cuando la config no los
+ * tocó—: el mount no resolve nada, solo lee.
+ */
+interface TemasMapHeatmapParams {
+    blur: number;
+    radius: number;
+    gradient: string[];
+}
+/**
+ * Lo que las dos vistas del mapa le pasan distinto al mismo armadillo de OpenLayers
  * (`_mountTemasMapOn`). Sin esto habría que duplicar las ~200 líneas del agrupamiento de marcadores
  * superpuestos, que son las que más caro salen de mantener.
  */
@@ -210,8 +221,10 @@ interface TemasMapMountOptions<P> {
      * information. The layer is a second `ol.Heatmap` over the **same** source, so it follows
      * `updatePoints` for free, and it reads each feature's own geometry ?the true coordinate? ignoring
      * the spider/cluster displacement, which is exactly what "where do the topics pile up" should show.
+     * Los parámetros ya vienen resueltos (ver `TemasMapHeatmapParams`): el radio y la mancha salen de
+     * la config (`FullMapHeatmapOptions`), y el gradiente es la constante del componente.
      */
-    heatmap?: boolean;
+    heatmap?: TemasMapHeatmapParams;
     /**
      * Si el punto es el que est? abierto en la ficha, o `false`/`null` si este mapa no marca ninguno.
      *
@@ -436,6 +449,29 @@ export interface TimelineSorter {
      */
     default?: boolean;
 }
+/**
+ * Ajustes de la capa de densidad del mapa general (`fullMapHeatmap`). Se pasan **como objeto** en
+ * lugar de `true` para dejar de usar los defaults del componente; el `true` pelado sigue
+ * significando "la capa con los values por defecto".
+ */
+export interface FullMapHeatmapOptions {
+    /**
+     * Arrancar el mapa con la capa de densidad encendida (default: false). Es **solo el arranque**,
+     * y con la misma prioridad que tenía el estado persistido: si `localStorage` (`tv-fullmap-heatmap`)
+     * ya tiene un valor guardado, ese manda —el `defaultOn` solo aplica la primera vez, cuando no hay
+     * nada que restaurar—. A partir del primer toggle el estado es del usuario y se persiste igual que
+     * siempre.
+     */
+    defaultOn?: boolean;
+    /**
+     * Radio del núcleo de la capa, en px (default: 16, `TEMAS_MAP_HEATMAP_RADIUS`).
+     */
+    radius?: number;
+    /**
+     * Radio de la mancha de la capa, en px (default: 24, `TEMAS_MAP_HEATMAP_BLUR`).
+     */
+    blur?: number;
+}
 export interface TimelineOptions {
     container: string | HTMLElement;
     /**
@@ -594,8 +630,13 @@ export interface TimelineOptions {
      * temas" en vez de "qué temas hay", y un botón flotante sobre el canvas para encenderla y apagarla.
      *
      * Cada tema pesa lo mismo (`1`), as? que la intensidad depende solo de cu?ntos caen juntos: no hay
-     * campo nuevo ni configuraci?n de peso. El gradiente y el radio son constantes del componente
-     * (`TEMAS_MAP_HEATMAP_*`).
+     * campo nuevo ni configuraci?n de peso. El gradiente es constante del componente
+     * (`TEMAS_MAP_HEATMAP_GRADIENT`); el radio y la mancha se ajustan pasando un objeto
+     * `FullMapHeatmapOptions` en vez de `true` (`radius`, default 16, y `blur`, default 24).
+     *
+     * La opción **no** decide el estado con el que abre el botón: ese sale de `localStorage`
+     * (`tv-fullmap-heatmap`), que restaura la preferencia que dejó el usuario. `defaultOn: true`
+     * en el objeto solo se usa la primera vez, cuando no hay nada guardado todavía.
      *
      * Los marcadores **no** se apagan: la capa va por debajo y el hover, el click, el agrupamiento y
      * la selecci?n siguen funcionando por encima. Arranca apagada; el estado sobrevive a cambiar de
@@ -604,7 +645,7 @@ export interface TimelineOptions {
      * No tiene efecto en los mapas de tarjeta: es una funci?n del mapa general, donde la concentraci?n
      * de cientos de puntos es la informaci?n. Con `showFullMap` apagado la opci?n no hace nada.
      */
-    fullMapHeatmap?: boolean;
+    fullMapHeatmap?: boolean | FullMapHeatmapOptions;
     /**
      * Keep the state of the view in the browser URL (default: false), so the address bar is a
      * shareable link: whoever opens it sees the same search, filters, order, taxonomy and page.
@@ -944,6 +985,15 @@ export default class Timeline {
     fullMapHeatmapToggle: HTMLElement | null;
     /** Whether the density layer is on. Solo estado: la visibilidad la aplica el handle del mapa. */
     _fullMapHeatmap: boolean;
+    /** Radio del núcleo de la capa de densidad, resuelto de la config (`fullMapHeatmap.radius`) */
+    _fullMapHeatmapRadius: number;
+    /** Radio de la mancha de la capa de densidad, resuelto de la config (`fullMapHeatmap.blur`) */
+    _fullMapHeatmapBlur: number;
+    /**
+     * Arranque por defecto de la capa de densidad (`fullMapHeatmap.defaultOn`). Solo se usa cuando
+     * `localStorage` no tiene nada guardado: es la primera visita, no una preferencia que restaurar.
+     */
+    _fullMapHeatmapDefaultOn: boolean;
     /** The panel that holds the summary card of the clicked point, over the map */
     fullMapDetail: HTMLElement | null;
     /**
@@ -1154,6 +1204,13 @@ export default class Timeline {
      * compared against, so `[false, null]` is one checkbox that matches either.
      */
     protected _resolveFilterItems(field: string, items: TimelineFilterItem[]): FilterDefItem[] | null;
+    /**
+     * Resolver un parámetro numérico de la capa de densidad (`fullMapHeatmap.radius` / `.blur`):
+     * un número finito y no negativo se respeta, cualquier otra cosa avisa por consola y cae al
+     * default del componente. Mismo patrón que los validadores de `filters`/`sorters`: la config
+     * inválida de un consumidor no rompe el montaje, se queda con el default.
+     */
+    protected _resolveHeatmapNumber(value: number | undefined, fallback: number, name: string): number;
     /** Report a group of the `filters` option that was dropped, so a typo does not go unnoticed */
     protected _warnFilter(index: number, reason: string): void;
     /**

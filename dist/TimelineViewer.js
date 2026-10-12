@@ -857,7 +857,14 @@ export default class Timeline {
         this._olModules = null;
         this._temasMaps = new Map();
         this.showFullMap = config.showFullMap === true;
-        this.fullMapHeatmap = config.fullMapHeatmap === true;
+        // La opción acepta `true` (la capa con los defaults) o un objeto `FullMapHeatmapOptions`. El
+        // objeto se resuelve acá, en el constructor, porque el montaje lee los parámetros listos y el
+        // arranque (`defaultOn`) se necesita antes del primer build del layout.
+        const heatmapOptions = typeof config.fullMapHeatmap === 'object' && config.fullMapHeatmap !== null ? config.fullMapHeatmap : null;
+        this.fullMapHeatmap = config.fullMapHeatmap === true || heatmapOptions !== null;
+        this._fullMapHeatmapBlur = this._resolveHeatmapNumber(heatmapOptions?.blur, TEMAS_MAP_HEATMAP_BLUR, 'fullMapHeatmap.blur');
+        this._fullMapHeatmapRadius = this._resolveHeatmapNumber(heatmapOptions?.radius, TEMAS_MAP_HEATMAP_RADIUS, 'fullMapHeatmap.radius');
+        this._fullMapHeatmapDefaultOn = heatmapOptions?.defaultOn === true;
         this.fullMapToggle = null;
         this.fullMapView = null;
         this.fullMapCanvas = null;
@@ -868,15 +875,17 @@ export default class Timeline {
         // El arranque del toggle sale de `localStorage` (`tv-fullmap-heatmap`): es una preferencia de UI
         // del consumidor, y si la dejó encendida, que reabra el mapa con la capa puesta. Se lee en el
         // constructor, antes del primer build del layout, para que `_applyFullMapHeatmapState()` —que
-        // corre tras cada remonte— ya tenga el valor correcto.
-        let persistedHeatmap = false;
+        // corre tras cada remonte— ya tenga el valor correcto. El `defaultOn` de la config es **solo**
+        // ese arranque para cuando no hay nada guardado todavía (primera visita): en cuanto el usuario
+        // toca el botón, el estado es suyo y se persiste igual que siempre.
+        let storedHeatmap = null;
         try {
-            persistedHeatmap = window.localStorage.getItem(FULLMAP_HEATMAP_STORAGE_KEY) === '1';
+            storedHeatmap = window.localStorage.getItem(FULLMAP_HEATMAP_STORAGE_KEY);
         }
         catch {
             /* localStorage unavailable */
         }
-        this._fullMapHeatmap = persistedHeatmap;
+        this._fullMapHeatmap = storedHeatmap === '1' ? true : storedHeatmap === '0' ? false : this._fullMapHeatmapDefaultOn;
         this._fullMapHandle = null;
         this._fullMapPoints = [];
         this._fullMapSeq = 0;
@@ -1093,6 +1102,20 @@ export default class Timeline {
             resolved.push({ token, tokens, label: item.label.trim(), checked: item.checked === true });
         }
         return resolved;
+    }
+    /**
+     * Resolver un parámetro numérico de la capa de densidad (`fullMapHeatmap.radius` / `.blur`):
+     * un número finito y no negativo se respeta, cualquier otra cosa avisa por consola y cae al
+     * default del componente. Mismo patrón que los validadores de `filters`/`sorters`: la config
+     * inválida de un consumidor no rompe el montaje, se queda con el default.
+     */
+    _resolveHeatmapNumber(value, fallback, name) {
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+            return value;
+        if (value !== undefined) {
+            console.warn(`TimelineViewer: "${name}" inválido (${String(value)}), se usa el default ${fallback}.`);
+        }
+        return fallback;
     }
     /** Report a group of the `filters` option that was dropped, so a typo does not go unnoticed */
     _warnFilter(index, reason) {
@@ -2731,13 +2754,15 @@ export default class Timeline {
         }
         // The density layer goes **under** the markers: it is context, not the thing you click. It shares
         // the very `source` of the markers, so `updatePoints` keeps it in sync with no extra bookkeeping,
-        // and it starts hidden ?`_refreshFullMap` applies the current state right after mounting?.
+        // and it starts hidden ?`_refreshFullMap` applies the current state right after mounting?. Los
+        // parámetros vienen resueltos en `options.heatmap` (el montaje ya no conoce la config): el radio
+        // y la mancha de `FullMapHeatmapOptions`, el gradiente la constante del componente.
         const heatmapLayer = options.heatmap
             ? new ol.HeatmapLayer({
                 source,
-                blur: TEMAS_MAP_HEATMAP_BLUR,
-                radius: TEMAS_MAP_HEATMAP_RADIUS,
-                gradient: TEMAS_MAP_HEATMAP_GRADIENT,
+                blur: options.heatmap.blur,
+                radius: options.heatmap.radius,
+                gradient: options.heatmap.gradient,
                 visible: false
             })
             : null;
@@ -3653,7 +3678,18 @@ export default class Timeline {
     async _mountFullMap(canvas, points) {
         return this._mountTemasMapOn(canvas, points, {
             markerLabel: null,
-            heatmap: this.fullMapHeatmap,
+            // Parámetros ya resueltos de la capa de densidad, si la opción la habilitó (ver
+            // `TemasMapHeatmapParams`): el montaje no vuelve a resolver nada. El gradiente es la constante
+            // del componente; el radio y la mancha, la config `FullMapHeatmapOptions`.
+            ...(this.fullMapHeatmap
+                ? {
+                    heatmap: {
+                        blur: this._fullMapHeatmapBlur,
+                        radius: this._fullMapHeatmapRadius,
+                        gradient: TEMAS_MAP_HEATMAP_GRADIENT
+                    }
+                }
+                : {}),
             hoverHtml: (p) => `<span class="fullmap-tooltip-topic">${this._escapeHtml(p.titulo)}</span>` +
                 `<span class="fullmap-tooltip-source">${this._escapeHtml(p.nombre_fuente)}</span>`,
             tooltipClass: 'fullmap-tooltip',
@@ -3713,7 +3749,7 @@ export default class Timeline {
         if (this._fullMapSelectedKey !== key)
             return;
         if (!card) {
-            panel.innerHTML = `<div class="fullmap-detail-loading">No se encontró la publicación ${this._escapeHtml(id)}.</div>`;
+            panel.innerHTML = `<div class="fullmap-detail-loading">No se pudo cargar la publicación ${this._escapeHtml(id)}.</div>`;
             return;
         }
         const itemEl = this._createTimelineItem(card);

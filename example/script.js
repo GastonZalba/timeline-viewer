@@ -30,7 +30,8 @@ import sorters from './sorters.js';
 // toma lo que queda de la ventana bajo la barra pegada.
 // ?heatmap suma la capa de densidad (`fullMapHeatmap`), que solo tiene efecto junto con `?fullmap`:
 // el mapa general gana un botón flotante que enciende y apaga un `ol/layer/Heatmap` debajo de los
-// marcadores.
+// marcadores. Se pasa como objeto con `defaultOn: true` para que el demo arranque con la capa puesta
+// (el resto de los ajustes —`radius`, `blur`— quedan en el default).
 // El menú de información muestra el ID con el icono "Visitar" hacia la vista individual
 // del propio ítem (`link_view_entry`, un campo de cada artículo), y aparece también
 // el botón de compartir con esa misma URL.
@@ -49,6 +50,7 @@ const useSinInternos = new URLSearchParams(window.location.search).has('sininter
 // ?fullmap: la vista de mapa general (`showFullMap`), que no depende de ?full (ver la nota).
 const useFullMap = new URLSearchParams(window.location.search).has('fullmap');
 // ?heatmap: la capa de densidad del mapa general (`fullMapHeatmap`), que solo se ve con ?fullmap.
+// Se pasa `{ defaultOn: true }` para ejercitar la opción de arranque encendido de la config.
 const useHeatmap = new URLSearchParams(window.location.search).has('heatmap');
 const singleId = new URLSearchParams(window.location.search).get('id');
 
@@ -153,7 +155,9 @@ const baseOptions = {
   // en vez del listado. En modo API los puntos salen de `GET /api/points`.
   showFullMap: useFullMap,
   // Con ?heatmap el mapa general suma la capa de densidad y el botón que la enciende (ver la nota).
-  fullMapHeatmap: useHeatmap,
+  // Se pasa el objeto con `defaultOn: true` en vez de `true` pelado para mostrar la config nueva:
+  // el arranque encendido solo vale si `localStorage` no tiene nada guardado todavía.
+  fullMapHeatmap: useHeatmap ? { defaultOn: true } : false,
   relatedLabel: (count) => (count === 1 ? 'publicación' : 'publicaciones'),
   // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos

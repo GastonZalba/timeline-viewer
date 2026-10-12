@@ -182,7 +182,6 @@
       max-height: calc(100vh - var(--tv-fullmap-top, 8px) - 24px);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
 
       &[hidden] {
         display: none;
@@ -228,10 +227,8 @@
     .fullmap-detail-body {
       display: flex;
       flex-direction: column;
-      overflow: hidden;
       flex: 1;
       min-height: 0;
-      border-radius: 8px;
     }
 
     // La tarjeta dentro del panel: sin la margen inferior de 40px que usa como separación en la línea
@@ -284,8 +281,9 @@
       font-size: 0.75rem;
       font-weight: 300;
       font-style: italic;
-      color: var(--tv-text-muted);
+      color: var(--tv-text-primary);
       text-align: center;
+      text-shadow: 0 2px 2px black;
     }
 
     .fullmap-canvas {
