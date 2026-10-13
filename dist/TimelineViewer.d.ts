@@ -11,6 +11,7 @@ import type TileLayer from 'ol/layer/Tile.js';
 import type XYZ from 'ol/source/XYZ.js';
 import type OlStyle from 'ol/style/Style.js';
 import type CircleStyle from 'ol/style/Circle.js';
+import type IconStyle from 'ol/style/Icon.js';
 import type OlFill from 'ol/style/Fill.js';
 import type OlStroke from 'ol/style/Stroke.js';
 import type TextStyle from 'ol/style/Text.js';
@@ -52,6 +53,7 @@ interface TemasMapModules {
     XYZ: typeof XYZ;
     Style: typeof OlStyle;
     Circle: typeof CircleStyle;
+    Icon: typeof IconStyle;
     Fill: typeof OlFill;
     Stroke: typeof OlStroke;
     Text: typeof TextStyle;
@@ -146,11 +148,14 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
     selectedSpiderCenter(): number[] | null;
     /**
      * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida solo se pinta
-     * la densidad: clusters, anillos del spider, sus líneas y todo marker no seleccionado se apagan
-     * (ver la función de estilo), salvo el punto abierto y los que un click **reveló** en un anillo;
-     * apagada vuelven los fills opacos, los discos de clúster y el halo del texto. El hover, el click,
-     * el spiderfy y la selección siguen funcionando por encima en las dos. Apagarla cierra además la
-     * revelación abierta.
+     * la densidad: los clústeres se apagan **a cualquier zoom**, y los anillos del spider se pintan sin
+     * sus líneas; por encima de `TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM` los markers no seleccionados se
+     * pintan chicos y atenuados, y por debajo no se pinta ninguno (salvo el punto abierto y los que un
+     * click **reveló** en un anillo); apagada vuelven los fills opacos, los discos de clúster y el halo
+     * del texto. El apagado es **solo visual**: el hover, el click, el spiderfy y la selección siguen
+     * funcionando por encima en las dos —un clúster invisible conserva su `target`, así que desde
+     * `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM` el click **revela** su anillo y por debajo acerca—. Apagarla
+     * cierra además la revelación abierta.
      *
      * Es un no-op en un mapa que no pidió la capa (el de la tarjeta), por el mismo motivo que
      * `refreshStyles` es un gesto explícito y no parte de `updatePoints`: la visibilidad es una
@@ -663,8 +668,9 @@ export interface TimelineOptions {
      * (`tv-fullmap-heatmap`), que restaura la preferencia que dejó el usuario. `defaultOn: true`
      * en el objeto solo se usa la primera vez, cuando no hay nada guardado todavía.
      *
-     * Los marcadores **no** se apagan: la capa va por debajo y el hover, el click, el agrupamiento y
-     * la selecci?n siguen funcionando por encima. Arranca apagada; el estado sobrevive a cambiar de
+     * Los marcadores no se desactivan: la capa va por debajo y el hover, el click, el agrupamiento y
+     * la selecci?n siguen funcionando por encima, incluso de lejos, donde el heatmap no los pinta pero
+     * los deja clickeables. Arranca apagada; el estado sobrevive a cambiar de
      * filtro y a que el mapa se destruya y se vuelva a montar.
      *
      * No tiene efecto en los mapas de tarjeta: es una funci?n del mapa general, donde la concentraci?n

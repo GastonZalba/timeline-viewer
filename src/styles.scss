@@ -308,54 +308,94 @@
     // cálida del ramp del heatmap —naranja → rojo, sin recorrer el arcoíris entero—: apagado el aro
     // ya es ámbar y encendido el gradiente es el fondo. El estado va por `aria-pressed`, que es lo
     // que leen los lectores de pantalla.
+
     .fullmap-heatmap-toggle {
       position: absolute;
-      left: 0.5em;
-      bottom: 0.5em;
+      right: 0.5em;
+      bottom: 8.5em;
       z-index: 2;
+
       box-sizing: border-box;
       display: flex;
       align-items: center;
       justify-content: center;
+
       width: 48px;
       height: 48px;
       margin: 0;
       padding: 0;
-      border: 1.5px solid rgba(255, 138, 61, 0.55);
+
+      border: 0;
       border-radius: 50%;
-      background: rgba(0, 0, 0, 0.45);
-      color: rgba(255, 255, 255, 0.9);
+
+      background: radial-gradient(
+        ellipse,
+        rgba(210, 38, 47, 0.82) 0%,
+        rgba(255, 91, 45, 0.78) 40%,
+        rgba(255, 157, 46, 0.82) 72%,
+        #0f0 100%
+      );
+
+      color: #fff;
       cursor: pointer;
+
+      box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.35),
+        inset 0 1px 1px rgba(255, 255, 255, 0.3),
+        inset 0 -1px 2px rgba(120, 20, 10, 0.25);
+
       transition:
         background 0.2s ease,
         border-color 0.2s ease,
-        color 0.2s ease,
-        box-shadow 0.2s ease;
+        box-shadow 0.2s ease,
+        transform 0.2s ease,
+        filter 0.2s ease;
 
       svg {
-        filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+        transition: transform 0.2s ease;
       }
 
       &:hover {
-        border-color: rgba(255, 138, 61, 0.95);
-        background: rgba(0, 0, 0, 0.6);
-        color: #ffffff;
+        border-color: rgba(255, 225, 185, 0.95);
+        filter: brightness(1.12);
+
+        box-shadow:
+          0 3px 12px rgba(0, 0, 0, 0.4),
+          0 0 0 2px rgba(255, 150, 70, 0.2),
+          inset 0 1px 1px rgba(255, 255, 255, 0.35);
+
+        svg {
+          transform: scale(1.08);
+        }
+      }
+
+      &:active {
+        transform: scale(0.94);
       }
 
       &[aria-pressed='true'] {
-        border-color: transparent;
-        color: #ffffff;
-        background: linear-gradient(145deg, #ff9d2e, #ff3b2f);
+        border-color: rgba(255, 255, 255, 0.95);
+
+        background: radial-gradient(ellipse, #f52f35 5%, #ff702e 32%, #ffb347 56%, #0f0 100%);
+
         box-shadow:
-          0 0 0 2px rgba(255, 255, 255, 0.85),
-          0 2px 14px rgba(255, 60, 30, 0.45);
+          0 0 0 1px rgba(255, 255, 255, 0.8),
+          0 3px 14px rgba(255, 75, 35, 0.5),
+          inset 0 1px 2px rgba(255, 255, 255, 0.4);
 
         &:hover {
-          filter: brightness(1.07);
+          filter: brightness(0.9);
+
           box-shadow:
-            0 0 0 2px rgba(255, 255, 255, 1),
-            0 3px 16px rgba(255, 60, 30, 0.55);
+            0 0 0 1px #fff,
+            0 4px 18px rgba(255, 75, 35, 0.65),
+            inset 0 1px 2px rgba(255, 255, 255, 0.45);
         }
+      }
+
+      &:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 4px;
       }
     }
 
@@ -429,6 +469,10 @@
       padding: 5px 9px;
       border-radius: 4px;
       background: rgb(14 17 22 / 92%);
+      // Franja del tono del punto al costado izquierdo. Va como `inset` y no como `border-left` para
+      // no reservar 3px de ancho en el globo de un clúster (que no tiene tono y queda sin franja):
+      // con la variable ausente el color cae en `transparent` y no se ve nada.
+      box-shadow: inset 3px 0 0 0 var(--tv-tooltip-tone, transparent);
       color: #ffffff;
       font-family: inherit;
       font-size: 0.68rem;
@@ -1196,6 +1240,9 @@
         padding: 4px 8px;
         border-radius: 4px;
         background: rgb(14 17 22 / 92%);
+        // Misma franja de tono que el globo del mapa general (ver `.fullmap-tooltip`), y por el mismo
+        // motivo `inset`: el nodo del hover es el mismo para markers y clústeres.
+        box-shadow: inset 3px 0 0 0 var(--tv-tooltip-tone, transparent);
         color: #ffffff;
         font-family: inherit;
         font-size: 0.68rem;
