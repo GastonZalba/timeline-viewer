@@ -221,7 +221,7 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(210, 38, 47, 0.82) 0%, rgba(255, 91, 45, 0.78) 40%, rgba(255, 157, 46, 0.82) 72%, #0f0 100%);
+  background: radial-gradient(ellipse, rgba(210, 38, 47, 0.72) 0%, rgba(255, 91, 45, 0.68) 40%, rgba(255, 157, 46, 0.72) 72%, #0f0 100%);
   color: #fff;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3), inset 0 -1px 2px rgba(120, 20, 10, 0.25);
@@ -244,11 +244,9 @@
 .publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true] {
   border-color: rgba(255, 255, 255, 0.95);
   background: radial-gradient(ellipse, #f52f35 5%, #ff702e 32%, #ffb347 56%, #0f0 100%);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8), 0 3px 14px rgba(255, 75, 35, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true]:hover {
-  filter: brightness(0.9);
-  box-shadow: 0 0 0 1px #fff, 0 4px 18px rgba(255, 75, 35, 0.65), inset 0 1px 2px rgba(255, 255, 255, 0.45);
+  filter: brightness(0.95);
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle:focus-visible {
   outline: 2px solid #fff;
