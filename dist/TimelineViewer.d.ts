@@ -145,9 +145,12 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
      */
     selectedSpiderCenter(): number[] | null;
     /**
-     * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida los círculos
-     * pasan a translúcidos (para que la densidad se lea debajo) y apagada vuelven al fill opaco del
-     * tono; el hover, el click, el spiderfy y la selección siguen funcionando por encima en las dos.
+     * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida solo se pinta
+     * la densidad: clusters, anillos del spider, sus líneas y todo marker no seleccionado se apagan
+     * (ver la función de estilo), salvo el punto abierto y los que un click **reveló** en un anillo;
+     * apagada vuelven los fills opacos, los discos de clúster y el halo del texto. El hover, el click,
+     * el spiderfy y la selección siguen funcionando por encima en las dos. Apagarla cierra además la
+     * revelación abierta.
      *
      * Es un no-op en un mapa que no pidió la capa (el de la tarjeta), por el mismo motivo que
      * `refreshStyles` es un gesto explícito y no parte de `updatePoints`: la visibilidad es una
@@ -176,6 +179,14 @@ interface TemasMapHeatmapParams {
     blur: number;
     radius: number;
     gradient: string[];
+    /**
+     * Base layer the map swaps to while the layer is visible, or `null` when the caller declared none
+     * —then the heatmap state keeps `mapTiles`, as before—. `''` is a declared "no base" for that
+     * state: it is the state's own source, so it also brings its own credit, `attribution`.
+     */
+    tiles?: string | null;
+    /** Credit of `tiles`, already resolved by the caller (with its fallback), like the tiles. */
+    attribution?: string;
 }
 /**
  * Lo que las dos vistas del mapa le pasan distinto al mismo armadillo de OpenLayers
@@ -471,6 +482,20 @@ export interface FullMapHeatmapOptions {
      * Radio de la mancha de la capa, en px (default: 24, `TEMAS_MAP_HEATMAP_BLUR`).
      */
     blur?: number;
+    /**
+     * Base raster del mapa general mientras la capa de densidad está visible, como la misma plantilla
+     * XYZ que `mapTiles`. Es para poner un fondo que haga leer la gradiente —uno oscuro o liso— sin
+     * cambiar la base del mapa normal: al apagar la capa vuelve la de `mapTiles`.
+     *
+     * Ausente = no cambia nada: encendida la capa se sigue usando `mapTiles`. `''` explícito = sin capa
+     * base en ese estado (solo la gradiente y los puntos).
+     */
+    tiles?: string;
+    /**
+     * Crédito de `tiles`, igual que `mapAttribution` lo es de `mapTiles`. Ausente = hereda el valor de
+     * `mapAttribution`; `''` = sin crédito (y sin control de atribución) mientras la capa está visible.
+     */
+    attribution?: string;
 }
 export interface TimelineOptions {
     container: string | HTMLElement;
@@ -574,13 +599,13 @@ export interface TimelineOptions {
      *
      * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar.
      */
-    temasMapTiles?: string;
+    mapTiles?: string;
     /**
      * Crédito de la capa base del mapa de los temas, como texto (con HTML: el crédito es un link a las
      * condiciones del proveedor). Por defecto es el de OpenStreetMap.
      *
      * **Es la atribución de la capa que se está mostrando, no una etiqueta fija**: la capa base se
-     * declara en `temasMapTiles`, así que la de OpenStreetMap solo corresponde mientras siga siendo la
+     * declara en `mapTiles`, así que la de OpenStreetMap solo corresponde mientras siga siendo la
      * que se usa. Un consumidor con su propio servidor de tiles tiene que poner acá su propio crédito
      * —o `''` explícito si su capa no necesita ninguno— porque si no queda la atribución de
      * OpenStreetMap creditando tiles que no son suyos.
@@ -592,10 +617,10 @@ export interface TimelineOptions {
      * pueda ser un link.
      *
      * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar. Con
-     * `temasMapTiles: ''` tampoco: sin capa base no hay tiles que acreditar, así que no se muestra
+     * `mapTiles: ''` tampoco: sin capa base no hay tiles que acreditar, así que no se muestra
      * (que es lo que ya pasaba antes de que existiera esta opción).
      */
-    temasMapAttribution?: string;
+    mapAttribution?: string;
     /**
      * Vista de mapa general (default: false): agrega un botón en la barra de herramientas que
      * reemplaza el timeline por **un solo mapa con los puntos de todo lo que hay en pantalla**, en
@@ -957,7 +982,7 @@ export default class Timeline {
      * the public OpenStreetMap standard layer; read from the options, while the map itself is built
      * lazily, the first time someone opens one.
      */
-    temasMapTiles: string;
+    mapTiles: string;
     /**
      * Credit of the base layer, `''` meaning no attribution at all —and, with it, no attribution
      * control on the map. Read from the options along with the tiles, because it describes them: it
@@ -965,7 +990,7 @@ export default class Timeline {
      * template does. It is empty for nothing by itself, it is just that a consumer whose tiles need
      * no credit is the one case the map cannot guess.
      */
-    temasMapAttribution: string;
+    mapAttribution: string;
     /**
      * General map (`showFullMap`): whether the toolbar button that swaps the timeline for one map with
      * every point on screen is rendered at all.
@@ -994,6 +1019,17 @@ export default class Timeline {
      * `localStorage` no tiene nada guardado: es la primera visita, no una preferencia que restaurar.
      */
     _fullMapHeatmapDefaultOn: boolean;
+    /**
+     * Base propia del estado "capa de densidad encendida" (`fullMapHeatmap.tiles`), o `null` cuando no
+     * se declaró —entonces ese estado sigue con `mapTiles`, como antes—. `''` es "sin capa base" para
+     * ese estado.
+     */
+    _fullMapHeatmapTiles: string | null;
+    /**
+     * Crédito de `_fullMapHeatmapTiles` (`fullMapHeatmap.attribution`), resuelto en el constructor con
+     * fallback a `mapAttribution` cuando no se declaró.
+     */
+    _fullMapHeatmapAttribution: string;
     /** The panel that holds the summary card of the clicked point, over the map */
     fullMapDetail: HTMLElement | null;
     /**

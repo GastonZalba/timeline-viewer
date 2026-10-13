@@ -157,7 +157,14 @@ const baseOptions = {
   // Con ?heatmap el mapa general suma la capa de densidad y el botón que la enciende (ver la nota).
   // Se pasa el objeto con `defaultOn: true` en vez de `true` pelado para mostrar la config nueva:
   // el arranque encendido solo vale si `localStorage` no tiene nada guardado todavía.
-  fullMapHeatmap: useHeatmap ? { defaultOn: true } : false,
+  fullMapHeatmap: useHeatmap
+    ? {
+        defaultOn: true,
+        radius: 6,
+        blur: 10,
+        tiles: 'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}@2x.png'
+      }
+    : false,
   relatedLabel: (count) => (count === 1 ? 'publicación' : 'publicaciones'),
   // Los grupos del panel de filtros. Sin esta opción no hay filtros: la librería no trae ninguno
   // hardcodeado, los declara el consumidor (ver example/filters.js). En modo API los mismos
@@ -168,9 +175,10 @@ const baseOptions = {
   sorters,
   singleId,
   // El mapa de "Temas destacados" usa la capa estándar de OpenStreetMap por defecto; para verlo sin
+  // fondo alcanza con `mapTiles: ''`.
   // fondo alcanza con `temasMapTiles: ''`.
-  temasMapTiles: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-  temasMapAttribution: ''
+  mapTiles: 'https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}@2x.png',
+  mapAttribution: ''
 };
 
 if (useApi) {

@@ -208,9 +208,10 @@
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle {
   position: absolute;
-  right: 0.5em;
-  bottom: 8.5em;
+  left: 0.5em;
+  bottom: 0.5em;
   z-index: 2;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -218,23 +219,30 @@
   height: 48px;
   margin: 0;
   padding: 0;
-  border: none;
+  border: 1.5px solid rgba(255, 138, 61, 0.55);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.4);
-  color: rgba(255, 255, 255, 0.85);
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle svg {
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle:hover {
+  border-color: rgba(255, 138, 61, 0.95);
   background: rgba(0, 0, 0, 0.6);
-}
-.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true] {
-  background: var(--tv-accent);
   color: #ffffff;
 }
+.publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true] {
+  border-color: transparent;
+  color: #ffffff;
+  background: linear-gradient(145deg, #ff9d2e, #ff3b2f);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 2px 14px rgba(255, 60, 30, 0.45);
+}
 .publicaciones-container .publicaciones-fullmap-section .fullmap-heatmap-toggle[aria-pressed=true]:hover {
-  background: var(--tv-accent);
-  filter: brightness(1.1);
+  filter: brightness(1.07);
+  box-shadow: 0 0 0 2px rgb(255, 255, 255), 0 3px 16px rgba(255, 60, 30, 0.55);
 }
 .publicaciones-container .publicaciones-fullmap-section .fullmap-error {
   display: flex;

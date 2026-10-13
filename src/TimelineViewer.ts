@@ -110,7 +110,7 @@ const TEMAS_MAP_MAX_ZOOM = 20;
  * actually substitutes are `{z}`, `{x}`, `{y}` and `{-y}`, so anything else (the `{r}` that Leaflet
  * uses for retina) ends up literal in the URL and 404s on every tile.
  *
- * Passing `temasMapTiles: ''` explicitly opts out and leaves the map with only its own points. It
+ * Passing `mapTiles: ''` explicitly opts out and leaves the map with only its own points. It
  * used to be the default, and the base layer opt-in; the map was a blank canvas without it, which
  * read as broken rather than as minimal.
  *
@@ -118,7 +118,7 @@ const TEMAS_MAP_MAX_ZOOM = 20;
  * real volume should point this at their own tile server instead —which is also why the component
  * cannot be the one that decides.
  */
-const TEMAS_MAP_TILES_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const MAP_TILES_DEFAULT = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
 /**
  * Blur radius, in screen pixels, of the optional density layer of the general map (`fullMapHeatmap`):
@@ -132,20 +132,6 @@ const TEMAS_MAP_HEATMAP_BLUR = 24;
  * the weight is painted at full strength before the blur fades it.
  */
 const TEMAS_MAP_HEATMAP_RADIUS = 16;
-
-/**
- * Color y alpha del fill de los markers **no agrupados** mientras la capa de densidad está
- * encendida. Con el heatmap la mancha de color de cada punto compite con la gradiente —que ya
- * cuenta "cuántos temas hay acá"—, así que los círculos sueltan su tono y se pintan **uniformes** y
- * bien translúcidos: la topografía del amontonamiento la cuenta el heatmap, y los puntos solo
- * necesitan seguir existiendo para el hover y el click. El seleccionado **no** entra en la regla
- * (conserva el tono crudo y opaco, ver `selectedCircleOf`), y los clusters tienen la suya propia:
- * con la capa encendida pierden el disco y quedan solo como el conteo blanco con halo oscuro (ver
- * `clusterCircleOf`/`clusterTextOf`), porque su círculo taparía la gradiente igual que el de un
- * marker.
- */
-const TEMAS_MAP_HEATMAP_MARKER_COLOR = '#0e1116';
-const TEMAS_MAP_HEATMAP_MARKER_ALPHA = 0.25;
 
 /**
  * Color ramp of the density heatmap, from the lowest to the highest concentration. The same default
@@ -165,9 +151,9 @@ const TEMAS_MAP_MARKER_RADIUS = 7;
 /**
  * Width of the ring around a marker, in screen pixels. It is what separates a mid-tone marker
  * from whatever the raster map has under it, and a dark ring needs more than a hairline to read,
- * so it sits at 1.5px: the stroke is centered on the radius, which still leaves 16.5px of tone
- * inside the 18px circle for the number painted in the middle, and two neighbors spread by the
- * spiderfy —fixed at 22px, see `TEMAS_MAP_SPIDER_GAP`— keep two and a half pixels of air between rings.
+ * so it sits at 2px: the stroke is centered on the radius, which still leaves 12px of tone
+ * inside the 16px circle for the number painted in the middle, and two neighbors spread by the
+ * spiderfy —fixed at 26px, see `TEMAS_MAP_SPIDER_GAP`— keep 10px of air between rings.
  */
 const TEMAS_MAP_MARKER_STROKE = 2;
 
@@ -190,7 +176,7 @@ const TEMAS_MAP_MARKER_FONT = 10;
 const TEMAS_MAP_MARKER_TEXT_OFFSET_Y = 0.5;
 
 /**
- * Extra pixels added to `TEMAS_MAP_MARKER_RADIUS` for the hover hit test, so an 18px circle is not a
+ * Extra pixels added to `TEMAS_MAP_MARKER_RADIUS` for the hover hit test, so a 16px circle is not a
  * pixel-perfect target. It only widens the pointer target: the marker itself keeps its radius.
  */
 const TEMAS_MAP_MARKER_HIT_PADDING = 3;
@@ -224,26 +210,38 @@ const TEMAS_MAP_MARKER_TEXT_COLOR = '#0e1116';
 const TEMAS_MAP_MARKER_RING_COLOR = '#0e1116';
 
 /**
- * Screen distance, in pixels, below which two markers are considered overlapped and get spread
- * apart. It is the marker diameter —18px, so the two numbers already touch at this distance— plus a
- * few px of slack, because a ringer separation of one or two px still reads as a single blob while
- * the map keeps zooming out.
- *
- * It is also the **widest a group is allowed to get**: `declutter` merges a marker only when it sits
- * within this distance of every member of the group, so no spiderfy ring and no cluster ever stands
- * for more than this across (see the complete linkage in `declutter`).
+ * Marker the density layer paints in place of the tone one, for the points that stay visible with the
+ * heatmap on —a lone marker—. The heatmap already says what the tone color would repeat, so the
+ * marker drops it for a single neutral ink, drops the dark ring too, goes translucent —the gradient
+ * reads through it— and shrinks from `TEMAS_MAP_MARKER_RADIUS` (7) to `TEMAS_MAP_HEATMAP_MARKER_RADIUS`
+ * (5), which keeps it clickable without competing with the density. The selected marker and the ones
+ * a click revealed in a ring are the exception: they keep their own full-size style, because the
+ * open card and the interactive ring still have to read over the gradient.
  */
-const TEMAS_MAP_SPIDER_THRESHOLD = TEMAS_MAP_MARKER_RADIUS * 2 + 4;
+const TEMAS_MAP_HEATMAP_MARKER_RADIUS = 5;
+const TEMAS_MAP_HEATMAP_MARKER_COLOR = '#ffffff';
+const TEMAS_MAP_HEATMAP_MARKER_ALPHA = 0.5;
+
+/**
+ * Zoom at which the density layer stops hiding the markers, in the general map. With the layer on the
+ * far view is the density alone —a cluster or a numbered circle painted over the gradient would cover
+ * exactly what the layer is there to show—, so below this zoom neither clusters nor lone markers are
+ * painted: only the gradient, plus the selected marker, which the open card still has to name. From
+ * this zoom up the map behaves exactly as with the layer off (clusters, muted lone markers, and a
+ * ring a click reveals at full size). Only the general map carries a density layer, so a per-card map
+ * never reads it.
+ */
+const TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM = 12;
 
 /**
  * Extra gap, in pixels, left between the rings of two neighboring markers when they are spread on a
  * circle. The distance between consecutive markers stays fixed at
  * `2 * (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP)` whatever their count: the radius of the
  * circle grows with the count, so the count never squeezes the neighbors, and the gap is what keeps
- * a ring from bleeding into the next one: at that fixed 22px pitch two 1.5px rings
- * (`TEMAS_MAP_MARKER_STROKE`) come within 2.5px and keep a small, clear air between them.
+ * a ring from bleeding into the next one: at that fixed 26px pitch two 16px markers
+ * (`TEMAS_MAP_MARKER_RADIUS` plus `TEMAS_MAP_MARKER_STROKE`) keep 10px of clear air between them.
  */
-const TEMAS_MAP_SPIDER_GAP = 2;
+const TEMAS_MAP_SPIDER_GAP = 6;
 
 /**
  * Width of the line that ties a displaced marker back to the topic's own coordinate, in screen
@@ -262,68 +260,33 @@ const TEMAS_MAP_SPIDER_LINE_WIDTH = 2;
 const TEMAS_MAP_SPIDER_LINE_COLOR = '#0e1116';
 
 /**
- * Zoom below which overlapping markers are drawn as a single cluster marker —one circle carrying
- * the count of the topics it stands for— instead of being spread apart by the spiderfy. **This is
- * the knob for how far the spiderfy reaches**: below this zoom no group is ever spread — every
- * overlap becomes a count and only a lone topic keeps its own circle—, so a far view only ever
- * aggregates, and where the spiderfy comes back it is capped by `TEMAS_MAP_SPIDER_MAX_GROUP`.
+ * Screen distance, in pixels, below which two markers become one cluster: the map's **only** way to
+ * draw an overlap —a cluster is a 30px circle (radius plus ring) carrying the count of the topics it
+ * stands for, sitting at their centroid—. Clicking it from `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM` up
+ * opens the group into a spider ring, where each topic becomes individually clickable.
  *
- * The breakage it prevents is screen-space, not geographic: at a far view hundreds of points land
- * inside a few dozen pixels, and the spiderfy answers with a ring whose radius grows with the count
- * (`(radius + gap) / sin(PI / n)` ≈ 3.2·n px) — an n of 200 is a 640px ring whose lines cross the
- * whole map. A cluster says the same thing ("there are n topics here") in one fixed 30px circle,
- * whatever the count.
- *
- * The threshold only picks the mode the far view starts in; what guarantees the spiderfy never
- * grows past a readable ring in the range where it is allowed back is its own cap,
- * `TEMAS_MAP_SPIDER_MAX_GROUP`. That pairing is why this value can be conservative: at 8 a 40px
- * cluster still stands for a couple of dozen km on the default view. Above
- * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` the cap is off by design.
- */
-const TEMAS_MAP_CLUSTER_MAX_ZOOM = 12;
-
-/**
- * Screen distance, in pixels, below which two markers become one cluster at the far view. It is
- * wider than `TEMAS_MAP_SPIDER_THRESHOLD` on purpose: a cluster marker is a 30px circle (radius plus
- * ring), so clusters have to sit further apart than two 18px markers do, or two counts read as one
- * blob. Below this distance a pair of points merges into one icon with the total, which is the
- * standard reading of a general view — nothing is lost, the count says how many are in there.
- *
- * It is also the **widest a cluster is allowed to get across**, for the same reason its sibling
- * above caps the spiderfy: the grouping takes every pair of members within this distance, so the
- * far view trades one giant count —whose centroid can land half a screen away from any marker— for
- * several small ones sitting on the markers they stand for.
+ * It is the **widest a cluster is allowed to get across**: the grouping takes every pair of members
+ * within this distance (complete linkage), so a far view trades one giant count —whose centroid can
+ * land half a screen away from any marker— for several small ones sitting on the markers they stand
+ * for.
  */
 const TEMAS_MAP_CLUSTER_DISTANCE = 40;
 
 /**
- * Biggest group the spiderfy spreads before it draws a cluster instead, below
- * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`. This is the safety net of `TEMAS_MAP_CLUSTER_MAX_ZOOM`: a
- * mis-set threshold —or a dataset denser than the one it was set for— would otherwise bring back
- * the giant ring, and the cap makes that failure impossible by construction. 12 is a ring of
- * ≈39px, about the size of a small cluster.
+ * Zoom from which a click on a cluster stops zooming and instead spreads the group into a spider
+ * ring (`TEMAS_MAP_CLUSTER_ZOOM_STEP` is not applied), in **both** the normal and the density view.
+ *
+ * Below this zoom a click drills in the usual way (it animates `TEMAS_MAP_CLUSTER_ZOOM_STEP` toward
+ * the hotspot): at a far view a group can hold hundreds of co-located topics, and a ring whose
+ * radius grows with the count is exactly the breakage `TEMAS_MAP_CLUSTER_DISTANCE` avoids. From here
+ * up, zooming further would not separate the topics any more (they may even share a coordinate), so
+ * the click reveals the group instead: the member markers appear spread on their ring and become
+ * individually clickable, without moving the view. The rings never show up on their own — a group is
+ * only ever spread by that click, so the value is purely the zoom from which that is worth offering.
+ *
+ * The value is provisional —pending on-field tuning— and applies to every map that builds a cluster.
  */
-const TEMAS_MAP_SPIDER_MAX_GROUP = 12;
-
-/**
- * Zoom from which the spiderfy cap above stops applying: **every** group is spread on its ring,
- * however many points it has, and nothing is ever drawn as a count cluster again.
- *
- * The reason is clickability, and it is structural rather than cosmetic. A cluster answers a click
- * with a zoom-in animation (`TEMAS_MAP_CLUSTER_ZOOM_STEP`), which only dissolves it if the points
- * were merely close on screen —topics at (or near) the same coordinate never separate at any zoom—
- * and the animation stops at `TEMAS_MAP_FIT_MAX_ZOOM` anyway. At street level, then, a cluster is a
- * dead end: clicking it changes nothing and the points inside can never be reached. Past this zoom
- * the map is already saying "this exact place", so the honest reading is the spread one: every
- * topic visible and clickable, even when the ring grows large (accepted on purpose — a giant ring
- * at a close zoom is information, a count you cannot open is not).
- *
- * Below it nothing changes: the far view still clusters, and the spiderfy still caps its groups.
- *
- * It sits **exactly at** `TEMAS_MAP_FIT_MAX_ZOOM`, which is also the `maxZoom` of the `View`: a
- * threshold above the ceiling can never be reached and the rule becomes dead code.
- */
-const TEMAS_MAP_NO_CLUSTER_MIN_ZOOM = 15;
+const TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM = 10;
 
 /**
  * Radius of a cluster marker, in screen pixels: the 18px marker plus the room a count of up to
@@ -346,14 +309,16 @@ const TEMAS_MAP_CLUSTER_FONT = 12;
  * family.
  */
 const TEMAS_MAP_CLUSTER_FILL_DARK = '#0e1116';
-/** Color of the count painted on a cluster: white, over the tone color or over the dark fill. With
- * the density layer on the cluster disc is gone (see `clusterCircleOf`), so the count picks up a
- * dark halo —`#000` at 3px, baked in `clusterTextOf`— to keep reading white against the heatmap. */
+/** Color of the count painted on a cluster: white, over the tone color or over the dark fill. The
+ * count paints in every state, heatmap on included: the cluster is the only thing a click can open,
+ * so it is always the dark disc with the white number, plus a `#000` 3px halo (`clusterTextOf`) to
+ * keep reading over the gradient. */
 const TEMAS_MAP_CLUSTER_TEXT_COLOR = '#ffffff';
 /**
  * Zoom levels a click on a cluster adds to the view: four, a deliberate jump and not a
- * level-by-level walk, so that a couple of clicks take the far view —where `clusterMode` draws
- * every group as a count— down to where the spiderfy spreads them. The call site clamps it against
+ * level-by-level walk, so that a couple of clicks take the far view down to
+ * `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM`, where the click opens the group by hand instead of zooming.
+ * The call site clamps it against
  * `TEMAS_MAP_FIT_MAX_ZOOM`, so near the ceiling the step is just whatever is left. A `fit` to the
  * members' extent is never the answer: when that extent already fills the viewport it would not
  * zoom at all and the click would look dead.
@@ -445,7 +410,7 @@ const TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS = 4;
 const TEMAS_MAP_SELECTED_Z_INDEX = 1;
 
 /**
- * Default of `temasMapAttribution`: the credit of the default base layer. The tile template is
+ * Default of `mapAttribution`: the credit of the default base layer. The tile template is
  * opaque to the component (the consumer hands it over ready to use, key included), so the provider
  * cannot be derived from it, and the attribution of the data most such tiles carry —OpenStreetMap—
  * is the one declared here.
@@ -456,7 +421,7 @@ const TEMAS_MAP_SELECTED_Z_INDEX = 1;
  * It is markup, not plain text, because that is what the attribution is: the credit is a link to the
  * provider's terms. The default already is one, and the control renders it as HTML.
  */
-const TEMAS_MAP_ATTRIBUTION_DEFAULT =
+const MAP_ATTRIBUTION_DEFAULT =
   '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
 
 /**
@@ -885,6 +850,12 @@ type TemasMapTarget =
       radius: number;
       /** How many topics the cluster stands for, and what its marker is numbered with */
       count: number;
+      /**
+       * Positions in `current` of the topics the cluster stands for (the selected one excluded, as
+       * in the count). It is what a click reads to open the group into a ring (see
+       * `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM`).
+       */
+      members: number[];
     };
 
 /**
@@ -941,9 +912,12 @@ interface TemasMapHandle<P extends TemasMapPlottable = TemasMapPlottable> {
    */
   selectedSpiderCenter(): number[] | null;
   /**
-   * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida los círculos
-   * pasan a translúcidos (para que la densidad se lea debajo) y apagada vuelven al fill opaco del
-   * tono; el hover, el click, el spiderfy y la selección siguen funcionando por encima en las dos.
+   * Mostrar u ocultar la capa de densidad (`fullMapHeatmap`). Con la capa encendida solo se pinta
+   * la densidad: clusters, anillos del spider, sus líneas y todo marker no seleccionado se apagan
+   * (ver la función de estilo), salvo el punto abierto y los que un click **reveló** en un anillo;
+   * apagada vuelven los fills opacos, los discos de clúster y el halo del texto. El hover, el click,
+   * el spiderfy y la selección siguen funcionando por encima en las dos. Apagarla cierra además la
+   * revelación abierta.
    *
    * Es un no-op en un mapa que no pidió la capa (el de la tarjeta), por el mismo motivo que
    * `refreshStyles` es un gesto explícito y no parte de `updatePoints`: la visibilidad es una
@@ -974,6 +948,14 @@ interface TemasMapHeatmapParams {
   blur: number;
   radius: number;
   gradient: string[];
+  /**
+   * Base layer the map swaps to while the layer is visible, or `null` when the caller declared none
+   * —then the heatmap state keeps `mapTiles`, as before—. `''` is a declared "no base" for that
+   * state: it is the state's own source, so it also brings its own credit, `attribution`.
+   */
+  tiles?: string | null;
+  /** Credit of `tiles`, already resolved by the caller (with its fallback), like the tiles. */
+  attribution?: string;
 }
 
 /**
@@ -1281,6 +1263,20 @@ export interface FullMapHeatmapOptions {
    * Radio de la mancha de la capa, en px (default: 24, `TEMAS_MAP_HEATMAP_BLUR`).
    */
   blur?: number;
+  /**
+   * Base raster del mapa general mientras la capa de densidad está visible, como la misma plantilla
+   * XYZ que `mapTiles`. Es para poner un fondo que haga leer la gradiente —uno oscuro o liso— sin
+   * cambiar la base del mapa normal: al apagar la capa vuelve la de `mapTiles`.
+   *
+   * Ausente = no cambia nada: encendida la capa se sigue usando `mapTiles`. `''` explícito = sin capa
+   * base en ese estado (solo la gradiente y los puntos).
+   */
+  tiles?: string;
+  /**
+   * Crédito de `tiles`, igual que `mapAttribution` lo es de `mapTiles`. Ausente = hereda el valor de
+   * `mapAttribution`; `''` = sin crédito (y sin control de atribución) mientras la capa está visible.
+   */
+  attribution?: string;
 }
 
 export interface TimelineOptions {
@@ -1385,13 +1381,13 @@ export interface TimelineOptions {
    *
    * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar.
    */
-  temasMapTiles?: string;
+  mapTiles?: string;
   /**
    * Crédito de la capa base del mapa de los temas, como texto (con HTML: el crédito es un link a las
    * condiciones del proveedor). Por defecto es el de OpenStreetMap.
    *
    * **Es la atribución de la capa que se está mostrando, no una etiqueta fija**: la capa base se
-   * declara en `temasMapTiles`, así que la de OpenStreetMap solo corresponde mientras siga siendo la
+   * declara en `mapTiles`, así que la de OpenStreetMap solo corresponde mientras siga siendo la
    * que se usa. Un consumidor con su propio servidor de tiles tiene que poner acá su propio crédito
    * —o `''` explícito si su capa no necesita ninguno— porque si no queda la atribución de
    * OpenStreetMap creditando tiles que no son suyos.
@@ -1403,10 +1399,10 @@ export interface TimelineOptions {
    * pueda ser un link.
    *
    * Irrelevante para las tarjetas sin temas con `geom`: no hay sección que mostrar. Con
-   * `temasMapTiles: ''` tampoco: sin capa base no hay tiles que acreditar, así que no se muestra
+   * `mapTiles: ''` tampoco: sin capa base no hay tiles que acreditar, así que no se muestra
    * (que es lo que ya pasaba antes de que existiera esta opción).
    */
-  temasMapAttribution?: string;
+  mapAttribution?: string;
   /**
    * Vista de mapa general (default: false): agrega un botón en la barra de herramientas que
    * reemplaza el timeline por **un solo mapa con los puntos de todo lo que hay en pantalla**, en
@@ -1975,7 +1971,7 @@ export default class Timeline {
    * the public OpenStreetMap standard layer; read from the options, while the map itself is built
    * lazily, the first time someone opens one.
    */
-  temasMapTiles: string;
+  mapTiles: string;
   /**
    * Credit of the base layer, `''` meaning no attribution at all —and, with it, no attribution
    * control on the map. Read from the options along with the tiles, because it describes them: it
@@ -1983,7 +1979,7 @@ export default class Timeline {
    * template does. It is empty for nothing by itself, it is just that a consumer whose tiles need
    * no credit is the one case the map cannot guess.
    */
-  temasMapAttribution: string;
+  mapAttribution: string;
   /**
    * General map (`showFullMap`): whether the toolbar button that swaps the timeline for one map with
    * every point on screen is rendered at all.
@@ -2012,6 +2008,17 @@ export default class Timeline {
    * `localStorage` no tiene nada guardado: es la primera visita, no una preferencia que restaurar.
    */
   _fullMapHeatmapDefaultOn: boolean;
+  /**
+   * Base propia del estado "capa de densidad encendida" (`fullMapHeatmap.tiles`), o `null` cuando no
+   * se declaró —entonces ese estado sigue con `mapTiles`, como antes—. `''` es "sin capa base" para
+   * ese estado.
+   */
+  _fullMapHeatmapTiles: string | null;
+  /**
+   * Crédito de `_fullMapHeatmapTiles` (`fullMapHeatmap.attribution`), resuelto en el constructor con
+   * fallback a `mapAttribution` cuando no se declaró.
+   */
+  _fullMapHeatmapAttribution: string;
   /** The panel that holds the summary card of the clicked point, over the map */
   fullMapDetail: HTMLElement | null;
   /**
@@ -2207,12 +2214,11 @@ export default class Timeline {
     this.internalButtons = config.internalButtons || false;
     // `=== undefined` and not `||`: an explicit `''` is how a consumer turns the base off, and `||`
     // would swallow it and put the default tiles back on.
-    this.temasMapTiles = config.temasMapTiles === undefined ? TEMAS_MAP_TILES_DEFAULT : config.temasMapTiles;
+    this.mapTiles = config.mapTiles === undefined ? MAP_TILES_DEFAULT : config.mapTiles;
     // Same `=== undefined` as the tiles: an explicit `''` is how a consumer says "my layer needs no
     // credit", and `||` would swallow it and put the OpenStreetMap one back on — on a map that is
     // not showing a single OpenStreetMap tile.
-    this.temasMapAttribution =
-      config.temasMapAttribution === undefined ? TEMAS_MAP_ATTRIBUTION_DEFAULT : config.temasMapAttribution;
+    this.mapAttribution = config.mapAttribution === undefined ? MAP_ATTRIBUTION_DEFAULT : config.mapAttribution;
     this._olModules = null;
     this._temasMaps = new Map();
     this.showFullMap = config.showFullMap === true;
@@ -2233,6 +2239,13 @@ export default class Timeline {
       'fullMapHeatmap.radius'
     );
     this._fullMapHeatmapDefaultOn = heatmapOptions?.defaultOn === true;
+    // Base y crédito propios del estado "capa encendida", dentro de la misma config de la capa. La
+    // misma regla `=== undefined` de `mapTiles`: el ausente es "no cambiar" (queda `mapTiles`), y
+    // `''` explícito es cómo se apaga la base en ese estado. El crédito cae al de `mapAttribution`
+    // cuando no se declara, porque la base customizada suele ser del mismo proveedor.
+    this._fullMapHeatmapTiles = heatmapOptions?.tiles === undefined ? null : heatmapOptions.tiles;
+    this._fullMapHeatmapAttribution =
+      heatmapOptions?.attribution === undefined ? this.mapAttribution : heatmapOptions.attribution;
     this.fullMapToggle = null;
     this.fullMapView = null;
     this.fullMapCanvas = null;
@@ -3908,35 +3921,53 @@ export default class Timeline {
     // nadie que lo lea.
     if (!canvas.isConnected || !points.length) return null;
 
-    // ¿La capa de densidad está encendida en este mapa? Con ella apagada los círculos pintan el tono
-    // **opaco**; encendida, pasan a translúcidos (`_hexToRgba`) para que la densidad se lea debajo
-    // —la transparencia es un efecto de la capa, no del mapa base—. Declarado acá y no al pie del
-    // mount porque el primer `declutter()` —que corre durante el montaje, antes del `return`— ya
-    // ejecuta la función de estilo y la lee: un `let` tardío la dejaría en el temporal dead zone y
-    // el mapa crashearía en la primera apertura.
+    // ¿La capa de densidad está encendida en este mapa? Con ella encendida, y desde
+    // `TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM` para arriba, los markers se pintan con el estilo atenuado
+    // (`heatmapMarkerCircleOf`) para que la gradiente se lea a través de ellos; por debajo de ese zoom
+    // no se pinta ningún clúster ni marker suelto —la densidad tiene que verse sola—, salvo el
+    // seleccionado (ver `heatmapMarkersVisible`). Declarado acá y no al pie del mount porque el primer
+    // `declutter()` —que corre durante el montaje, antes del `return`— ya ejecuta la función de estilo
+    // y la lee: un `let` tardío la dejaría en el temporal dead zone y el mapa crashearía en la primera
+    // apertura.
     let heatmapVisible = false;
+    // Lo escribe `declutter` en cada pasada: `false` es "densidad sola" (capa encendida y zoom por
+    // debajo de `TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM`). La función de estilo lo lee para apagar
+    // clústeres y markers, y el propio `declutter` corta antes de agrupar para no dejar targets
+    // invisibles. Arranca en `true` porque el mapa nace sin capa.
+    let heatmapMarkersVisible = true;
 
     // One circle style per tone, shared by every marker of that tone. Unlike an `Icon`, a `Circle`
-    // has no image to decode, so the cache only saves object churn. La key lleva el estado del
-    // heatmap porque el fill es opaco o translúcido según él: sin el prefijo, el toggle no repintaría
-    // nada (la caché devolvería el style del estado anterior).
+    // has no image to decode, so the cache only saves object churn.
     const circles = new Map<string, CircleStyle>();
     const circleOf = (color: string): CircleStyle => {
-      const key = `${heatmapVisible ? 'h' : ''}${color}`;
-      let circle = circles.get(key);
+      let circle = circles.get(color);
       if (!circle) {
         circle = new ol.Circle({
           radius: TEMAS_MAP_MARKER_RADIUS,
-          // Con el heatmap apagado el fill es el tono crudo; encendido, uniforme y translúcido (ver
-          // `TEMAS_MAP_HEATMAP_MARKER_COLOR`).
-          fill: new ol.Fill({
-            color: heatmapVisible ? _hexToRgba(TEMAS_MAP_HEATMAP_MARKER_COLOR, TEMAS_MAP_HEATMAP_MARKER_ALPHA) : color
-          }),
+          fill: new ol.Fill({ color }),
           stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_MARKER_STROKE })
         });
-        circles.set(key, circle);
+        circles.set(color, circle);
       }
       return circle;
+    };
+
+    // El marker del estado heatmap: uno solo para todos los puntos —el color ya no sale del tono,
+    // es un neutro fijo— así que no lleva caché por color; se construye la primera vez y se reusa.
+    // Va **sin anillo**: sobre la gradiente el stroke oscuro pesaba más que el punto, así que el
+    // círculo queda solo con el fill translúcido (el aro del marker normal sigue siendo el de
+    // siempre fuera del heatmap).
+    let heatmapMarkerCircle: CircleStyle | null = null;
+    const heatmapMarkerCircleOf = (): CircleStyle => {
+      if (!heatmapMarkerCircle) {
+        heatmapMarkerCircle = new ol.Circle({
+          radius: TEMAS_MAP_HEATMAP_MARKER_RADIUS,
+          fill: new ol.Fill({
+            color: _hexToRgba(TEMAS_MAP_HEATMAP_MARKER_COLOR, TEMAS_MAP_HEATMAP_MARKER_ALPHA)
+          })
+        });
+      }
+      return heatmapMarkerCircle;
     };
 
     // El círculo del punto abierto: más grande y con un anillo negro, que es lo que dice "este es
@@ -3946,9 +3977,9 @@ export default class Timeline {
     // está desplazado en un anillo pinta este, y fuera de un anillo el de siempre. La caché lleva
     // los dos en la misma key por color, porque es un Style distinto y el repintado alterna entre
     // ellos según el `declutter` meta o saque al punto del anillo.
-    // **El fill no sigue al heatmap**: el elegido tiene que seguir diciendo "este es" también con la
-    // capa de densidad encendida, así que conserva el tono crudo y opaco aunque los demás markers
-    // se pinten uniformes y translúcidos (por eso la key no lleva el flag del heatmap).
+    // **El elegido sobrevive al heatmap**: es el único marker suelto que se sigue pintando con la
+    // capa de densidad encendida (el resto se apaga, ver `heatmapVisible`), porque la ficha abierta
+    // tiene que seguir diciendo "este es" sobre la gradiente.
     const selectedCircles = new Map<string, CircleStyle>();
     const selectedCircleOf = (color: string, grown: boolean): CircleStyle => {
       const key = `${color}|${grown ? 1 : 0}`;
@@ -4014,32 +4045,24 @@ export default class Timeline {
     // One circle per cluster color and one text per count, shared by every cluster that needs them.
     // The style function runs on every repaint of every feature, so without the cache a pan would
     // build a fresh `Circle` per cluster per frame —same reason as the `circleOf` caches above.
-    // Con la capa de densidad encendida el clúster cambia de lenguaje: el disco desaparece (un
-    // círculo opaco o translúcido taparía la gradiente igual que un marker) y queda solo el conteo
-    // con el halo oscuro que le agrega `clusterTextOf` para seguir leyéndose blanco sobre el
-    // heatmap. Por eso las dos cachés llevan el estado del heatmap en la key.
+    // Con la capa de densidad encendida los clusters no se pintan (ver `heatmapVisible`), así que
+    // estas dos cachés solo se usan con el heatmap apagado y no llevan su estado en la key.
     const clusterCircles = new Map<string, CircleStyle>();
     const clusterCircleOf = (color: string): CircleStyle => {
-      const key = `${heatmapVisible ? 'h' : ''}${color}`;
-      let circle = clusterCircles.get(key);
+      let circle = clusterCircles.get(color);
       if (!circle) {
         circle = new ol.Circle({
           radius: TEMAS_MAP_CLUSTER_RADIUS,
-          ...(!heatmapVisible
-            ? {
-                fill: new ol.Fill({ color: _hexToRgba(color, 1) }),
-                stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_CLUSTER_STROKE })
-              }
-            : {})
+          fill: new ol.Fill({ color: _hexToRgba(color, 1) }),
+          stroke: new ol.Stroke({ color: TEMAS_MAP_MARKER_RING_COLOR, width: TEMAS_MAP_CLUSTER_STROKE })
         });
-        clusterCircles.set(key, circle);
+        clusterCircles.set(color, circle);
       }
       return circle;
     };
     const clusterTexts = new Map<string, TextStyle>();
     const clusterTextOf = (count: number): TextStyle => {
-      const key = `${heatmapVisible ? 'h' : ''}${count}`;
-      let text = clusterTexts.get(key);
+      let text = clusterTexts.get(String(count));
       if (!text) {
         text = new ol.Text({
           text: String(count),
@@ -4048,16 +4071,9 @@ export default class Timeline {
           textBaseline: 'middle',
           // Mismo nudge que el número del marker: la constante es la misma y por la misma razón.
           offsetY: TEMAS_MAP_MARKER_TEXT_OFFSET_Y,
-          fill: new ol.Fill({ color: TEMAS_MAP_CLUSTER_TEXT_COLOR }),
-          // Con la densidad encendida no hay disco detrás (ver `clusterCircleOf`): el halo negro le
-          // da al conteo el contraste que el fill del clúster no le presta.
-          ...(heatmapVisible
-            ? {
-                stroke: new ol.Stroke({ color: '#000', width: 3 })
-              }
-            : {})
+          fill: new ol.Fill({ color: TEMAS_MAP_CLUSTER_TEXT_COLOR })
         });
-        clusterTexts.set(key, text);
+        clusterTexts.set(String(count), text);
       }
       return text;
     };
@@ -4101,11 +4117,22 @@ export default class Timeline {
       const plainStyle = (point: P, grown: boolean): OlStyle[] => {
         const selected = Boolean(options.isSelected?.(point));
         const grow = grown && selected;
-        const key = `${point.color}|${selected ? 1 : 0}${grow ? 'g' : ''}`;
+        // Con la capa de densidad encendida el punto pierde el color del tono —el heatmap ya dice lo
+        // que el color repetiría— y pasa al marker neutro, translúcido y más chico; el seleccionado y
+        // los que un click reveló en un anillo (pintados desplazados, `grown`) son la excepción y
+        // conservan su estilo propio: el anillo es lo interactivo que queda sobre la gradiente y tiene
+        // que leerse a tamaño completo, no encogido (`heatmapMarkerCircleOf`). El estado entra en la
+        // key porque cambia la imagen y el cache es por key.
+        const muted = heatmapVisible && !selected && !grown;
+        const key = `${point.color}|${selected ? 1 : 0}${grow ? 'g' : ''}${muted ? 'h' : ''}`;
         const hit = plainStyles.get(key);
         if (hit) return hit;
         const marker = new ol.Style({
-          image: selected ? selectedCircleOf(point.color, grow) : circleOf(point.color),
+          image: selected
+            ? selectedCircleOf(point.color, grow)
+            : muted
+              ? heatmapMarkerCircleOf()
+              : circleOf(point.color),
           text: markerText(point) || undefined,
           // El z index solo en el seleccionado. Los demás se quedan en `undefined`, que OpenLayers
           // ordena como 0, así que el orden entre ellos sigue siendo el que dejaría el `declutter`.
@@ -4119,10 +4146,15 @@ export default class Timeline {
       };
       feature.setStyle((f) => {
         const point = (f.get('point') as P | undefined) || p;
+        // Densidad sola (capa encendida y zoom por debajo de `TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM`): no
+        // se pinta ningún clúster ni marker suelto, porque taparían justo lo que el heatmap muestra.
+        // El seleccionado es la excepción, porque la ficha abierta tiene que seguir diciendo cuál es.
+        if (!heatmapMarkersVisible && !options.isSelected?.(point)) return [];
         // El clúster manda sobre lo demás: su círculo se pinta en el centroide del grupo (la
         // geometría vive en la propiedad, igual que la del spider) y nunca trae línea ni número de
         // marker. Un feature no puede ser líder y miembro a la vez: `declutter` pone las dos
-        // propiedades en el mismo paso y el líder no recibe `hidden`.
+        // propiedades en el mismo paso y el líder no recibe `hidden`. El conteo es el único blanco
+        // clickeable que abre el anillo (por encima del umbral de la densidad, ver arriba).
         const cluster = f.get('cluster') as TemasMapCluster | undefined;
         if (cluster) {
           return new ol.Style({
@@ -4132,7 +4164,7 @@ export default class Timeline {
           });
         }
         // Miembro absorbido por un clúster: estilo vacío, o sea nada pintado (el renderer itera el
-        // array y no tiene estilos que dibujar).
+        // array y no tiene estilos que dibujar). El líder del grupo es el único que pinta el conteo.
         if (f.get('hidden')) return [];
         // El `spider` se lee **antes** del `base`: es lo que decide el crecimiento extra del
         // seleccionado, y tiene que estar en la caché como una key distinta para que alternar entre
@@ -4140,6 +4172,21 @@ export default class Timeline {
         const spider = f.get('spider') as TemasMapSpider | undefined;
         const base = plainStyle(point, Boolean(spider));
         if (!spider) return base;
+        // Los estilos del punto desplazado, con la geometría del anillo. Se arman siempre; la única
+        // diferencia del heatmap es si además se pinta la línea que los une al origen.
+        const displaced = base.map(
+          (style) =>
+            new ol.Style({
+              geometry: spider.marker,
+              image: style.getImage() || undefined,
+              text: style.getText() || undefined,
+              zIndex: style.getZIndex()
+            })
+        );
+        // Con la capa de densidad encendida la línea **no** se pinta: es una tinta oscura que
+        // competiría con la gradiente, y el punto desplazado ya se lee solo por su círculo. La línea
+        // sigue viva fuera del heatmap, para el spiderfy normal.
+        if (heatmapVisible) return displaced;
         // The line first, so the marker is painted over its own end of it.
         return [
           // La línea **no** sube de z index: si subiera, cruzaría por encima de los círculos
@@ -4148,15 +4195,7 @@ export default class Timeline {
           // círculo en el del `TEMAS_MAP_SELECTED_Z_INDEX`—, porque son estilos del mismo feature
           // y sin eso el punto desplazado se quedaría atrás igual que el resto.
           new ol.Style({ geometry: spider.line, stroke: connector }),
-          ...base.map(
-            (style) =>
-              new ol.Style({
-                geometry: spider.marker,
-                image: style.getImage() || undefined,
-                text: style.getText() || undefined,
-                zIndex: style.getZIndex()
-              })
-          )
+          ...displaced
         ];
       });
       return feature;
@@ -4177,19 +4216,26 @@ export default class Timeline {
     // is what the map already did before the credit became an option, the attribution control having
     // nothing to render without a source that declares `attributions`. Both knobs are read at mount
     // time, like every other option of the map.
-    const showAttribution = Boolean(this.temasMapTiles && this.temasMapAttribution);
-    if (this.temasMapTiles) {
-      layers.push(
-        new ol.TileLayer({
-          // `attributions` is omitted rather than passed empty: it is what the attribution control
-          // reads, and an empty value would leave it rendering an empty box over the map.
-          source: new ol.XYZ({
-            url: this.temasMapTiles,
-            wrapX: false,
-            ...(showAttribution ? { attributions: this.temasMapAttribution } : {})
-          })
-        })
-      );
+    const showAttribution = Boolean(this.mapTiles && this.mapAttribution);
+    // Base del estado "heatmap encendido", si el llamador declaró una propia. `null` es "ninguna"
+    // (plantilla `''`), `undefined` es "no se declaró" y se queda con `mapTiles`.
+    const heatmapTiles = options.heatmap?.tiles ?? null;
+    const heatmapAttribution = options.heatmap?.attribution ?? '';
+    // `attributions` is omitted rather than passed empty: it is what the attribution control reads,
+    // and an empty value would leave it rendering an empty box over the map. `null` is the
+    // "no base layer" source, which `TileLayer` accepts and renders as nothing.
+    const baseSourceFor = (tiles: string, attribution: string): XYZ | null =>
+      tiles ? new ol.XYZ({ url: tiles, wrapX: false, ...(attribution ? { attributions: attribution } : {}) }) : null;
+    // La capa base existe si **alguna** de las dos plantillas lo hace: con `mapTiles: ''` y una
+    // `fullMapHeatmap.tiles` declarada el mapa arranca sin base (la capa arranca apagada) y la
+    // recibe al encenderla; ver `setHeatmapVisible`.
+    let tileLayer: TileLayer | null = null;
+    if (this.mapTiles || heatmapTiles) {
+      // `source` no acepta `null` en el constructor (sí en `setSource`), así que la clave se omite
+      // cuando la plantilla normal es `''`: la capa nace sin base y la recibe al encender el heatmap.
+      const initialSource = baseSourceFor(this.mapTiles, this.mapAttribution);
+      tileLayer = new ol.TileLayer(initialSource ? { source: initialSource } : {});
+      layers.push(tileLayer);
     }
     // The density layer goes **under** the markers: it is context, not the thing you click. It shares
     // the very `source` of the markers, so `updatePoints` keeps it in sync with no extra bookkeeping,
@@ -4229,16 +4275,36 @@ export default class Timeline {
       // pinch and the double click on whole levels too.
       constrainResolution: true
     });
+    // El control de atribución se guarda para poder agregarlo o sacarlo cuando la base cambia de
+    // estado (ver `syncAttributionControl`): con la capa de densidad encendida la base puede ser otra
+    // y su crédito, ninguno. El bloque de `controls` le pasa la instancia inicial, así que la
+    // referencia tiene que existir **antes** de construir el mapa.
+    let attributionControl: AttributionControl | null = showAttribution
+      ? new ol.Attribution({ collapsible: false })
+      : null;
     const map = new ol.OlMap({
       target: canvas,
       layers,
       view,
       // The default set would add `Rotate`, which has no place on a read-only map this small.
       // `Attribution` is conditional for the same reason the base layer is: it renders the
-      // `attributions` the sources declare, so with none —`temasMapAttribution: ''`, or no tiles at
+      // `attributions` the sources declare, so with none —`mapAttribution: ''`, or no tiles at
       // all— it would only paint an empty box where the credit goes.
-      controls: showAttribution ? [new ol.Zoom(), new ol.Attribution({ collapsible: false })] : [new ol.Zoom()]
+      controls: attributionControl ? [new ol.Zoom(), attributionControl] : [new ol.Zoom()]
     });
+    // Mantiene el control de atribución acorde a la base que está puesta: se agrega solo si esa
+    // fuente declara crédito, para no dejar el recuadro vacío de OpenLayers con una base sin
+    // `attributions`. No es un `showAttribution` recalculado: el estado del heatmap cambia la base
+    // en caliente (ver `setHeatmapVisible`), y el control tiene que seguirlo.
+    const syncAttributionControl = (withCredit: boolean): void => {
+      if (withCredit && !attributionControl) {
+        attributionControl = new ol.Attribution({ collapsible: false });
+        map.addControl(attributionControl);
+      } else if (!withCredit && attributionControl) {
+        map.removeControl(attributionControl);
+        attributionControl = null;
+      }
+    };
 
     // **Before** the fit, and that order is the whole point: the target was `display: none` until
     // the toggle opened it, so the map still holds the 0x0 size of a hidden element, and fitting
@@ -4265,7 +4331,7 @@ export default class Timeline {
     // —which `declutter` reads every screen position from— returns `null` for every marker. A
     // `declutter` with no pixels groups nothing, so the spiderfy would only land on the next
     // `moveend`: with a base layer that came a few hundred ms later, when the tile requests resolved
-    // and moved the view, but with `temasMapTiles: ''` nothing ever moves it and the markers stayed
+    // and moved the view, but with `mapTiles: ''` nothing ever moves it and the markers stayed
     // piled up on top of each other (and, with the lines, on top of a pile of lines) for good.
     // `renderSync()` is the one public method that paints before returning.
     map.renderSync();
@@ -4303,38 +4369,30 @@ export default class Timeline {
     // resets every marker before grouping, so the geometry is only ever read, never accumulated: the
     // marker of a topic that no longer overlaps comes back to its real place.
     let ownPoints: OlPoint[] = current.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
+    // Posiciones de `current` que el último click **reveló**: el grupo de un clúster que se abrió en
+    // anillo porque el zoom ya alcanzó `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM` (ver el click en
+    // `singleclick`). Es la **única** fuente de anillos: nada se despliega solo, así que vacío el mapa
+    // agrupa todo en clústeres. Se limpia al cambiar los puntos (`updatePoints`), al apagar el heatmap
+    // y al alejarse por debajo del umbral (ver `declutter`).
+    let revealedIndices: number[] = [];
 
     /**
      * Decide, for the current zoom, how every overlapping group is drawn, and rebuild `targets`.
      *
-     * Three modes: the first two picked by `TEMAS_MAP_CLUSTER_MAX_ZOOM`, the third by
-     * `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`:
+     * **Every** group within `TEMAS_MAP_CLUSTER_DISTANCE` becomes one cluster —a circle with the
+     * count— at the group's centroid: the leader feature paints it and the rest paint nothing. That is
+     * the only representation of an overlap, with the density layer on or off. The rings of the
+     * spiderfy never show up on their own: the only group that is spread is the one a click
+     * **revealed** (`revealedIndices`, from `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM` up), and even a group
+     * revealed at a far zoom —where `declutter` would have clustered it— is spread, because the reveal
+     * exists precisely to open by hand a group the zoom cannot separate. Zooming back out below the
+     * threshold drops the reveal, so the far view always goes back to clusters.
      *
-     * - **Spiderfy** (near view, from `TEMAS_MAP_CLUSTER_MAX_ZOOM` up to
-     *   `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`): every marker starts at its
-     *   own coordinate, and the ones that sit closer than `TEMAS_MAP_SPIDER_THRESHOLD` to another
-     *   are re-laid out on a circle around the group's centroid, each with the line back to its
-     *   real coordinate. Unchanged from the original behavior, except that a group bigger than
-     *   `TEMAS_MAP_SPIDER_MAX_GROUP` is no longer spread —that ring grows with the count and is
-     *   what broke the far view— and is clustered instead.
-     * - **Cluster** (far view, `zoom < TEMAS_MAP_CLUSTER_MAX_ZOOM`): every group within
-     *   `TEMAS_MAP_CLUSTER_DISTANCE` becomes **one**
-     *   marker —a circle with the count— at the group's centroid. The leader feature paints it, the
-     *   rest paint nothing, and the only lines on screen are the ones the spiderfy still owns at a
-     *   near view.
-     * - **Close view** (`TEMAS_MAP_NO_CLUSTER_MIN_ZOOM` and up): the spiderfy with its cap off —
-     *   every group is spread, however many points it has, and nothing clusters. A cluster at this
-     *   zoom is a dead end (the click that would dissolve it is clamped by `TEMAS_MAP_FIT_MAX_ZOOM`,
-     *   and same-coordinate points never separate anyway), so all the topics have to be on screen
-     *   to be clickable. The ring growing past the canvas with a huge group is the accepted cost.
-     *
-     * The **selected** point of the general map rides its group like any other, so clicking a marker
-     * inside a spider ring leaves it in the ring —same slot, only the circle grows
-     * (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`)— instead of pulling it to the middle of the ring,
-     * which is what it used to do. The one place it is still pulled out is a **cluster**: its row
-     * says "it is here", and at a far view —where a click on a row does not change the zoom— it
-     * would otherwise be buried inside a count, so the cluster branch paints the count over the
-     * members that remain and the selection paints alone, with its selected circle, on top.
+     * The **selected** point of the general map rides its cluster like any other, except that the
+     * cluster branch kicks it out: a count circle would swallow the very marker the panel is pointing
+     * at (`hidden` members are not painted at all), so it paints alone on its own coordinate, with its
+     * selected circle over the count. Inside a revealed ring it sits in its slot like any other marker
+     * —same slot the reveal gave it— and only its circle grows (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`).
      *
      * A displaced marker is painted from the `spider` property and not from the feature's own
      * geometry: one feature then paints two geometries that are not the same point —the line back to
@@ -4350,15 +4408,18 @@ export default class Timeline {
       const n = current.length;
       const screens = current.map((p) => map.getPixelFromCoordinate(ol.fromLonLat([p.lon, p.lat])));
       const used = new Array<boolean>(n).fill(false);
-      // `getZoom()` is undefined only if the resolution maps to no zoom level, which the default
-      // view never does; the fallback keeps the old behavior rather than the new one.
+      // El zoom decide una sola cosa acá: si el anillo revelado sigue valiendo. Por debajo de
+      // `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM` se cierra y todo vuelve a clústeres; de ahí para arriba se
+      // conserva aunque la vista se mueva (el resto del ciclo lo gobierna el click).
       const zoom = map.getView().getZoom();
-      const clusterMode = (zoom ?? TEMAS_MAP_CLUSTER_MAX_ZOOM) < TEMAS_MAP_CLUSTER_MAX_ZOOM;
-      // The cap of `TEMAS_MAP_SPIDER_MAX_GROUP` turns off at a close zoom, where a cluster could
-      // not be dissolved by clicking it (see `TEMAS_MAP_NO_CLUSTER_MIN_ZOOM`). The two flags can
-      // never be on together —8 vs 15—, so `clusterMode` below keeps deciding alone.
-      const noCluster = (zoom ?? TEMAS_MAP_NO_CLUSTER_MIN_ZOOM) >= TEMAS_MAP_NO_CLUSTER_MIN_ZOOM;
-      const threshold = clusterMode ? TEMAS_MAP_CLUSTER_DISTANCE : TEMAS_MAP_SPIDER_THRESHOLD;
+      if ((zoom ?? 0) < TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM) revealedIndices = [];
+      // Con la capa de densidad encendida y el zoom por debajo de su umbral no se pinta ningún
+      // clúster ni marker suelto: la densidad es la vista de lejos y un círculo encima taparía justo
+      // lo que la capa muestra (ver `TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM`).
+      heatmapMarkersVisible = !heatmapVisible || (zoom ?? 0) >= TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM;
+      // Un solo umbral de agrupamiento: todo lo que esté más cerca que esto es un clúster (y el anillo
+      // que un click abra también sale de acá, ver `revealedGroup`).
+      const threshold = TEMAS_MAP_CLUSTER_DISTANCE;
 
       // Back to the own coordinate first: whatever was displaced or absorbed before this zoom may
       // not overlap anymore, and a feature keeps the last `spider`/`cluster`/`hidden` it was given.
@@ -4371,6 +4432,10 @@ export default class Timeline {
         features[i].set('cluster', undefined);
         features[i].set('hidden', undefined);
       }
+      // Densidad sola: con los features ya reseteados a su propia coordenada y sin clúster ni spider,
+      // no hay nada que agrupar ni targets que ofrecer (la función de estilo apaga los markers no
+      // seleccionados, ver `heatmapMarkersVisible`).
+      if (!heatmapMarkersVisible) return;
       // The open point is **not** pulled out of the grouping anymore: it joins every group exactly as
       // it would with nothing selected, which is what keeps the map still under the click. A marker
       // taken out of its spider read as "it left the ring and sat in the middle" —the complaint this
@@ -4381,6 +4446,60 @@ export default class Timeline {
       // coordinate, with its selected circle over the count — the same outcome the pre-mark produced,
       // minus the repartition.
       const selectedFlags = current.map((p) => Boolean(options.isSelected?.(p)));
+
+      // Despliega `group` en un anillo alrededor de su centroide y empuja el target de cada miembro.
+      // La usa **solo** el grupo que un click reveló: no hay spiderfy automático.
+      const spreadGroup = (group: number[]): void => {
+        let cx = 0;
+        let cy = 0;
+        for (const k of group) {
+          cx += screens[k]![0];
+          cy += screens[k]![1];
+        }
+        cx /= group.length;
+        cy /= group.length;
+        // Radius that keeps consecutive markers `2 * (radius + gap)` apart whatever their count;
+        // the ring grows with the count instead of letting the numbers overlap again on it. Starts
+        // at the top and goes clockwise, so the layout is stable between renders. A selected member
+        // sits in this ring like any other —same slot it had before the click, because the grouping
+        // no longer depends on the selection— and only its circle grows (see the style function).
+        const spread = (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP) / Math.sin(Math.PI / group.length);
+        group.forEach((k, position) => {
+          const angle = -Math.PI / 2 + (2 * Math.PI * position) / group.length;
+          const displaced: number[] = [cx + Math.cos(angle) * spread, cy + Math.sin(angle) * spread];
+          const coord = map.getCoordinateFromPixel(displaced);
+          // The line goes from the topic's own coordinate to the center of the displaced circle: it
+          // ends under the marker's own fill, so there is nothing to trim at the tip and nothing to
+          // anchor at the origin.
+          features[k].set('spider', {
+            line: new ol.OlLineString([ownPoints[k].getCoordinates(), coord]),
+            marker: new ol.OlPoint(coord)
+          } as TemasMapSpider);
+          targets.push({
+            kind: 'point',
+            index: k,
+            screen: displaced,
+            coord,
+            // The selected circle grows inside the ring (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`),
+            // so its target grows with it: a click on the enlarged rim has to land on this marker
+            // and not on the neighbor whose plain circle it overlaps.
+            radius:
+              TEMAS_MAP_MARKER_RADIUS +
+              TEMAS_MAP_MARKER_HIT_PADDING +
+              (selectedFlags[k] ? TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS : 0)
+          });
+        });
+      };
+
+      // El grupo que un click reveló (con el zoom ya en `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM`): se arma
+      // **antes** del agrupamiento normal y sus miembros se marcan `used`, así el resto se reparte sin
+      // contarlos. Se despliega siempre en anillo —aunque el zoom sea lejano y el agrupamiento lo
+      // hubiera puesto en un clúster—, porque la revelación precisamente existe para separar a mano un
+      // grupo que el zoom ya no puede abrir. Un miembro que quedó fuera de la vista no entra; si queda
+      // uno solo igual se marca `used` y el pase final lo pinta en su propia coordenada.
+      const revealedGroup = revealedIndices.filter((k) => k >= 0 && k < n && screens[k]);
+      for (const k of revealedGroup) used[k] = true;
+      if (revealedGroup.length > 1) spreadGroup(revealedGroup);
 
       for (let i = 0; i < n; i++) {
         if (used[i] || !screens[i]) continue;
@@ -4415,85 +4534,44 @@ export default class Timeline {
         // A lone marker is painted on its own coordinate and is left alone.
         if (group.length < 2) continue;
 
-        if (clusterMode || (group.length > TEMAS_MAP_SPIDER_MAX_GROUP && !noCluster)) {
-          // The selection is kicked out of the cluster and painted on its own coordinate by the
-          // final pass: it never rides a count circle (see the `selectedFlags` note above), and the
-          // count is of the members that remain —the same number the cluster had with nothing
-          // selected, minus the point the panel is now showing separately. With fewer than two
-          // members left there is nothing to aggregate: both points paint on their own, and falling
-          // through to the spider branch is not an option because this is a cluster's zoom.
-          const members = group.filter((k) => !selectedFlags[k]);
-          if (members.length >= 2) {
-            let mx = 0;
-            let my = 0;
-            for (const k of members) {
-              mx += screens[k]![0];
-              my += screens[k]![1];
-            }
-            mx /= members.length;
-            my /= members.length;
-            // One circle with the count, at the centroid. The color is dark neutral
-            const coord = map.getCoordinateFromPixel([mx, my]);
-            const color = TEMAS_MAP_CLUSTER_FILL_DARK;
-            features[members[0]].set('cluster', {
-              count: members.length,
-              color,
-              marker: new ol.OlPoint(coord)
-            } as TemasMapCluster);
-            for (const k of members) {
-              if (k !== members[0]) features[k].set('hidden', true);
-            }
-            targets.push({
-              kind: 'cluster',
-              screen: [mx, my],
-              coord,
-              radius: TEMAS_MAP_CLUSTER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING,
-              count: members.length
-            });
+        // Todo grupo es un clúster: es la única representación de un solapamiento. El anillo solo lo
+        // abre un click (ver `revealedIndices`), nunca este agrupamiento.
+        // The selection is kicked out of the cluster and painted on its own coordinate by the
+        // final pass: it never rides a count circle (see the `selectedFlags` note above), and the
+        // count is of the members that remain —the same number the cluster had with nothing
+        // selected, minus the point the panel is now showing separately. With fewer than two
+        // members left there is nothing to aggregate: both points paint on their own.
+        const members = group.filter((k) => !selectedFlags[k]);
+        if (members.length >= 2) {
+          let mx = 0;
+          let my = 0;
+          for (const k of members) {
+            mx += screens[k]![0];
+            my += screens[k]![1];
           }
-          continue;
-        }
-
-        let cx = 0;
-        let cy = 0;
-        for (const k of group) {
-          cx += screens[k]![0];
-          cy += screens[k]![1];
-        }
-        cx /= group.length;
-        cy /= group.length;
-
-        // Radius that keeps consecutive markers `2 * (radius + gap)` apart whatever their count;
-        // the ring grows with the count instead of letting the numbers overlap again on it. Starts
-        // at the top and goes clockwise, so the layout is stable between renders. A selected member
-        // sits in this ring like any other —same slot it had before the click, because the grouping
-        // no longer depends on the selection— and only its circle grows (see the style function).
-        const spread = (TEMAS_MAP_MARKER_RADIUS + TEMAS_MAP_SPIDER_GAP) / Math.sin(Math.PI / group.length);
-        group.forEach((k, position) => {
-          const angle = -Math.PI / 2 + (2 * Math.PI * position) / group.length;
-          const displaced: number[] = [cx + Math.cos(angle) * spread, cy + Math.sin(angle) * spread];
-          const coord = map.getCoordinateFromPixel(displaced);
-          // The line goes from the topic's own coordinate to the center of the displaced circle: it
-          // ends under the marker's own fill, so there is nothing to trim at the tip and nothing to
-          // anchor at the origin.
-          features[k].set('spider', {
-            line: new ol.OlLineString([ownPoints[k].getCoordinates(), coord]),
+          mx /= members.length;
+          my /= members.length;
+          // One circle with the count, at the centroid. The color is dark neutral
+          const coord = map.getCoordinateFromPixel([mx, my]);
+          const color = TEMAS_MAP_CLUSTER_FILL_DARK;
+          features[members[0]].set('cluster', {
+            count: members.length,
+            color,
             marker: new ol.OlPoint(coord)
-          } as TemasMapSpider);
+          } as TemasMapCluster);
+          for (const k of members) {
+            if (k !== members[0]) features[k].set('hidden', true);
+          }
           targets.push({
-            kind: 'point',
-            index: k,
-            screen: displaced,
+            kind: 'cluster',
+            screen: [mx, my],
             coord,
-            // The selected circle grows inside the ring (`TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS`),
-            // so its target grows with it: a click on the enlarged rim has to land on this marker
-            // and not on the neighbor whose plain circle it overlaps.
-            radius:
-              TEMAS_MAP_MARKER_RADIUS +
-              TEMAS_MAP_MARKER_HIT_PADDING +
-              (selectedFlags[k] ? TEMAS_MAP_SELECTED_SPIDER_EXTRA_RADIUS : 0)
+            radius: TEMAS_MAP_CLUSTER_RADIUS + TEMAS_MAP_MARKER_HIT_PADDING,
+            count: members.length,
+            // El click los lee para abrir el anillo (ver `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM`).
+            members
           });
-        });
+        }
       }
 
       // Every point that ended up painted on its own: a lone marker, or the selected one a cluster
@@ -4542,6 +4620,12 @@ export default class Timeline {
         clearHover();
         return;
       }
+      // El cursor apunta siempre que debajo haya algo clickeable: un clúster (que se revela o
+      // acerca), un marker pintado, o un marker que la capa de densidad ocultó pero que el click
+      // igual abre la ficha. La capa cambia el globo, no el cursor.
+      canvas.classList.add('is-hover-marker');
+      // El globo nombra lo que hay debajo: el conteo de un clúster, o el tema de un marker. La capa de
+      // densidad atenúa los markers pero no los esconde, así que un `point` siempre lo muestra.
       // `innerHTML` and not `textContent` because the general map writes two lines —the topic and the
       // headline of its article—. The markup is built by the caller and its texts come escaped; the
       // cluster's count is a number, so it needs no escaping of its own.
@@ -4555,7 +4639,6 @@ export default class Timeline {
       // sit inside the cluster. `HIT_PADDING` is what the target's radius adds over the painted
       // circle, so taking it back gives the visual radius of each.
       overlay.setOffset([0, -(target.radius - TEMAS_MAP_MARKER_HIT_PADDING)]);
-      canvas.classList.add('is-hover-marker');
     });
     // The map stops firing `pointermove` the moment the pointer leaves it, so without this the
     // tooltip of the last marker would stay up over whatever the pointer moved on to. The node goes
@@ -4565,12 +4648,19 @@ export default class Timeline {
     // Click sobre el mapa. Reusa el mismo hit test del hover, así que lo que se abre es exactamente
     // lo que el puntero nombraba —y no el primero que pasó por el radio—. El listener va
     // **siempre** bindeado, aunque el mapa no traiga callbacks: el click sobre un clúster es
-    // navegación (acercar) y le corresponde a los dos mapas. El click en el vacío es un caso aparte:
-    // no hay target, así que va por su propio callback y no con un punto `undefined` que cada
-    // consumidor tendría que adivinar.
+    // navegación (acercar de lejos, abrir el anillo de cerca) y le corresponde a los dos mapas. El
+    // click en el vacío es un caso aparte: no hay target, así que va por su propio callback y no con
+    // un punto `undefined` que cada consumidor tendría que adivinar.
     map.on('singleclick', (e) => {
       const target = hitTest(e.pixel);
       if (!target) {
+        // Click en el vacío: cierra la revelación abierta, si hay (el consumidor cierra además su
+        // ficha con `onMarkerMiss`). Es la única forma de cerrarla además de alejarse por debajo del
+        // umbral, y devuelve el grupo a su clúster.
+        if (revealedIndices.length) {
+          revealedIndices = [];
+          refreshStyles();
+        }
         options.onMarkerMiss?.();
         return;
       }
@@ -4578,6 +4668,14 @@ export default class Timeline {
         const view = map.getView();
         const zoom = view.getZoom();
         if (zoom === undefined) return;
+        // A partir del umbral el click ya no acerca: abre el grupo en un anillo **revelado** y la
+        // vista se queda donde está. Por debajo sigue acercando, que es la única forma de separar dos
+        // puntos que comparten coordenada (ver `TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM`).
+        if (zoom >= TEMAS_MAP_SPIDER_REVEAL_MIN_ZOOM) {
+          revealedIndices = target.members.slice();
+          refreshStyles();
+          return;
+        }
         // Dos niveles por click disuelven el clúster desde cualquier zoom de partida sin el salto
         // que tendría un `fit` al extent de los miembros cuando ese extent ya llena el viewport.
         // El `moveend` del animate re-corre `declutter`, que va agrupando de nuevo en el camino.
@@ -4612,6 +4710,8 @@ export default class Timeline {
      */
     const updatePoints = (next: P[]): void => {
       clearHover();
+      // Los índices revelados pertenecen al set viejo: con puntos nuevos no significan nada.
+      revealedIndices = [];
       current = next;
       features = current.map(featureOf);
       ownPoints = current.map((p) => new ol.OlPoint(ol.fromLonLat([p.lon, p.lat])));
@@ -4697,16 +4797,32 @@ export default class Timeline {
      * sin capa —el de la tarjeta— simplemente no hace nada, que es lo que mantiene al mount
      * genérico sin una rama por consumidor.
      *
-     * El `refreshStyles()` no es opcional: cada factoría lee `heatmapVisible` —con la capa apagada
-     * los círculos van con su fill, y encendida los markers pasan a uniformes translúcidos, el
-     * seleccionado conserva su tono y los clusters pierden el disco—, y una variable de closure no
-     * repinta nada por sí sola. Sin él el toggle del heatmap cambiaría la densidad pero dejaría los
+     * El `refreshStyles()` no es opcional: la función de estilo lee `heatmapVisible` y
+     * `heatmapMarkersVisible` —apagada pinta markers con su tono y clústeres con su conteo; encendida,
+     * y desde `TEMAS_MAP_HEATMAP_MARKERS_MIN_ZOOM` para arriba, deja los clústeres y pinta los markers
+     * chicos y atenuados; y por debajo de ese zoom no pinta ninguno (densidad sola)— y una variable de
+     * closure no repinta nada por sí sola. Sin él el toggle cambiaría la densidad pero dejaría los
      * círculos con el estilo del estado anterior hasta el próximo `declutter()` (el `moveend` de un
      * zoom), no de inmediato.
+     *
+     * Apagar la capa cierra la revelación abierta: sus anillos vuelven a ser clústeres y no tiene
+     * sentido arrastrarlos al estado sin heatmap.
+     *
+     * Si el llamador declaró una base propia para el estado de heatmap (`FullMapHeatmapOptions.tiles`),
+     * acá se intercambia la fuente de la capa base —y su crédito— con el estado, y se revierte al
+     * apagar. Sin esa declaración (`tiles: undefined`) la base no se toca, que es el comportamiento de
+     * siempre.
      */
     const setHeatmapVisible = (visible: boolean): void => {
       heatmapVisible = visible;
+      if (!visible) revealedIndices = [];
       heatmapLayer?.setVisible(visible);
+      if (tileLayer && heatmapTiles !== null) {
+        const tiles = visible ? heatmapTiles : this.mapTiles;
+        const credit = visible ? heatmapAttribution : this.mapAttribution;
+        tileLayer.setSource(baseSourceFor(tiles, credit));
+        syncAttributionControl(Boolean(tiles && credit));
+      }
       refreshStyles();
     };
 
@@ -5120,13 +5236,16 @@ export default class Timeline {
       markerLabel: null,
       // Parámetros ya resueltos de la capa de densidad, si la opción la habilitó (ver
       // `TemasMapHeatmapParams`): el montaje no vuelve a resolver nada. El gradiente es la constante
-      // del componente; el radio y la mancha, la config `FullMapHeatmapOptions`.
+      // del componente; el radio, la mancha y la base propia del estado de heatmap, la config
+      // `FullMapHeatmapOptions`.
       ...(this.fullMapHeatmap
         ? {
             heatmap: {
               blur: this._fullMapHeatmapBlur,
               radius: this._fullMapHeatmapRadius,
-              gradient: TEMAS_MAP_HEATMAP_GRADIENT
+              gradient: TEMAS_MAP_HEATMAP_GRADIENT,
+              tiles: this._fullMapHeatmapTiles,
+              attribution: this._fullMapHeatmapAttribution
             }
           }
         : {}),
