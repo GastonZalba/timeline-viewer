@@ -922,6 +922,36 @@ export default class Timeline {
         this._apiFeaturedCards = [];
         // El modo fullpage implica abierto: siempre expandido y sin opción de colapsar.
         this.isExpanded = this.fullpage || config.startExpanded === true;
+        // Si la URL trae algún filtro activo (estado compartido), el timeline debe arrancar expandido.
+        // Se hace acá antes de `_init()` para que el observer/DOM reciban el estado correcto.
+        try {
+            const __params = new URLSearchParams(window.location.search);
+            const __prefix = URL_STATE_PREFIX;
+            let __hasUrlFilter = false;
+            for (const [k, v] of __params.entries()) {
+                if (k.startsWith(__prefix) &&
+                    k !== __prefix + 'tax' &&
+                    k !== __prefix + 'sort' &&
+                    k !== __prefix + 'sortBy' &&
+                    k !== __prefix + 'page' &&
+                    k !== __prefix + 'q') {
+                    if (v !== '') {
+                        __hasUrlFilter = true;
+                        break;
+                    }
+                    // tv_<campo>= vacío también cuenta como filtro presente (limpiado) pero queremos filtros activos: vacío no activa
+                }
+                if (k === __prefix + 'q' && __params.get(k)) {
+                    __hasUrlFilter = true;
+                    break;
+                }
+            }
+            if (__hasUrlFilter)
+                this.isExpanded = true;
+        }
+        catch {
+            // ignore
+        }
         this.featuredContainer = null;
         this.featuredRow = null;
         this.timelineContainer = null;
@@ -2128,7 +2158,21 @@ export default class Timeline {
                 // Sin este corte el click sube a `.timeline-card`, que expande o colapsa la tarjeta: el
                 // filtro tendría que pelear con el gesto de abrir el detalle.
                 e.stopPropagation();
-                this._applyCardFilter(CARD_CLICKABLE_FIELD, chip.dataset.value ?? '');
+                const token = chip.dataset.value ?? '';
+                if (!token)
+                    return;
+                if (this.singleId) {
+                    const url = this._buildCardFilterUrl(CARD_CLICKABLE_FIELD, token);
+                    try {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                    }
+                    catch {
+                        // ignore
+                    }
+                }
+                else {
+                    this._applyCardFilter(CARD_CLICKABLE_FIELD, token);
+                }
             });
             // El chip es un span con `role="button"`, así que no dispara click con Enter ni con Espacio
             // como haría un `<button>`: el teclado se resuelve acá. Espacio además hay que cortarlo,
@@ -2138,7 +2182,21 @@ export default class Timeline {
                     return;
                 e.preventDefault();
                 e.stopPropagation();
-                this._applyCardFilter(CARD_CLICKABLE_FIELD, chip.dataset.value ?? '');
+                const token = chip.dataset.value ?? '';
+                if (!token)
+                    return;
+                if (this.singleId) {
+                    const url = this._buildCardFilterUrl(CARD_CLICKABLE_FIELD, token);
+                    try {
+                        window.open(url, '_blank', 'noopener,noreferrer');
+                    }
+                    catch {
+                        // ignore
+                    }
+                }
+                else {
+                    this._applyCardFilter(CARD_CLICKABLE_FIELD, token);
+                }
             });
         });
     }
@@ -6035,7 +6093,7 @@ export default class Timeline {
      * card exactly as it has always been, plain text.
      */
     _cardFilterGroup(field) {
-        if (this.singleId)
+        if (this.singleId && field !== CARD_CLICKABLE_FIELD)
             return null;
         return this.filters.find((f) => f.field === field && f.cardClickable) ?? null;
     }
@@ -6093,6 +6151,31 @@ export default class Timeline {
         if (this.filters.some((g) => g.persist))
             this._savePersistedFilterState();
         this._applyFilters(true);
+    }
+    _buildCardFilterUrl(field, token) {
+        const url = new URL(window.location.origin + window.location.pathname);
+        const prefix = URL_STATE_PREFIX;
+        const current = new URL(window.location.href);
+        const keepTv = new Set([prefix + 'tax', prefix + 'sort', prefix + 'sortBy']);
+        current.searchParams.forEach((v, k) => {
+            if (k.startsWith(prefix)) {
+                if (keepTv.has(k) && v) {
+                    url.searchParams.set(k, v);
+                }
+                return;
+            }
+            // Los params ajenos al estado (modo del demo, flags, etc.) se conservan; los de entrada
+            // única no, porque son los que harían que la pestaña nueva vuelva a abrir la vista individual.
+            const kl = k.toLowerCase();
+            if (kl === 'id' || kl === 'entryid' || kl === 'singleid' || kl === 'item' || kl === 'itemid') {
+                return;
+            }
+            url.searchParams.set(k, v);
+        });
+        url.searchParams.delete(prefix + 'page');
+        url.searchParams.delete(prefix + 'q');
+        url.searchParams.set(prefix + field, token);
+        return url.toString();
     }
     /** Open the list of a `'select'` group, building it the first time */
     _openSelect(f) {

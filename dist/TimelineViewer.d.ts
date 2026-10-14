@@ -2396,6 +2396,7 @@ export default class Timeline {
      * full map and the page reload of API mode all follow it without this method knowing about them.
      */
     protected _applyCardFilter(field: string, value: string): void;
+    protected _buildCardFilterUrl(field: string, token: string): string;
     /** Open the list of a `'select'` group, building it the first time */
     protected _openSelect(f: FilterDef): void;
     /** Close the list of a `'select'` group and send the focus back to its trigger */

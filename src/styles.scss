@@ -134,6 +134,7 @@
         background: var(--color-1);
         box-sizing: border-box;
       }
+
       .loader::before,
       .loader::after {
         content: '';
@@ -144,6 +145,7 @@
         box-sizing: border-box;
         animation: ripple 1.4s ease-out infinite;
       }
+
       .loader::after {
         animation-delay: -0.7s;
       }
@@ -153,6 +155,7 @@
           transform: scale(1);
           opacity: 0.8;
         }
+
         100% {
           transform: scale(4);
           opacity: 0;
@@ -548,6 +551,7 @@
       height: 1px;
       background: var(--tv-accent-light);
     }
+
     &:has(.timeline-card.expanded) .timeline-hline {
       display: block;
     }
@@ -696,6 +700,7 @@
         overflow: visible;
         border: 1px solid var(--tv-accent);
         box-shadow: 0 8px 20px rgba(4, 8, 15, 0.81);
+
         .card-status-badges {
           right: 38px;
         }
@@ -721,6 +726,7 @@
 
       .card-body {
         padding: 16px;
+
         .card-title {
           margin-bottom: 7px;
         }
@@ -1181,6 +1187,7 @@
         padding: 0;
         background: transparent;
         border-radius: 0;
+
         &.ol-attribution ul {
           font-size: 11px;
         }
@@ -1575,11 +1582,13 @@
         opacity: 0;
         transform: translateX(-50%) translateY(-6px);
       }
+
       12%,
       80% {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
       }
+
       100% {
         opacity: 0;
         transform: translateX(-50%) translateY(-6px);
@@ -1653,6 +1662,7 @@
 
     .card-adjuntos {
       position: relative;
+
       .card-actions-btn {
         height: 100%;
       }
@@ -1787,6 +1797,7 @@
       0% {
         transform: translateX(-100%);
       }
+
       100% {
         transform: translateX(100%);
       }
@@ -1847,6 +1858,7 @@
       0% {
         background-position: 200% 0;
       }
+
       100% {
         background-position: -200% 0;
       }
@@ -2032,6 +2044,7 @@
         .tema-desc {
           color: var(--tv-text-primary);
         }
+
         .tema-map-ref {
           margin-left: 4px;
         }
@@ -2095,6 +2108,7 @@
     .tone-tema-positivo {
       --tema-tone-color: var(--tv-tone-positive);
       border-color: var(--tv-tone-positive);
+
       .tema-tone {
         color: var(--tv-tone-positive);
         background: rgba(34, 197, 94, 0.1);
@@ -2104,6 +2118,7 @@
     .tone-tema-negativo {
       --tema-tone-color: var(--tv-tone-negative);
       border-color: var(--tv-tone-negative);
+
       .tema-tone {
         color: var(--tv-tone-negative);
         background: rgba(239, 68, 68, 0.1);
@@ -2113,6 +2128,7 @@
     .tone-tema-neutro {
       --tema-tone-color: var(--tv-tone-neutral);
       border-color: var(--tv-tone-neutral);
+
       .tema-tone {
         color: var(--tv-tone-neutral);
         background: rgba(148, 163, 184, 0.1);
@@ -2250,6 +2266,7 @@
         .featured-cards .featured-card {
           box-shadow: 0 4px 16px rgba(4, 8, 15, 0.3);
         }
+
         .expand-toggle {
           background: var(--tv-accent);
           color: var(--tv-text-on-primary);
@@ -2299,6 +2316,7 @@
       &.has-taxonomy #remaining-text {
         margin-left: 5px;
       }
+
       .featured-row {
         gap: 0;
         border: none;
@@ -2449,9 +2467,11 @@
         border: 0;
         background: none !important;
         pointer-events: none;
+
         .expand-icon {
           display: none;
         }
+
         .expand-text {
           gap: 10px;
         }
@@ -2748,11 +2768,13 @@
       &:hover {
         background: rgba(255, 255, 255, 0.3);
         border: 1px solid var(--tv-color-map);
+
         @container publicaciones (min-width: 611px) {
           // El ancho extra es el que la etiqueta ocupa al crecer; el `all 0.3s ease` del botón lo
           // anima junto con el fondo y el borde.
           width: 116px;
         }
+
         &::before {
           opacity: 1;
           animation: tv-row-spin 2s linear infinite;
@@ -2810,17 +2832,21 @@
         display: block;
         width: 15px;
         height: 15px;
+
         &:first-child {
           fill: var(--tv-color-map);
+
           &:not(:last-child) {
             margin-left: 4px;
           }
         }
+
         &.fullmap-toggle-chevron {
           stroke: var(--tv-color-map);
           transition: transform 0.3s ease;
         }
       }
+
       &:focus-visible {
         outline: 2px solid var(--tv-color-map-light);
         outline-offset: 2px;
@@ -2895,10 +2921,10 @@
       // entero y se baja la opacidad para que sea legible sin competir con el término escrito (mismo
       // criterio que el resto de los íconos claros de la barra). El hover la sube a opaco.
       &::-webkit-search-cancel-button {
-        filter: #{'invert(1)'};
-        opacity: 0.75;
+        opacity: 0.9;
         cursor: pointer;
         transition: opacity 0.2s ease;
+        filter: brightness(5);
 
         &:hover {
           opacity: 1;
@@ -3647,6 +3673,7 @@
         $delay: (0s, 0.1s, 0.2s, 0.3s, 0.4s, 0.5s, 0.6s, 0.7s, 0.8s, 0.9s);
         $s: (1, 0.97, 0.94, 0.91, 0.88, 0.85, 0.82, 0.79, 0.76, 0.73);
         $opacity: (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.9, 0.9);
+
         &:nth-child(#{$i}) {
           left: list.nth($left, $i);
           z-index: #{11 - $i};
@@ -4061,7 +4088,6 @@
       background: var(--tv-accent-light);
       border: 5px solid var(--tv-bg-primary);
       border-radius: 50%;
-      z-index: 2;
     }
 
     .timeline-load-more-item {
@@ -4516,6 +4542,7 @@
       .featured-row {
         padding: 10px 10px;
       }
+
       .expand-toggle {
         font-size: 0.7rem;
         padding: 4px 11px 4px 4px;
@@ -4565,6 +4592,7 @@
         font-size: 0.8em;
         margin-left: 10px;
       }
+
       .card-actions {
         .card-actions-btn {
           justify-content: center;
@@ -4703,6 +4731,7 @@
       .timeline-cards {
         padding-bottom: 0;
       }
+
       .timeline-load-more-wrap {
         margin-bottom: 0;
       }
@@ -4739,6 +4768,7 @@
     }
   }
 }
+
 .timeline-gallery {
   .lg-backdrop.in {
     opacity: 0.9;
@@ -4747,6 +4777,7 @@
   .lg-backdrop {
     background-color: #1a2025;
   }
+
   .lg-content button.lg-icon {
     border-radius: 40px;
     height: 44px;
