@@ -910,6 +910,7 @@ export default class Timeline {
         this._sortAsc = false;
         this.relatedLabel = config.relatedLabel || null;
         this.singleId = config.singleId ? config.singleId.replace(/^\/+/, '') : null;
+        this._singleFilterUrl = config.singleFilterUrl ? config.singleFilterUrl : null;
         this.taxonomyRow = null;
         this.taxonomySelectWrap = null;
         this.taxonomySelectLabel = null;
@@ -6152,25 +6153,45 @@ export default class Timeline {
             this._savePersistedFilterState();
         this._applyFilters(true);
     }
+    /**
+     * URL de la lista que abre un chip de `cardClickable` en single mode.
+     *
+     * La base es `singleFilterUrl` (resuelta contra la página actual) cuando se declaró, y si no el
+     * `origin + pathname` de la página actual, que es la ruta de la vista individual. Con base propia
+     * no se arrastran los params ajenos de la página single (el `?id=` que la abrió, flags del
+     * consumidor): la URL destino es la declarada, y solo se le suma el estado. Sin la opción se
+     * conserva el comportamiento de siempre, que sí copia los params ajenos salvo los de entrada
+     * única (`id`, `entryid`, ...), porque son los que harían que la pestaña nueva vuelva a abrir la
+     * vista individual.
+     *
+     * En los dos casos se copian `tv_tax` / `tv_sort` / `tv_sortBy` de la página actual, se descartan
+     * `tv_page` / `tv_q` (la pestaña nueva no comparte página ni búsqueda) y se setea
+     * `tv_<field>=<token>`.
+     */
     _buildCardFilterUrl(field, token) {
-        const url = new URL(window.location.origin + window.location.pathname);
+        const url = this._singleFilterUrl
+            ? new URL(this._singleFilterUrl, window.location.href)
+            : new URL(window.location.origin + window.location.pathname);
         const prefix = URL_STATE_PREFIX;
         const current = new URL(window.location.href);
+        if (!this._singleFilterUrl) {
+            // Solo en la base implícita: la base propia ya es la URL de destino que eligió el consumidor.
+            current.searchParams.forEach((v, k) => {
+                if (k.startsWith(prefix))
+                    return;
+                // Los params ajenos al estado (modo del demo, flags, etc.) se conservan; los de entrada
+                // única no, porque son los que harían que la pestaña nueva vuelva a abrir la vista individual.
+                const kl = k.toLowerCase();
+                if (kl === 'id' || kl === 'entryid' || kl === 'singleid' || kl === 'item' || kl === 'itemid') {
+                    return;
+                }
+                url.searchParams.set(k, v);
+            });
+        }
         const keepTv = new Set([prefix + 'tax', prefix + 'sort', prefix + 'sortBy']);
         current.searchParams.forEach((v, k) => {
-            if (k.startsWith(prefix)) {
-                if (keepTv.has(k) && v) {
-                    url.searchParams.set(k, v);
-                }
-                return;
-            }
-            // Los params ajenos al estado (modo del demo, flags, etc.) se conservan; los de entrada
-            // única no, porque son los que harían que la pestaña nueva vuelva a abrir la vista individual.
-            const kl = k.toLowerCase();
-            if (kl === 'id' || kl === 'entryid' || kl === 'singleid' || kl === 'item' || kl === 'itemid') {
-                return;
-            }
-            url.searchParams.set(k, v);
+            if (keepTv.has(k) && v)
+                url.searchParams.set(k, v);
         });
         url.searchParams.delete(prefix + 'page');
         url.searchParams.delete(prefix + 'q');

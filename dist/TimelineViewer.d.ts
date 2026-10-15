@@ -710,6 +710,21 @@ export interface TimelineOptions {
      */
     relatedLabel?: (count: number) => string;
     singleId?: string;
+    /**
+     * URL de la vista de lista que abren en una pestaña nueva los chips de `cardClickable` cuando se
+     * está en single mode (`singleId`). Los valores relativos se resuelven contra la página actual
+     * (`'/publicaciones/'`, `'../'`) y una URL absoluta se usa tal cual.
+     *
+     * Solo afecta a single mode: en la lista el chip filtra en el lugar. Sin la opción la base es el
+     * `origin + pathname` de la página actual, que en single mode es justamente la ruta de la vista
+     * individual, y por eso un chip abierto en `/publicaciones/FUE-00658/` se quedaba en ese path.
+     *
+     * Los params de la URL configurada se conservan; del estado viajan `tv_tax` / `tv_sort` /
+     * `tv_sortBy`, se descartan `tv_page` / `tv_q` y se setea `tv_<field>=<token>`. Los params
+     * ajenos de la página single **no** se arrastran a la base propia. No hace nada fuera de
+     * single mode.
+     */
+    singleFilterUrl?: string;
 }
 interface ImageInfo {
     thumb: string;
@@ -1120,6 +1135,12 @@ export default class Timeline {
     fullpage: boolean;
     relatedLabel: ((count: number) => string) | null;
     singleId: string | null;
+    /**
+     * Base de la lista que abren los chips de `cardClickable` en single mode (opción
+     * `singleFilterUrl`), o `null` para usar el `origin + pathname` de la página actual. La cruda:
+     * se resuelve contra `window.location.href` recién al armar la URL, en `_buildCardFilterUrl`.
+     */
+    _singleFilterUrl: string | null;
     content: ContentGroup[];
     /** Index of the selected group, or `ALL_TAXONOMIES_INDEX` when "Ver todo" is selected */
     _contentIndex: number;
@@ -2396,6 +2417,21 @@ export default class Timeline {
      * full map and the page reload of API mode all follow it without this method knowing about them.
      */
     protected _applyCardFilter(field: string, value: string): void;
+    /**
+     * URL de la lista que abre un chip de `cardClickable` en single mode.
+     *
+     * La base es `singleFilterUrl` (resuelta contra la página actual) cuando se declaró, y si no el
+     * `origin + pathname` de la página actual, que es la ruta de la vista individual. Con base propia
+     * no se arrastran los params ajenos de la página single (el `?id=` que la abrió, flags del
+     * consumidor): la URL destino es la declarada, y solo se le suma el estado. Sin la opción se
+     * conserva el comportamiento de siempre, que sí copia los params ajenos salvo los de entrada
+     * única (`id`, `entryid`, ...), porque son los que harían que la pestaña nueva vuelva a abrir la
+     * vista individual.
+     *
+     * En los dos casos se copian `tv_tax` / `tv_sort` / `tv_sortBy` de la página actual, se descartan
+     * `tv_page` / `tv_q` (la pestaña nueva no comparte página ni búsqueda) y se setea
+     * `tv_<field>=<token>`.
+     */
     protected _buildCardFilterUrl(field: string, token: string): string;
     /** Open the list of a `'select'` group, building it the first time */
     protected _openSelect(f: FilterDef): void;
