@@ -33,7 +33,8 @@ const allItems = [
       'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
       'https://www.youtube.com/watch?v=jNQXAC9IVRw',
       'https://www.youtube.com/watch?v=9bZkp7q19f0',
-      'https://www.facebook.com/reel/1507257184326171'
+      'https://www.facebook.com/reel/1507257184326171',
+      'https://cdn.jwplayer.com/manifests/6M7Kcfzv.m3u8'
     ],
     // Grupos de links de navegación que se renderizan al pie de la tarjeta en modo
     // single. Viaja en el detalle del ítem (`GET {api}/{id}`), no en la lista paginada.

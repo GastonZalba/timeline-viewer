@@ -1827,6 +1827,7 @@
     }
 
     .card-iframe-youtube iframe,
+    .card-iframe-jwplayer iframe,
     .card-iframe-video video {
       position: absolute;
       inset: 0;
@@ -1864,6 +1865,7 @@
     }
 
     .card-iframe-youtube,
+    .card-iframe-jwplayer,
     .card-iframe-video {
       aspect-ratio: 16 / 9;
       overflow: hidden;

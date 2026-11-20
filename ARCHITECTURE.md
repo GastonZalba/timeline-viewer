@@ -96,11 +96,11 @@ new Timeline({ container, items, ... })
 
 | Método | Línea | Descripción |
 |--------|-------|-------------|
-| `_parseLinkWeb(url)` | 2835 | Detecta URLs de YouTube/Instagram/Twitter/Facebook y archivos de video directo, retorna `LinkInfo` |
+| `_parseLinkWeb(url)` | 2835 | Detecta URLs de YouTube/Instagram/Twitter/Facebook, manifests de JW Player y archivos de video directo, retorna `LinkInfo` |
 | `_isDirectVideoUrl(url)` | 2865 | True si la URL termina en `.mp4`/`.webm`/`.mov`/`.m4v`/`.ogv` (reusa `_getFileExt`, así el query string del CDN no molesta) |
-| `_buildEmbed(embedUrl)` | 2870 | Arma el markup del embed. Los tipos con SDK llevan shimmer; `video` lleva un `<video controls playsinline preload="metadata" loading="lazy">` sin shimmer |
+| `_buildEmbed(embedUrl)` | 2870 | Arma el markup del embed. Los tipos con SDK (y `jwplayer`, el iframe del player hosteado) llevan shimmer; `video` lleva un `<video controls playsinline preload="metadata" loading="lazy">` sin shimmer |
 | `_processCardEmbeds(cardEl)` | 5541 | Procesa los embeds de la tarjeta al expandir. Para `video` no hay SDK: solo copia el `aspectRatio` real desde `videoWidth`/`videoHeight` en `loadedmetadata` |
-| `_preloadEmbedLibraries()` | 5819 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook**. `video` y `youtube` no cargan nada |
+| `_preloadEmbedLibraries()` | 5819 | Carga SDKs de redes sociales bajo demanda. **Instagram ANTES de Facebook**. `video`, `youtube` y `jwplayer` no cargan nada |
 
 ### Mapa de temas (OpenLayers)
 
@@ -223,7 +223,7 @@ El componente agrega la clase `publicaciones-container` al `container` del consu
 
 │   │           ├── .card-protagonista
 │   │           ├── .card-fuente
-│   │           ├── .card-iframe-wrap (YouTube/Instagram/Twitter/Facebook/video, publicación original)
+│   │           ├── .card-iframe-wrap (YouTube/JW Player/Instagram/Twitter/Facebook/video, publicación original)
 │   │           └── .card-videos > .card-videos-list > .card-iframe-wrap × N (links_videos)
               │   ├── .timeline-item.timeline-load-more-item (si hay más páginas; sin `pagination`)
               │   ├── .timeline-item.timeline-paginator-item (solo con `pagination: true`)

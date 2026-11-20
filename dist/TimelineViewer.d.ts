@@ -732,7 +732,7 @@ interface ImageInfo {
 }
 interface LinkInfo {
     url: string;
-    type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video';
+    type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video' | 'jwplayer';
     /**
      * Plugin de Facebook que debe renderizar este link: `'post'` (default) o `'video'`.
      *

@@ -113,7 +113,7 @@ Each object in `content[].items` (or in the legacy `items`) supports these field
 | `actores_principales`  | `string[]` / `null`        | Key people or entities                   |
 | `screenshot`           | `string` (URL) / `null`     | Screenshot image URL                     |
 | `imagenes`             | `{ thumb: string; full: string }[]` / `null` | Image gallery with low-res `thumb` and full-res `full` URLs. `null` is accepted and treated as an empty gallery |
-| `links_videos`         | `string[]` (URL) / `null`  | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Supported platforms (YouTube, Instagram, Twitter/X, Facebook) are embedded through their SDK/iframe, and so are direct video files (`.mp4`, `.webm`, `.mov`, `.m4v`, `.ogv`), which are played with a native `<video>`. Anything else is ignored |
+| `links_videos`         | `string[]` (URL) / `null`  | Optional. Related video links rendered as embeds in the "Videos vinculados" section when the card is expanded. Supported platforms (YouTube, Instagram, Twitter/X, Facebook) are embedded through their SDK/iframe, JW Player manifests (`cdn.jwplayer.com/manifests/{id}.m3u8`) are embedded as the hosted player iframe, and direct video files (`.mp4`, `.webm`, `.mov`, `.m4v`, `.ogv`) are played with a native `<video>`. Anything else is ignored |
 | `has_video`            | `boolean`                   | Indicates whether the item has audiovisual content: `true` when `links_videos` is non-empty or when `link_web` points to a video (e.g. YouTube, Instagram reel, a direct `.mp4` file) |
 | `notas_de_trabajo`     | `string` / `null`           | Optional. Working notes displayed as a red badge above the summary in both collapsed and expanded card states |
 | `link_edit_entry`     | `string` (URL) / `null`     | Optional. URL to an edit form. When present, a red "Editar" button is shown next to the "Visitar" button in the card actions |
@@ -276,11 +276,12 @@ When the card is expanded, `link_web` and every entry of `links_videos` are auto
 | Instagram | `/p/`, `/reel/`, `/tv/`        | Official [embed.js](https://www.instagram.com/embed.js) via `<blockquote class="instagram-media">` |
 | Twitter/X | `/username/status/ID`          | Official [Twitter Widgets](https://platform.twitter.com/widgets.js) via `<blockquote class="twitter-tweet">` |
 | Facebook  | `/posts/`, `/videos/`, `/reel/`, `/permalink.php`, `/photo.php`, `/watch`, `/story.php`, `fb.watch` | Official [Facebook SDK](https://connect.facebook.net/es_ES/sdk.js) via `<div class="fb-post">` (`<div class="fb-video">` for reels, which Meta only accepts in the video plugin) |
+| JW Player | `cdn.jwplayer.com/manifests/{id}.m3u8` | Hosted player `<iframe>` at `cdn.jwplayer.com/players/{id}.html`, 16:9 |
 | Direct file | URL ending in `.mp4`, `.webm`, `.mov`, `.m4v`, `.ogv` (query/fragment allowed) | Native `<video controls playsinline preload="metadata" loading="lazy">` |
 
 Instagram, Twitter/X, and Facebook use **their official embed SDKs** instead of raw iframes. The scripts are loaded **lazily**.
 
-Direct video files need no SDK: a `<video>` plays them natively. The network request is deferred by `loading="lazy"` — the player lives inside a collapsed (`display: none`) card, so it does not intersect and the browser does not fetch a byte until the card is opened; on expand it requests only metadata (`preload="metadata"`), never the file itself, and the wrapper takes the video's real aspect ratio from that metadata. `.m3u8` (HLS) is **not** treated as a video, because it needs a streaming library the module does not ship.
+Direct video files need no SDK: a `<video>` plays them natively. The network request is deferred by `loading="lazy"` — the player lives inside a collapsed (`display: none`) card, so it does not intersect and the browser does not fetch a byte until the card is opened; on expand it requests only metadata (`preload="metadata"`), never the file itself, and the wrapper takes the video's real aspect ratio from that metadata. HLS needs a streaming library the module does not ship, so `.m3u8` is **not** played as a `<video>`: JW Player manifest URLs are rewritten to their hosted player iframe (`players/{id}.html`, the same media id), and any other HLS URL is ignored.
 
 Profile pages, channels, playlists and other non-content URLs are ignored.
 

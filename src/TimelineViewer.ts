@@ -55,6 +55,9 @@ const FACEBOOK_OTHER_REGEX =
 const FACEBOOK_EMBED_BASE = 'https://www.facebook.com/';
 const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&version=v20.0';
 
+const JWPLAYER_MANIFEST_REGEX = /cdn\.jwplayer\.com\/manifests\/([a-zA-Z0-9]+)\.m3u8/;
+const JWPLAYER_PLAYER_BASE = 'https://cdn.jwplayer.com/players/';
+
 /**
  * Containers a `<video>` puede reproducir nativamente, para los links que apuntan al archivo y no
  * a una plataforma.
@@ -62,7 +65,8 @@ const FACEBOOK_SDK_URL = 'https://connect.facebook.net/es_ES/sdk.js#xfbml=1&vers
  * `.ogg` queda afuera a propósito: casi siempre es audio (Vorbis), y meterlo en un `<video>` da un
  * player vacío. `.m3u8` también: es HLS y necesita una librería de streaming, que el módulo no
  * puede agregar (peer dependencies y cero dependencias runtime) — un `<video>` con un `.m3u8` sería
- * un reproductor roto.
+ * un reproductor roto. Los manifests de JW Player se resuelven antes como el iframe de su reproductor
+ * hosteado; cualquier otro HLS sigue sin renderizarse.
  */
 const VIDEO_FILE_EXTS = ['mp4', 'webm', 'mov', 'm4v', 'ogv'];
 
@@ -1546,7 +1550,7 @@ interface ImageInfo {
 
 interface LinkInfo {
   url: string;
-  type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video';
+  type: 'youtube' | 'instagram' | 'twitter' | 'facebook' | 'video' | 'jwplayer';
   /**
    * Plugin de Facebook que debe renderizar este link: `'post'` (default) o `'video'`.
    *
@@ -3176,6 +3180,10 @@ export default class Timeline {
     if (FACEBOOK_REEL_REGEX.test(url)) return { url: url, type: 'facebook', fbTag: 'video' };
     m = url.match(FACEBOOK_OTHER_REGEX);
     if (m) return { url: url, type: 'facebook' };
+    // Antes que el archivo directo: el HLS de JW Player no se puede tocar con un `<video>` sin una
+    // librería de streaming, pero el CDN sirve un reproductor hosteado con el mismo id de media.
+    m = url.match(JWPLAYER_MANIFEST_REGEX);
+    if (m) return { url: `${JWPLAYER_PLAYER_BASE}${m[1]}.html`, type: 'jwplayer' };
     // Al final, no al principio: una plataforma reconocida gana siempre. El falso positivo de un
     // social con `.mp4` en el query ya lo descarta `_getFileExt` (que corta en el `?`), pero el
     // orden deja la regla semántica: el archivo directo es el fallback, no el detector.

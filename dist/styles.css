@@ -1371,6 +1371,7 @@
   background: rgba(148, 163, 184, 0.1);
 }
 .publicaciones-container .timeline-item .card-iframe-youtube iframe,
+.publicaciones-container .timeline-item .card-iframe-jwplayer iframe,
 .publicaciones-container .timeline-item .card-iframe-video video {
   position: absolute;
   inset: 0;
@@ -1402,6 +1403,7 @@
   }
 }
 .publicaciones-container .timeline-item .card-iframe-youtube,
+.publicaciones-container .timeline-item .card-iframe-jwplayer,
 .publicaciones-container .timeline-item .card-iframe-video {
   aspect-ratio: 16/9;
   overflow: hidden;
